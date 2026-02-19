@@ -38,7 +38,7 @@ library(mapview)
 ```{r}
 # Importation des données - Informations opération pêche
 base_operation <-
-  readxl::read_xls(path = '~/Stage_M2_LR_BFC/Red_list_R_project/Red_list_fish/Liste_rouge_BFC/raw_data/RHP-RCS-RCO-REF DR 9.xls', sheet = "DONNEES SOURCE")
+  readxl::read_xls(path = '../raw_data/RHP-RCS-RCO-REF DR 9.xls', sheet = "DONNEES SOURCE")
 ```
 
 
