@@ -1,5 +1,5 @@
 ---
-title: "10_pretreatment"
+title: "00_pretreatment"
 author: "PabloVigneron"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output: 
@@ -28,6 +28,62 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 
 
 ```{r}
+#Importation des packages
+library(tidyverse)
+library(janitor)
+library(sf)
+library(mapview)
+```
+
+```{r}
+# Importation des données - Informations opération pêche
+base_operation <-
+  readxl::read_xls(path = '~/Stage_M2_LR_BFC/Red_list_R_project/Red_list_fish/Liste_rouge_BFC/raw_data/RHP-RCS-RCO-REF DR 9.xls', sheet = "DONNEES SOURCE")
+```
+
+
+```{r}
+ope_clean <- base_operation %>% # Ctrl+shift+M
+  janitor::clean_names() %>%
+  mutate(
+    protocole = as.factor(protocole),
+    reseaux = case_when(
+      rhp_old == 1 ~ "rhp_old",
+      rhp_new == 1 ~ "rhp_new",
+      old_ref == 1 ~ "old_ref",
+      rrp == 1 ~ "rrp",
+      rcs == 1 ~ "rcs"
+    )
+  ) 
+```
+
+```{r}
+summary(ope_clean$protocole)
+```
+
+```{r, fig.cap=" Localisation des secteurs et sites d’études.",fig.width = 7, fig.height = 5}
+# Représentation cartographique du secteur d'étude et des stations correspondants
+
+sites_geo <- ope_clean %>%
+  filter(!is.na(xaval_l93) & !is.na(yaval_l93)) %>%
+  dplyr::select(
+    code_station_bhp,
+    xaval_l93,
+    yaval_l93,
+    nom_sandre,
+    protocole,
+    mode_prospection,
+    annee_peche, 
+    reseaux
+  ) %>%
+  st_as_sf(coords = c("xaval_l93", "yaval_l93"), crs = 2154)
+
+
+mapview(
+  sites_geo,
+  zcol = "protocole",
+  col.regions = c("darkseagreen3" , "indianred1",  "purple")
+)
 
 ```
 
