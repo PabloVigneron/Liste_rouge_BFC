@@ -62,6 +62,13 @@ ope_clean <- base_operation %>% # Ctrl+shift+M
 summary(ope_clean$protocole)
 ```
 
+
+# Installer le package Aspe
+
+```{r}
+devtools::install_github("PascalIrz/aspe")
+```
+
 ```{r, fig.cap=" Localisation des secteurs et sites d’études.",fig.width = 7, fig.height = 5}
 # Représentation cartographique du secteur d'étude et des stations correspondants
 
