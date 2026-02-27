@@ -1,5 +1,5 @@
 ---
-title: "00_pretreatment"
+title: "10_pretreatment"
 author: "PabloVigneron"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output: 
@@ -44,7 +44,6 @@ base_operation <-
   readxl::read_xls(path = '../raw_data/RHP-RCS-RCO-REF DR 9.xls', sheet = "DONNEES SOURCE")
 ```
 
-
 ```{r}
 ope_clean <- base_operation %>% # Ctrl+shift+M
   janitor::clean_names() %>%
@@ -62,6 +61,18 @@ ope_clean <- base_operation %>% # Ctrl+shift+M
 
 ```{r}
 summary(ope_clean$protocole)
+```
+
+# importation tableau espèces TAXREF
+
+```{r}
+taxref <- 
+  read_table('../raw_data/TAXREFv18.txt')
+  
+```
+
+```{r}
+summary(taxref)
 ```
 
 # Représentation cartographique du secteur d'étude et des stations correspondantes
@@ -115,13 +126,13 @@ usethis::edit_r_environ()
 ```{r}
 # connexion à l'IDG
 # ! veillez à disposer des informations de connexion et un droit d'accès
-aspe_db <- aspe::imp_connecter_aspe_idg()
+aspe_db <- imp_connecter_aspe_idg()
 
 # importation des tables de la base aspe
 imp_importer_aspe_idg(aspe_db)
 ```
 
 ```{r}
-aspe::imp_connecter_aspe_idg()
+export_tables_rdata('../processed-data')
 ```
 
