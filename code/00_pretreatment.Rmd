@@ -1,5 +1,5 @@
 ---
-title: "10_pretreatment"
+title: "00_pretreatment"
 author: "PabloVigneron"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output: 
@@ -39,13 +39,13 @@ library(usethis)
 ```
 
 ```{r}
-# Importation des données - Informations opération pêche
-base_operation <-
+# Importation des données - Informations stations pêches
+base_station <-
   readxl::read_xls(path = '../raw_data/RHP-RCS-RCO-REF DR 9.xls', sheet = "DONNEES SOURCE")
 ```
 
 ```{r}
-ope_clean <- base_operation %>% # Ctrl+shift+M
+station_clean <- base_station %>% # Ctrl+shift+M
   janitor::clean_names() %>%
   mutate(
     protocole = as.factor(protocole),
@@ -60,27 +60,16 @@ ope_clean <- base_operation %>% # Ctrl+shift+M
 ```
 
 ```{r}
-summary(ope_clean$protocole)
+summary(station_clean$protocole)
 ```
 
-# importation tableau espèces TAXREF
-
-```{r}
-taxref <- 
-  read_table('../raw_data/TAXREFv18.txt')
-  
-```
-
-```{r}
-summary(taxref)
-```
 
 # Représentation cartographique du secteur d'étude et des stations correspondantes
 
 ```{r, fig.cap=" Localisation des secteurs et sites d’études.",fig.width = 7, fig.height = 5}
 # Représentation cartographique du secteur d'étude et des stations correspondants
 
-sites_geo <- ope_clean %>%
+sites_geo <- station_clean %>%
   filter(!is.na(xaval_l93) & !is.na(yaval_l93)) %>%
   dplyr::select(
     code_station_bhp,
@@ -102,7 +91,6 @@ mapview(
 )
 
 ```
-
 
 # Installer le package aspe
 ```{r}
@@ -136,3 +124,15 @@ imp_importer_aspe_idg(aspe_db)
 export_tables_rdata('../processed-data')
 ```
 
+
+# importation tableau espèces TAXREF
+
+```{r}
+taxref <- 
+  read_table('../raw_data/TAXREFv18.txt')
+  
+```
+
+```{r}
+summary(taxref)
+```
