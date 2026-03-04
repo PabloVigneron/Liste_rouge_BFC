@@ -33,9 +33,9 @@ knitr::opts_chunk$set(echo = TRUE,
 
 Script : 01_pretreatment_ope
 
-  L'objectif de cette étude est d'évaluer les tendances démographiques des poissons d'eau douce de de Bourgogne-Franche-comté. Ce travail vient en appui de la révision de la liste rouge régionale de 2017.
+  L'objectif de cette étude est d'évaluer les tendances démographiques des poissons d'eau douce de de Bourgogne-Franche-comté. Ce travail vient en appui de la création de la liste rouge régionale de la nouvelle région Bourgogne-Franche-comté.
 
-  Ce script vise à constituer un premier jeu de données regroupant une sélection de stations  à étudier, tirées de la base nationale ASPE (regroupant l'ensemble des données piscicoles disponibles en France). Ces données serviront à construire des séries temporelles représentatives des dynamiques de population de poissons d'eau douce de Bourgogne-Franche-comté. Elles permettrons ainsi une première évaluation simple et globale des dynamiques populationnelles des poissons d'eau douce de Bourgogne-Franche-comté.. 
+  Ce script vise à constituer un premier jeu de données regroupant une sélection de stations à étudier, tirées de la base nationale ASPE (regroupant l'ensemble des données piscicoles disponibles en France). Ces données serviront à construire des séries temporelles représentatives des dynamiques de population de poissons d'eau douce de Bourgogne-Franche-comté. Elles permettrons ainsi une première évaluation simple et globale des dynamiques populationnelles des poissons d'eau douce de Bourgogne-Franche-comté.. 
 
 # Installation 
 
@@ -46,23 +46,34 @@ library(tidyverse)
 library(wesanderson) # Palette de couleur
 library(aspe) # Traitement de la base aspe
 library(mapview)
-#library(COGiter)
+library(COGiter)
 library(sf)
 ```
 
-
-
-```{r Chargement fonction}
-#source(file = "../R/borner_series.R") # Chargement de la fonction borner_series 
+```{r installation des packages}
+#install.packages("attempt")
+#install.packages("C:/Users/pablo.vigneron/Downloads/MaelTheuliere-COGiter-v0.0.15-3-gb3198c8.tar", repos = NULL, type ="source")
 ```
 
-Chargement des données issues de la base ASPE : 
+```{r Chargement fonction}
+source(file = "../R/borner_series.R") # Chargement de la fonction borner_series 
+```
+
+# Chargement des données issues de la base ASPE : 
 
 ```{r Chargement des données}
 rdata_tables <- misc_nom_dernier_fichier(
-  repertoire = "../../../../Liste_rouge_BFC/processed_data",
+  repertoire = "../../../../Liste_rouge_BFC/raw_data",
   pattern = "^tables")
 load(rdata_tables) # Chargement des données 
+```
+
+# Chargement de la table aspe des données de mesures individuelles 
+```{r Chargement des données}
+#mei_table <- misc_nom_dernier_fichier(
+#  repertoire = "../../../../Liste_rouge_BFC/raw_data/mei_1_2026_02_26_16_31_28.145166.rdata",
+#  pattern = "^mei")
+#load(mei_table) # Chargement des données 
 ```
 
 
@@ -98,7 +109,7 @@ Seuls les trois premiers réseaux seront conservés dans cette étude.
 
 - Le *nombre d'années manquantes consécutives maximum* sur les séries de pêches. 
 
-- L'*année de départ* et l'*année de fin* de l'étude : ici nous souhaitons étudier les dynamiques populationnelles des poissons d'eau douce sur la période la plus longue disponible (1990-2023). 
+- L'*année de départ* et l'*année de fin* de l'étude : ici nous souhaitons étudier les dynamiques populationnelles des poissons d'eau douce sur la période la plus longue disponible (2007-2025). 
 
 Les paramètres souhaités sont ainsi renseignés dans des objets qui seront utilisés au cours de l'étude. 
 
@@ -118,7 +129,7 @@ n_mini_annee <- 9 # Nombre minimum d'années des séries de pêches
 
 n_max_manquant <- 2 # Nombre d'années manquantes maximum consécutives sur les séries de pêches 
 
-annee_depart <- 1990 # Année de départ de l'étude 
+annee_depart <- 2007 # Année de départ de l'étude 
 
 annee_fin <- 2025 # Année de fin de l'étude 
 ```
@@ -132,108 +143,32 @@ annee_fin <- 2025 # Année de fin de l'étude
 passerelle <- mef_creer_passerelle() # Création d'une passerelle
 ```
 
-
-# Sélection d’un périmètre géographique 
-
-  Pour notre étude, nous nous concentrerons sur la Bourgogne-Franche-Comté, incluant les départements 89, 21, 58, 71, 70, 25 et 39. Ces départements sont modifiables selon la région et l'objectif de l'étude.
-
-## Sélectionner des départements
-
-```{r Sélection aire géographique}
-aspe_bfc <- passerelle %>% 
-  mef_ajouter_dept() %>% 
-  filter(dept == c( "21","25","39", "58", "70","71","89")) # Sélection de l'aire géographique : choix des départements 
-```
-
-## Spatialisation des points 
+## Sélection de l'aire géographique 
 
 ```{r}
-pops <- point_prelevement %>%
-  left_join(y = ref_type_projection,
-            by = c("pop_typ_id" = "typ_id"))
+mes_depts <- departements_metro_geo %>% 
+  filter (DEP %in% c( "21","25","39", "58", "70","71","89")) # Sélection de l'aire géographique : choix des départements 
 ```
 
 ```{r}
-summary(point_prelevement)
+mes_depts %>% 
+  mapview::mapview() # Visualisation de la zone géographique sélectionnée 
 ```
-
-
-```{r}
-# coordonnées
-coords <- aspe::geo_convertir_coords_df(
-  df = pops,
-  var_x = pop_coordonnees_x,
-  var_y = pop_coordonnees_y,
-  var_crs_initial = typ_code_epsg,
-  crs_sortie = 2154 # Lambert 93
-)
-```
-
-```{r}
-# création d'un objet géographique
-pops_geo <- pops %>%
-  cbind(coords) %>%
-  sf::st_as_sf(coords = c("X", "Y"),
-               crs = 2154)
-```
-
-```{r Visualisation carte depts, eval = FALSE}
-mapview::mapview(aspe_bfc)
-```
-
-## Chargement des contours du bassin 
-
-Avec les fonctions du package sf, on charge le shapefile, puis si besoin on le reprojette s’il n’a pas le même CRS que les points.
-
-```{r}
-bv_fichier <- "../raw_data/bassin.shp"
-
-mon_bv <- sf::read_sf(dsn = bv_fichier) %>% 
-  sf::st_transform(crs = 2154)
-```
-
-## Croisement géographique
-
-On opère une sélection géographique en ne conservant que les points pour lesquels la jointure géographique a permis d’obtenir un attribut du bassin (ici la variable ID).
-
-```{r}
-pops_geo_bv <- pops_geo %>%
-  sf::st_join(mon_bv) %>%
-  filter(!is.na(ID)) %>% # suppression des lignes où ID est manquant
-  select(names(pops_geo)) # sélection des mêmes colonnes que celles de pops_geo
-```
-
-On collecte un vecteur contenant les identifiants pop_id des points localisés dans le bassin.
-
-```{r}
-pops_bv_ids <- pops_geo_bv %>%
-  pull(pop_id)
-```
-
-## Sélection des points
-
-La passerelle est filtrée pour ne retenir que les points de prélèvement localisés dans le polygone.
-
-```{r}
-aspe_sel <- passerelle %>% 
-  filter(pop_id %in% pops_bv_ids)
-```
-
 
 ## Mise en place d'un buffer
 
-  Notre étude se concentre sur la Bretagne. Toutes les stations bretonnes sont regroupées dans un jeu de données initial. Ici, il ne s’agit pas de réfléchir à l’échelle des bassins versants, leurs limites n’étant pas toujours évidentes. Un buffer est donc mis en place autour des limites départementales pour considérer les stations aux emplacements ambigüs et englober les stations frontalières. La taille du buffer est définie selon l'aire géographique considérée (cf. Paramètres).
+Notre étude se concentre sur la Bourgogne-Franche-Comté. Toutes les stations sont regroupées dans un jeu de données initial. Ici, il ne s’agit pas de réfléchir à l’échelle des bassins versants, leurs limites n’étant pas toujours évidentes. Un buffer est donc mis en place autour des limites départementales pour considérer les stations aux emplacements ambigüs et englober les stations frontalières. La taille du buffer est définie selon l’aire géographique considérée (cf. Paramètres).
 
-```{r Mise en place buffer}
-buffer <- st_buffer(aspe_bfc, # Mise en place d'un buffer 
+
+```{r}
+buffer <- st_buffer(mes_depts, # Mise en place d'un buffer 
                     taille_buffer) # Paramètres
 ```
 
-
-```{r Visualisation aire géographique}
+```{r}
 mapview( # Visualisation de l'aire géographique et du buffer ----
   list(buffer, mes_depts),
-  layer.name = c("Bretagne avec un buffer de 1 km", "Bretagne"),
+  layer.name = c("Bourgogne-Franche-Comté avec un buffer de 1 km", "Bourgogne-Franche-Comté"),
   col.regions = list("#0A9F9D", "#FDE725FF"))
 ```
 
@@ -255,8 +190,8 @@ pop_depts <- point_prelevement %>% # Les points de prélèvements sont regroupé
 ```{r Visualisation point prélèvements}
 mapview( # Visualisation des points de prélèvements présents dans l'aire géographique sélectionnée
   list(buffer, mes_depts),
-  layer.name = c("Buffer_1_km", "Bretagne"),
-  col.regions = list("#0A9F9D", "#FDE725FF")
+  layer.name = c("Buffer_1_km", "Bourgogne-Franche-Comté"),
+  col.regions = list("purple", "darkseagreen3")
 ) + mapview (pop_depts, shape = 20, color = "darkred", lwd =1)
 ```
 
@@ -268,25 +203,23 @@ passerelle <- passerelle %>%
   filter(pop_id %in% pop_depts$pop_id) # Sauvegarde des points de prélèvements dans la passerelle 
 ```
 
-
 ## Réseaux de pêche
 
   Il existe plusieurs réseaux de pêche en France. Chacune des stations (*sta_id*) et des points de prélèvements (*pop_id*) peuvent correspondre à un ou plusieurs types de réseaux de pêche. Ces différents réseaux sont identifiables par leur *obj_libelle* renseignés dans la base *aspe*. Nous ajoutons cette information dans notre jeu de données à l'aide la passerelle (*mef_ajouter_objectif()*), et nous sélectionnons seulement les réseaux souhaités pour l'étude : ici le RCS, le RHP et le RRP.
 
 ```{r Sélection réseaux de pêches} 
 passerelle <- passerelle %>%
-  mef_ajouter_objectif() %>%
-  filter(obj_libelle %in% mes_reseaux)   # Paramètres - Sélection des réseaux de pêche
+  mef_ajouter_objectif()  
+  #filter(obj_libelle %in% mes_reseaux )   # Paramètres - Sélection des réseaux de pêche
 ```
-
 
 ### But des différents réseaux sélectionnés : RHP, RCS et RRP
 
-  Le Réseau Hydrobiologique et Piscicole (RHP) a été mis en place dans les années 1990. Il a pour but d’évaluer l’état et l’évolution des peuplements piscicoles et de caractériser les perturbations subies par les écosystèmes aquatiques continentaux. En Bretagne, il s’appuie sur un suivi régulier de 32 stations représentatives des différents types de cours d’eau et de divers degrés de perturbations anthropiques (Vigneron *et al.*, 2006). Le suivi de certaines stations RHP a été interrompu en 2011 compte tenu de la construction du programme de surveillance de la Directive Cadre sur l’Eau. 
+  Le Réseau Hydrobiologique et Piscicole (RHP) a été mis en place dans les années 1990. Il a pour but **d’évaluer l’état et l’évolution des peuplements piscicoles** et de **caractériser les perturbations subies par les écosystèmes aquatiques continentaux**. En Bourgogne-Franche-Comté, il s’appuie sur un suivi régulier de "x " stations représentatives des différents types de cours d’eau et de divers degrés de perturbations anthropiques (Vigneron *et al.*, 2006). Le suivi de certaines stations RHP a été interrompu en 2011 compte tenu de la construction du programme de surveillance de la Directive Cadre sur l’Eau. 
 
-  Le Réseau de Contrôle de Surveillance (RCS), mis en place depuis 2007, géré par l’OFB, est composé de 86 stations (dont certaines stations appartiennent au RHP). Il vise, par un suivi bisannuel, à évaluer l’état écologique des milieux. 
+  Le Réseau de Contrôle de Surveillance (RCS), mis en place depuis 2007, géré par l’OFB, est composé de 86 stations (dont certaines stations appartiennent au RHP). Il vise, par un **suivi bisannuel**, à **évaluer l’état écologique des milieux**. 
 
-  Le Réseau de Référence Pérenne (RRP), mis en place en 2013, est conçu pour évaluer sur le long terme les tendances d’état des milieux naturels, i.e. pas ou peu anthropisés. Il est composé de 17 stations de référence, intégrant l’échantillonnage de certaines anciennes stations RHP mais aussi de nouvelles stations. 
+  Le Réseau de Référence Pérenne (RRP), mis en place en 2013, est conçu pour **évaluer sur le long terme les tendances d’état des milieux naturels**, i.e. pas ou peu anthropisés. Il est composé de 17 stations de référence, intégrant l’échantillonnage de certaines anciennes stations RHP mais aussi de nouvelles stations. 
 
 
 ## Types de pêche 
@@ -296,8 +229,8 @@ passerelle <- passerelle %>%
 
 ```{r Sélection types de pêche}
 ope_pro_libelle <- passerelle %>%
-  mef_ajouter_type_protocole() %>%
-  filter(pro_libelle %in% mes_types_de_peche) %>%  # Paramètres - Sélection des types de pêches 
+  mef_ajouter_type_protocole()%>%
+  #filter(pro_libelle %in% mes_types_de_peche) %>%  # Paramètres - Sélection des types de pêches 
   select(sta_id:ope_id, pro_libelle) %>% 
   distinct()
 ```
@@ -434,7 +367,7 @@ ope_selection %>% # Représentation graphique des stations sélectionnées et de
   scale_fill_manual(values= pal) +
   geom_tile() +
   labs(title = "Les points de prélèvements sélectionnés et les types de pêches associées",
-       subtitle = "Région Bretagne", 
+       subtitle = "Région Bourgogne-Franche-Comté", 
        x ="",
        y = "Années",
        fill = "Type de pêche") + 
@@ -473,7 +406,7 @@ sta_id_ope_selection <- ope_selection_sta %>%
 
 ```{r Visualisation effort pêche}
 mapview(list(buffer, mes_depts), # Visualisation de l'effort de pêche
-        layer.name = c("Buffer_1_km", "Bretagne"),
+        layer.name = c("Buffer_1_km", "Bourgogne-Franche-Comté"),
         col.regions = list("#440154FF", "#FDE725FF")) + 
   mapview(sta_id_ope_selection,
           layer.name = "Nombre operation par station", 
