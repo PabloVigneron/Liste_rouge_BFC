@@ -69,7 +69,7 @@ load(rdata_tables) # Chargement des données
 ```
 
 # Chargement de la table aspe des données de mesures individuelles 
-```{r Chargement des données}
+```{r Chargement des données espèces}
 #mei_table <- misc_nom_dernier_fichier(
 #  repertoire = "../../../../Liste_rouge_BFC/raw_data/mei_1_2026_02_26_16_31_28.145166.rdata",
 #  pattern = "^mei")
@@ -169,7 +169,7 @@ buffer <- st_buffer(mes_depts, # Mise en place d'un buffer
 mapview( # Visualisation de l'aire géographique et du buffer ----
   list(buffer, mes_depts),
   layer.name = c("Bourgogne-Franche-Comté avec un buffer de 1 km", "Bourgogne-Franche-Comté"),
-  col.regions = list("#0A9F9D", "#FDE725FF"))
+  col.regions = list("#0A9F9D", "darkseagreen"))
 ```
 
 
@@ -191,7 +191,7 @@ pop_depts <- point_prelevement %>% # Les points de prélèvements sont regroupé
 mapview( # Visualisation des points de prélèvements présents dans l'aire géographique sélectionnée
   list(buffer, mes_depts),
   layer.name = c("Buffer_1_km", "Bourgogne-Franche-Comté"),
-  col.regions = list("purple", "darkseagreen3")
+  col.regions = list("#0A9F9D", "darkseagreen")
 ) + mapview (pop_depts, shape = 20, color = "darkred", lwd =1)
 ```
 
@@ -299,66 +299,129 @@ ope_selection <- ope_selection %>%
   Nous réalisons une représentation graphique des séries temporelles constituées. Nous ajoutons les types de pêches (*pro_libelle*) associées aux opérations des séries. En amont, les libellés des points de prélèvements sont mis en forme et ajoutés dans le jeu de données *ope_selection*. 
 
 ```{r Ajout libellés points de prélèvements}
-regles_modification <- tribble( # Définir les règles de modification des libellés
-  ~ancien_libelle,                        ~nouveau_libelle,
-  "VILAINE à SAINTE-MARIE",               "Vilaine à Sainte-Marie",
-  "Le Semnon à Poligne",                  "Semnon à Poligne",
-  "L'Aulne à Locmaria-berrien",           "Aulne à Locmaria-berrien",
-  "La Claie à Pleucadeuc",                "Claie à Pleucadeuc",
-  "Le Ruisseau de Loup à Plougonver",     "Ruisseau de Loup à Plougonver",
-  "La Cantache à Dompierre-du-chemin",    "Cantache à Dompierre-du-chemin",
-  "La Rivière de Pont l'abbé à Peumerit", "Rivière de Pont l'abbé à Peumerit",
-  "Le Kerambellec à Brasparts",           "Kerambellec à Brasparts",
-  "Le Gouessant à Andel",                 "Gouessant à Andel",
-  "La Vilaine à Chateaubourg",            "Vilaine à Chateaubourg",
-  "L'Arguenon à Dolo",                    "Arguenon à Dolo",
-  "Le Ruisseau la Mignonne (bras naturel ou aménagé) à Saint-urbain", "Ruisseau la Mignonne à Saint-urbain",
-  "Le Jet (bras naturel ou aménagé) à Elliant",  "Jet à Elliant",
-  "L'Ille à Montreuil-sur-ille",          "Ille à Montreuil-sur-ille",
-  "L'Ével à Baud",                        "Ével à Baud",
-  "L' Aven à Melgven",                    "Aven à Melgven",
-  "Le Guyoult à Mont-dol",                "Guyoult à Mont-dol",
-  "La Rance à Ereac",                     "Rance à Ereac",
-  "Le Couesnon à Romazy",                 "Couesnon à Romazy",
-  "L' Inam à Lanvenegen",                 "Inam à Lanvenegen",
-  "Le Nanson à Parigne",                  "Nanson à Parigne",
-  "LEGUER à PLOUBEZRE",                   "Leguer à Ploubezre",
-  "TRIEUX à PLESIDY",                     "Trieux à Plesidy",
-  "Le Larhon à Saint-maudan",             "Larhon à Saint-maudan",
-  "Le Kersault à Locarn",                 "Kersault à Locarn",
-  "La Sarre à Melrand",                   "Sarre à Melrand",
-  "Le Ruisseau le Sedon à Guegon",        "Ruisseau le Sedon à Guegon",
-  "L'Ellé au Faouet",                     "Ellé au Faouet",
-  "L'Élorn à la Roche-maurice",           "Élorn à la Roche-maurice",
-  "L' Aër au Croisty",                    "Aër au Croisty",
-  "La Vilaine à  Guichen",                "Vilaine à Guichen",
-  "Le Ruisseau l' Yvel à Neant-sur-yvel", "Ruisseau Yvel à Neant-sur-Yvel",
-  "L'Élorn à Commana",                    "Élorn à Commana",
-  "L'Horn à Mespaul",                     "Horn à Mespaul",
-  "Le Tarun à Plumelin",                  "Tarun à Plumelin",
-  "ISOLE à SAINT-THURIEN",                "Isole à Saint-Thurien",
-  "L'Aff à Paimpont",                     "Aff à Paimpont",
-  "LIE à LA PRENESSAYE",                  "Lié à la Prenessaye",
-  "Le Gozvoalet à Langonnet",             "Gozvoalet à Langonnet",
-  "GARVAN A DINEAULT",                    "Garvan à Dineault",
-  "MILIN PRAT A LOGUIVY-PLOUGRAS",        "Milin Prat à Loguivy-Plougras",
-  "MARZAN À MARZAN",                      "Marzan à Marzan")
+#regles_modification <- tribble( # Définir les règles de modification des libellés
+#  ~ancien_libelle,                        ~nouveau_libelle,
+#  "AIN A MESNOIS 1",                        "Ain à Mesnois 1",
+#  "ALENE A FOURS",                          "Alene à Fours", 
+#  "ALENE à LUZY",                           "Alene à Luzy",
+#  "ALLIER à LANGERON",                      "Allier à Langeron",
+#  "ARCONCE à POISSON",                      "Aronce à Poisson",
+#  "ARROUX à AUTUN",                         "Arroux à Autun",
+#  "BALERNE A NEY 2",                        "Balerne à ney 2",
+#  "BALME A BOURCIA ",                       "Balme à Bourcia",
+#  "BEULETIN A ESMOULIERES 1",               "Beuletin à Esmouileres 1",
+#  "BOURBINCE à VITRY-EN-CHAROLLAIS",        "Bourbince à Vitry-en-charollais",
+#  "BREUCHIN A ORMOICHE 1",                  "Breuchin à Ormoiche",
+#  "BRIZOTTE A AUXONNE",                     "Brizotte à Auxonne",
+#  "CANNE à SAINT-GRATIEN-SAVIGNY",          "Canne à Saint-Gratien-Savigny",
+#  "CLAUGE A LA-LOYE 1",                     "Clauge à La-Loye 1",
+#  "CUSANCIN A BAUME-LES-DAMES 1",           "Cusancin à Beaume-les-Dames 1",
+#  "DESSOUBRE A ST-HIPPOLYTE 1",             "Dessourbe à St-Hippolyte 1",
+#  "DHEUNE A ESSERTENNE", 
+#  "DHEUNE A ST-MARTIN-EN-GATINOIS", 
+#  "DOUBS A COLOMBIER-FONTAINE 1", 
+#  "DOUBS A MOLAY", 
+#  "DOUBS A MORTEAU 1", 
+# "DOUBS A THORAISE 1",
+#  "DOULONNES A PLUMONT 2",
+#  "DREE à SAINT-LEGER-DU-BOIS",
+#  "FOURCHES A AUXON 5",
+#  "FURIEUSE A LA-CHAPELLE-SUR-FURIEUSE 4",
+#  "GLAND A AUDINCOURT 1",
+#  "GOURGEONNE A TINCEY-ET-PONTREBEAU 1",
+#  "GRISON A ETRIGNY",
+#  "GUYE A SIGY-LE-CHATEL",
+#  "L'ARMANÇON A CHENY 1",
+#  "L'OUANNE A SAINT-MARTIN-SUR-OUANNE 1",
+#  "L'OURCE A MENESBLE 1",
+#  "L'YONNE A CHATEAU-CHINON(CAMPAGNE) 3",
+#  "L'YONNE A MONTREUILLON 1",
+#  "L'YONNE A PREGILBERT 1",
+#  "LA CURE A ACCOLAY 1",
+#  "LA CURE A ASQUINS 1",
+#  "LA GROÈME A TERREFONDREE 1",
+#  "La Loire à Lere",
+#  "LA RIVIÈRE DE DRUYES A ANDRYES 1",
+#  "LA SEINE A NOD-SUR-SEINE 1",
+#  "LANTERNE A FLEUREY-LES-FAVERNEY 1",
+#  "LE BRANLIN A MEZILLES 1",
+#  "LE BREVON A BUSSEAUT 1",
+#  "LE CHALAUX A OUROUX-EN-MORVAN 2",
+#  "LE RUISSEAU DE VILLARNON A MONTMOYEN 1",
+#  "LE RUISSEAU DES GOTHS A CHALAUX 1",
+#  "LE SAUZAY A CORVOL-L'ORGUEILLEUX 1",
+#  "LE SEREIN A VIEUX-CHATEAU 2",
+#  "LE THOLON A CHAMPVALLON 1",
+#  "Loire à Beaulon",
+#  "LOIRE à DECIZE",
+#  "LOIRE à NEVERS",
+#  "LOIRE À SURY-PRES-LERE",
+#  "MECHET à SAINT-PRIX",
+#  "MEUZIN A CORGENGOUX 2",
+#  "MORTE A BUCEY-LES-GY 3",
+#  "NIEVRE à COULANGES-LES-NEVERS",
+#  "NIEVRE à DOMPIERRE-SUR-NIEVRE",
+#  "NOHAIN à SAINT-MARTIN-SUR-NOHAIN",
+#  "OGNON A BUSSIERES 1",
+#  "OGNON A HAUT-DU-THEM-CHATEAU-LAMBERT 1",
+#  "OGNON A PESMES 1",
+#  "OUCHE A FLEUREY-SUR-OUCHE 1",
+#  "RAFFENOT A CHATEAUVIEUX-LES-FOSSES",
+#  "RAHIN A AYNANS 1",
+#  "RHIEN A RONCHAMP 1",
+#  "ROMAINE A LA ROMAINE 1",
+#  "RUISSEAU DE NOIRONTE A RUFFEY-LE-CHATEAU",
+#  "SALON A AUTET 1",
+#  "SAONE A APREMONT 1",
+#  "SAONE A AUXONNE 1",
+#  "SAONE A CHARREY-SUR-SAONE",
+#  "SAONE A FLEURVILLE",
+#  "SAONE A GERGY",
+#  "SAONE A JUSSEY 1",
+#  "SAONE A OUROUX-SUR-SAONE",
+#  "SAONE A SCEY-SUR-SAONE-ET-ST-ALBIN 1",
+#  "SAONE A SEURRE",
+#  "SAONE A ST-SYMPHORIEN-D'ANCELLES",
+#  "SAVOUREUSE A VIEUX-CHARMONT",
+#  "SEILLE A LA-TRUCHERE",
+#  "SEILLE A NEVY-SUR-SEILLE 2",
+#  "SOMME à MALTAT",
+#  "SORNIN à SAINT-MAURICE-LES-CHATEAUNEUF",
+#  "TERNIN à CHISSEY-EN-MORVAN",
+#  "THEVEROT A LES-GRAS 1",
+#  "TILLE A CHAMPDOTRE 1",
+#  "TILLE A CUSSEY-LES-FORGES",
+#  "TILLE A TIL-CHATEL 1",
+#  "VALSERINE A LAJOUX 3",
+#  "VENELLE A FONCEGRIVE",
+#  "VIEILLES GRANGES A SORANS-LES-BREUREY 1",
+#  "VOUGE A AUBIGNY-EN-PLAINE"  
+#)
+
 ```
 
+```{r Autre méthode Mise à jour des libellés}
+#ope_selection <- ope_selection %>%
+#  left_join(regles_modification, by = c("pop_libelle" = "ancien_libelle")) %>% # Ajout des nouveaux libellés
+#  mutate(n_pop_libelle = coalesce(nouveau_libelle, pop_libelle)) %>%
+#  select(-nouveau_libelle,
+#         -pop_libelle) %>% 
+#  rename(pop_libelle = n_pop_libelle)
+```
 
 ```{r Mise à jour des libellés}
 ope_selection <- ope_selection %>%
-  left_join(regles_modification, by = c("pop_libelle" = "ancien_libelle")) %>% # Ajout des nouveaux libellés
-  mutate(n_pop_libelle = coalesce(nouveau_libelle, pop_libelle)) %>%
-  select(-nouveau_libelle,
-         -pop_libelle) %>% 
-  rename(pop_libelle = n_pop_libelle)
+  mutate(
+    pop_libelle = pop_libelle %>%
+      str_to_lower %>%
+      str_to_title %>%
+      str_replace_all("\\b(A|À)\\b", "à")
+  )
+    
 ```
-
-
 Une représentation graphique des séries temporelles constitués est réalisée : 
 
-```{r Représentation séries temporelles, fig.height = 10, fig.width = 15}
+```{r Représentation séries temporelles, fig.height = 15, fig.width = 20}
 ope_selection %>% # Représentation graphique des stations sélectionnées et des types de pêche associées
   ggplot(aes(x = as.character(pop_libelle),
              y = annee, 
@@ -398,19 +461,26 @@ ope_selection_sta <- ope_selection %>%
 ```
 
 ```{r Préparation visualisation effort pêche échantillon}
-sta_id_ope_selection <- ope_selection_sta %>% 
-  group_by(sta_id) %>% 
-  sample_n(1) %>% 
-  ungroup() # Pour la visualisation graphique je n'ai besoin que d'un seul exemple d'ope_id par station
+sta_id_ope_selection <- ope_selection_sta %>%
+  group_by(sta_id) %>%
+  sample_n(1) %>%
+  ungroup() #%>% # Pour la visualisation graphique je n'ai besoin que d'un seul exemple d'ope_id par station
+ # mutate(taille_point = scales::rescale((nb_ope_par_sta), to = c(10, 19)))
+
 ```
+
+```{r}
+summary(sta_id_ope_selection)
+```
+
 
 ```{r Visualisation effort pêche}
 mapview(list(buffer, mes_depts), # Visualisation de l'effort de pêche
         layer.name = c("Buffer_1_km", "Bourgogne-Franche-Comté"),
-        col.regions = list("#440154FF", "#FDE725FF")) + 
+        col.regions = list("darkseagreen4", "darkseagreen1")) + 
   mapview(sta_id_ope_selection,
           layer.name = "Nombre operation par station", 
-          size_var = "nombre_ope_sta",
+          size_var = "nb_ope_par_sta",
           cex = "sta_id",
           lwd = 0.2,
           col.regions = "#D693E0",
