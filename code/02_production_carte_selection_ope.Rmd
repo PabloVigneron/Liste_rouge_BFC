@@ -1,0 +1,157 @@
+---
+title: "02_production_carte_selection_ope"
+author: "PabloVigneron"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  bookdown::html_document2:
+   fig_caption: yes
+   tab_caption: yes
+   number_sections: yes
+   global_numbering: yes
+   toc: yes
+   toc_float:
+         toc_collapsed: yes
+         toc_depth: 2
+   code_folding: hide
+   css: "style.css"
+#bibliography: .bib
+#link-citations: true
+#cls: apa.cls
+#editor_options: 
+#  markdown: 
+#    wrap: sentence
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+# Objectif : Dynamique de population des poissons d'eau douce de Bretagne 
+
+Script : 01_production_carte_selection_station
+
+  Après avoir sélectionné les différentes stations / points de prélèvements et opérations de pêches de l'aire géographique ciblée, une carte globale est réalisée.  
+
+
+# Installation 
+
+## Chargement des packages et des données 
+
+```{r Chargement des packages}
+library(ggplot2)
+library(sf)
+library(cowplot)
+library(png)
+library(rnaturalearth)
+library(png)
+```
+
+```{r Chargement des données}
+load(file = "../processed_data/selection_pop_ope_carte.rda") # Chargement des données
+```
+
+```{r Chargement de la palette de couleur}
+pal <- c("#007844", "#92D050", "#0087C1", "#A97B30","#FCEE21", "#00AEEF", "#1D1D1B", "#B9D9EB")## Chargement de la palette de couleur 
+```
+
+
+# Création de la carte 
+
+## Création de la carte de situation
+
+  Dans un premier temps, il s'agit de créer une petite carte de situation permettant de situer l'aire géographique étudiée à l'échelle de la France (ici la Bourgogne-Franche-Comté). 
+
+```{r Création carte situation}
+france <- ne_countries(country = "france", returnclass = "sf") # Sélection du pays de l'étude (#France)
+
+carte_france_dept <- ggplot(data = france) + # Création de la zone précise de l'étude (#BFC)
+  geom_sf(fill = "gray82", color = "black") +
+  theme_void() +
+  annotate("path",
+           x = -3.24 + 1.75 * cos(seq(0, 2 * pi, length.out = 100)),
+           y = 48.2 + 1.0 * sin(seq(0, 2 * pi, length.out = 100)),
+           color = "red", size = 1) +
+  xlim(-5, 10) +
+  ylim(40, 52) +
+  theme(panel.background = element_rect(fill = "white", color = "black"))
+```
+
+```{r Convertion carte Grob}
+carte_france_dept_grob <- ggplotGrob(carte_france_dept)# Convertir la carte de France en un objet grob 
+```
+
+
+## Création de la carte station
+
+  Il s'agit de créer la carte principale regroupant les stations étudiées (données issues de pré-traitements réalisés dans le script *01_selection_pop_ope*). 
+
+```{r Création carte station}
+carte_sta <- ggplot(sta_id_ope_selection) +
+  geom_sf(data = mes_depts) +
+  geom_sf(data = buffer) +
+  geom_sf(aes(color = DEP), size = 2) +
+  scale_color_manual(values = pal) +
+  theme_bw() +
+  labs(color = "Département") + # Ajouter une légende pour la variable DEP
+  theme(legend.position = "bottom")
+```
+
+
+# Création carte finale
+
+Nous combinons les deux cartes créées précédemment. 
+
+```{r Construction carte finale, fig.height = 8, fig.width = 10}
+carte_combinee <- ggdraw() + # Assemblage des cartes pré-créée
+  draw_plot(carte_sta) +
+  draw_plot(
+    carte_france_dept,
+    x = 0.015,
+    y = 0.03,
+    width = 0.4,
+    height = 0.25,
+    hjust = 0.05,
+    vjust = -0.75
+  )
+
+logo <- readPNG("../output/bloc-marque-RF-OFB_horizontal.png") # Ajout du logo de l'OFB
+
+carte_combinee <- carte_combinee + # Créer la carte combinée avec le logo
+  annotation_raster(
+    logo,
+    xmin = 0.8,
+    xmax = 0.98,
+    ymin = 0.015,
+    ymax = 0.13
+  )
+
+titre <- ggdraw() + # Ajouter un titre
+  draw_label(
+    "Stations BFC sélectionnées pour
+             l'appui à la création de la Liste Rouge Régionale des poissons d'eau douce 2026",
+    fontface = 'bold',
+    x = 0.5,
+    y = 0.70,
+    size = 10
+  ) +
+  theme(plot.margin = margin(0, 0, 0, 0))
+
+carte_finale <- plot_grid(titre,
+                          carte_combinee,
+                          ncol = 1,
+                          rel_heights = c(0.1, 1)) # Combiner le titre et la carte
+carte_finale
+```
+
+
+# Sauvegarde 
+
+Nous enregistrons la carte finale sous format .png.
+
+```{r Enregistrement carte finale}
+ggsave(filename = "../assets/carte_selection_stations.png", 
+       plot = carte_finale, width = 10, height = 8, dpi = 300) # Enregistrer l'image
+```

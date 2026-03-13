@@ -1,0 +1,273 @@
+---
+title: "14_GAMMs"
+author: "PabloVigneron"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  bookdown::html_document2:
+   fig_caption: yes
+   tab_caption: yes
+   number_sections: yes
+   global_numbering: yes
+   toc: yes
+   toc_float:
+         toc_collapsed: yes
+         toc_depth: 2
+   code_folding: hide
+   css: "style.css"
+#bibliography: .bib
+#link-citations: true
+#cls: apa.cls
+#editor_options: 
+#  markdown: 
+#    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+# Chargement des packages, des fonctions et des données
+
+```{r Chargement des packages}
+library(tidyverse)
+library(wesanderson) # Palette de couleur
+library(aspe) # Traitement de la base aspe
+library(mgcv)
+```
+
+# TRY EXEMPLE
+
+```{r}
+#Chargements des packages et du jeu de données
+library(mgcv)
+library(gamair)
+data("mpg", package="gamair")
+
+# Fit the model
+mod_reml <- gam(hw.mpg ~ s(weight) + s(rpm) + s(price) + comp.ratio, 
+           data = mpg, method = "REML")
+
+# Plot the weight effect with colored shading
+plot.gam(
+  mod_reml,
+  shade = TRUE,
+  se = TRUE,
+  shade.col = "lightblue",
+  page = 1,
+  residuals = T,
+  pch = 1,
+  cex = 1
+)
+
+# Make another plot adding the intercept value and uncertainty
+mgcv::plot.gam(
+  mod_reml,
+  shade = TRUE,
+  se = TRUE,
+  shade.col = "lightgreen",
+  select = 1,  residuals = T,
+  rug = TRUE,
+  pch = 1,
+  cex = 1,
+  seWithMean = TRUE,
+  shift = coef(mod_reml)[1]
+)
+
+```
+```{r}
+library(gratia)
+
+library(gamair)
+data("mpg", package="gamair")
+
+# Fit the model
+mod_reml <- gam(hw.mpg ~ s(weight) + s(rpm) + s(price) + comp.ratio, 
+           data = mpg, method = "REML")
+
+
+draw(mod_reml)
+
+
+```
+
+# Plot avec ggplot
+
+```{r}
+library("gratia")
+library("mgcv")
+library("ggplot2")
+library("dplyr")
+library("patchwork")
+
+# simulate data
+n <- 400
+eg1 <- data_sim("eg1", n = n, seed = 1)
+
+# fit model
+m <- gam(y ~ s(x0) + s(x1) + s(x2) + s(x3),
+  data = eg1, method = "REML")
+```
+
+```{r}
+p1 <- draw(m, select = "s(x0)")
+p2 <- draw(m, select = "s(x1)")
+p3 <- draw(m, select = "s(x2)")
+p1 + p2 + p3 + plot_layout(ncol = 3)
+```
+
+```{r}
+# evaluate the smooths
+sm <- smooth_estimates(m) |>
+  add_confint()
+sm
+```
+
+```{r}
+# add partial residuals to data
+eg1 <- eg1 |>
+  add_partial_residuals(m)
+names(eg1)
+```
+
+
+```{r}
+p_sx2 <- sm  %>% 
+  filter(.smooth == "s(x2)")  %>% 
+  ggplot() +
+  geom_rug(aes(x = x2),
+    data = eg1,
+    sides = "b", length = grid::unit(0.02, "npc")
+  ) +
+  geom_ribbon(aes(ymin = .lower_ci, ymax = .upper_ci, x = x2),
+    alpha = 0.2
+  ) +
+  geom_point(aes(x = x2, y = `s(x2)`),
+    data = eg1, cex = 1.5, colour = "steelblue3"
+  ) +
+  geom_line(aes(x = x2, y = .estimate), lwd = 1.2) +
+  labs(y = "Partial effect", title = "s(x2)")
+p_sx2
+```
+```{r}
+p_sx0 <- sm  %>% 
+  filter(.smooth == "s(x0)")  %>% 
+  ggplot() +
+  geom_rug(aes(x = x0),
+    data = eg1,
+    sides = "b", length = grid::unit(0.02, "npc")
+  ) +
+  geom_ribbon(aes(ymin = .lower_ci, ymax = .upper_ci, x = x0),
+    alpha = 0.2
+  ) +
+  geom_point(aes(x = x0, y = `s(x0)`),
+    data = eg1, cex = 1.5, colour = "steelblue3"
+  ) +
+  geom_line(aes(x = x0, y = .estimate), lwd = 1.2) +
+  labs(y = "Partial effect", title = "s(x0)")
+p_sx0
+```
+
+
+
+```{r}
+p_sx0 + p_sx2 + plot_layout(ncol = 2)
+```
+## Concurvity 
+mgcv's concurvity() function measures concurvity in model variables. Like gam.check(), we run this function on a model object to examine the quality of our model.
+
+concurvity() has two modes.
+
+The first mode, full = TRUE, reports overall concurvity for each smooth. Specifically, it shows how much each smooth is predetermined by all the other smooths.
+
+Since concurvity is complex, the function reports three different ways of measuring concurvity. Each is better in some situations. What is important is that you should always look at the worst case, and if the value is high (say, over 0.8), inspect your model more carefully.
+
+Here I show the output of running the concurvity() function on a model with variables that are related but not perfectly. The concurvity of the terms is high in the worst case, so we'll want to inspect the plots of our model closely and be careful in making interpretations.
+
+## Paiwise concurvities 
+
+If any of these values from the full = TRUE mode is high, we will want to also use the second mode, setting full = FALSE. With full = FALSE, the function returns matrices of pairwise concurvities. These show the degree to which each variable is predetermined by each other variable, rather than all the other variables. This can be used to pinpoint which variables have a close relationship. Once again, the function returns three measures, this time as three matrices. Look for the worst-case scenario and see if variables with high values have problematic shapes or confidence intervals.
+
+
+
+
+# Poser les modèles 
+
+## Basis functions and smoothing
+
+La capacité du GAM à capturer les modèles dans les données est mesurée par un terme appelé « vraisemblance ». Sa complexité, ou la mesure dans laquelle la courbe change de forme, est mesurée par la « sinuosité ». La clé d'un bon ajustement réside dans le compromis entre ces deux éléments. Ce compromis est exprimé par cette équation simple, avec un paramètre de lissage, ou valeur lambda, qui contrôle l'équilibre. Ce paramètre de lissage est optimisé lorsque R ajuste un GAM aux données.
+
+Balancing Wiggliness : Fit = Likelihood - λ x Wiggliness
+
+Normalement, lorsque nous ajustons un modèle avec la fonction gam() de mgcv, nous laissons le package sélectionner le paramètre de lissage. Cependant, nous pouvons fixer le paramètre de lissage à une valeur de notre choix via l'argument sp. L'argument sp peut être défini pour l'ensemble du modèle via un argument de la fonction gam(), comme dans la première ligne de code. Nous pouvons également définir l'argument sp pour un terme spécifique de la formule GAM, comme indiqué dans la deuxième ligne de code.
+
+Si nous laissons R faire ce travail à notre place, le package mgcv propose plusieurs méthodes différentes pour sélectionner les paramètres de lissage. La plupart des experts en GAM, et moi-même, recommandons vivement d'ajuster les modèles avec la méthode REML, ou « Restricted Maximum Likelihood » (vraisemblance maximale restreinte). Bien que différentes méthodes aient leurs avantages, la méthode REML est la plus susceptible de vous donner des résultats fiables et stables
+```{r}
+gam(y ~ s(x), data = dat, method = "REML")
+```
+
+```{r Par default}
+gam_mod_sk <- gam(accel ~ s(times, k = 50), # k = knots : nombre de fonctions 
+                  data = mcycle, 
+                  sp = 0.0001) # Smoothing parameter
+
+
+```
+The smoothing parameter balances between likelihood and wiggliness to optimize model fit. Here, you’ll examine smoothing parameters and will fit models with different fixed smoothing parameters.
+
+# Interpreter les output des GAMs
+
+```{r}
+summary()
+```
+
+# Représenter graphiquement les GAMs
+
+```{r}
+?plot.gam
+```
+
+## Représenter les données en graphique
+
+```{r Représenter les données graphiquement}
+plot(
+  gam_model,
+  rug = TRUE,
+  #L'argument rug place les valeurs X au bas du graphique.
+  residuals = T,
+  # L'argument residuals affiche les résidus partiels sur les graphiques
+  pch = 1,
+  # Change la forme des  points residus
+  cex = 1
+) # change la taille des points résidus
+
+# Les résidus partiels correspondent à la différence entre l'effet partiel et les données, après prise en compte de tous les autres effets partiels.
+```
+
+## Représenter l'erreur standard
+
+
+```{r  Représenter l'erreur standard}
+plot(gam_model, se = TRUE) # Montre  l'IC à 95 % pour la forme moyenne de l'effet.
+```
+
+
+```{r  Représenter l'erreur standard 2}
+plot(gam_model, 
+     shade = TRUE, # Représenter l'IC avec une ombre
+     shade.col = "lightblue") # Choix de la couleur
+```
+
+## Représenter l'erreur standard transformés
+
+```{r  Représenter l'erreur standard transformée}
+
+plot(
+  gam_model,
+  seWithMean = TRUE,
+  # Il est souvent utile de tracer les erreurs types d'un terme d'effet partiel combinées aux erreurs types de l'interception du modèle. En effet, les intervalles de confiance à la valeur moyenne d'une variable peuvent être très faibles et ne reflètent pas l'incertitude globale de notre modèle. L'utilisation de l'argument seWithMean ajoute cette incertitude.
+  shift = coef(gam_model)[1]
+) #décaler l'échelle afin d'inclure l'ordonnée à l'origine. 
+```
+
