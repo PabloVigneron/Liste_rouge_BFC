@@ -3,11 +3,10 @@ title: "03_Selection_especes"
 author: "PabloVigneron"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 params:
-  especes_lrr_2015: !r c("ABL","ANG","ALA","BRB","BRE","BRO","CCO","CHA","CHE",
-                         "EPI","EPT","GAR","GOU","GRE","LPP","LPM",
-                         "LOF","PER","ROT","SAT","TAN","TRF","VAI","VAR") # Sélection des espèces de la liste rouge régionale 2015 (Vigneron et al., 2017)
-  especes_a_retirer: !r c("APP","ASL","BRX","CAX","CYP","HBG","OCL","PCC","PFL",
-                       "CCU","CAS") # Sélection des espèces à retirer du jeu de données initial
+#  especes_lrr_2015: !r c("ABL","ANG","ALA","BRB","BRE","BRO","CCO","CHA","CHE",
+#                         "EPI","EPT","GAR","GOU","GRE","LPP","LPM",
+#                         "LOF","PER","ROT","SAT","TAN","TRF","VAI","VAR") # Sélection des espèces de la liste rouge régionale 2015 
+  especes_a_retirer: !r c("APP","ASA", "OCL", "PCC","PFL", "BRX","CAX","CYP","HBG","CCU","GOX", "LPX") # Sélection des espèces à retirer du jeu de données initial
 output: 
   bookdown::html_document2:
    fig_caption: yes
@@ -73,6 +72,9 @@ load(mei_table) # Chargement des données
 ```
 
 
+# Chargement de la liste d'espèce de la liste rouge 2016 Bourgogne
+
+
 # Constitution du jeu de données
 
 ## Création du dataframe
@@ -103,38 +105,43 @@ esp_ope_selection <- passerelle %>% # dataframe contenant toutes les espèces pr
 ```
 
 
-
-```{r}
-boxplot(log(esp_ope_selection$lop_effectif)~ esp_ope_selection$esp_code_alternatif)
-```
-
-
-
-```{r}
-summary(esp_ope_selection)
-```
-
-```{r}
-esp_table <- table(esp_ope_selection$esp_code_alternatif)
-esp_table
-```
-
-
-
-
 ## Tri du dataframe
 
   Dans le cadre de notre étude, seules les espèces de poissons d'eau douce nous intéressent. Nous retirons alors les autres espèces du jeu de données *esp_ope_selection* établis dans les paramètres (cf params : "especes_a_retier")
 
-Dans le cas de la Bretagne, des spécificités sur certaines espèces sont prises en compte. Par exemple, un changement de nom de code pour la vandoise rostrée est intervenu au cours des années : VAR et VAN désignent tout deux la même espèce (les *esp_code_alternatif* "VAN" sont alors transformés en "VAR"). De la même manière, différents éco-types de Carpe ("CCX" _ "CMI" _ "CCU") sont rassemblés sous un même code *esp_code_alternatif* : "CCO". 
+- Différents éco-types de Carpe ("CCX" _ "CMI" _ "CCU") sont rassemblés sous un même code *esp_code_alternatif* : "CCO". 
+
+- "APP","ASA", "OCL", "PCC","PFL" sont retirées car ce sont des espèces d'écrevisses
+
+- "BRX","CAX","CCU","GOX", "LPX", "CYP" sont retirées car ce sont des espèces indéterminées.
+
+- "HBG" : Hybride Brème/Gardon
+
+A finir la prise de décision !!! : 
+
+- "CAA" est le nouveau code de "CAD"
+
+- "VAR" : arrivé de la vandoise rostrée où modification de l'identification de "VAN"?
+
+- "ROI" Rotengle italien ?
+
+- "GOU"=> "GOO" : à partir d'environ 2018 : changement d'identification le Goujon (GOU) devient le Goujon occitan (GOO)
+
+```{r recherche arrivé VAR}
+esp_ope_selection_VAR <- esp_ope_selection %>% 
+  filter(esp_code_alternatif == "VAR")
+```
+
+
 
 ```{r Tri espèces esp_ope_selection}
-esp_ope_selection <- esp_ope_selection %>% 
-  mutate(esp_code_alternatif = 
+esp_ope_selection <- esp_ope_selection %>%
+  mutate(esp_code_alternatif =
            case_when(
-             esp_code_alternatif %in% c("VAN", "VAX") ~ "VAR", # Tranformation VAN en VAR
-             esp_code_alternatif %in% c("CCX", "CMI", "CCU") ~ "CCO", # Transformation CCX, CMI et CCU en CCO
-             TRUE ~ esp_code_alternatif)) %>% 
+             esp_code_alternatif %in% c("CCX", "CMI", "CCU") ~ "CCO",
+             # Transformation CCX, CMI et CCU en CCO
+             TRUE ~ esp_code_alternatif
+           )) %>%
   filter(!(esp_code_alternatif %in% params$especes_a_retirer)) # Espèces à retirer
 ```
 
@@ -183,6 +190,46 @@ esp_effectif <- ope_esp_densite %>% # Calcul de l'effectif total pour chaque esp
   summarise(effectif_total = sum(effectif))
 ```
 
+```{r Barplot effectif total espèce,  fig.height = 8, fig.width = 10}}
+
+library(scales)
+breaks <- unique(c(seq(0,1,by = 0.1), 
+    seq(1,10, 1), seq(10,100, 10)))
+
+ggplot(esp_effectif,
+       aes(x = esp_code_alternatif, y = effectif_total, fill = effectif_total)) +
+  geom_col() +
+  scale_fill_gradient(low = "darkseagreen3", high = "darkseagreen4") +
+  theme_minimal() +
+  labs(x = "Espèce", y = "Effectif total") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid.major = element_line(color = "#ffffff"),
+    panel.grid.minor = element_line(color = "#ffffff"),
+    panel.background = element_rect(fill = "#faf0e6")
+  ) 
+```
+
+```{r Barplot effectif total espèce log}
+ggplot(esp_effectif,
+       aes(x = esp_code_alternatif, y = effectif_total, fill = effectif_total)) +
+  geom_col() +
+  scale_fill_gradient(low = "darkseagreen3", high = "darkseagreen4") +
+  scale_y_log10(
+    name = "Effectif total (échelle log10)",
+    breaks = c(1, 10, 100, 1000),
+    labels = comma
+  ) +
+  coord_flip() +
+  theme_minimal() +
+  labs(x = "Espèce", y = "Effectif total") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid.major = element_line(color = "#ffffff"),
+    panel.grid.minor = element_line(color = "#ffffff"),
+    panel.background = element_rect(fill = "#faf0e6")
+  )
+```
 
 ## Pourcentage d'occurrence
 
@@ -223,7 +270,7 @@ tab_taux_occurrence <- tab_occurrence %>%
 
 ## Tableau final des densités surfaciques et des occurrences
 
-  Un tableau final regroupant les densités surfaciques moyennes et les occurrences moyennes des espèces est réalisé (relatifs à la sélection des stations et opérations réalisée dans le script 00_selection_pop_ope). 
+  Un tableau final regroupant les densités surfaciques moyennes et les occurrences moyennes des espèces est réalisé (relatifs à la sélection des stations et opérations réalisée dans le script 01_preatreatment_ope). 
 
 ```{r Compilation finale densite / occurrence}
 tab_densite_occurrence <- left_join(esp_densite_moyenne, tab_taux_occurrence, by = "esp_code_alternatif")
@@ -238,8 +285,8 @@ tab_densite_occurrence <- left_join(esp_densite_moyenne, tab_taux_occurrence, by
 ```{r Mise en place statut LRR 2015}
 tab_densite_occurrence <- tab_densite_occurrence %>%
   mutate(statut_lrr = ifelse (esp_code_alternatif %in% params$especes_lrr_2015, 
-                           "Liste Rouge Régionale Bretagne 2015",
-                           "Présente en Bretagne"))
+                           "Liste Rouge Régionale BFC 2016",
+                           "Présente en Bourgogne-Franche-Comté"))
 ```
 
 La représentation graphique est effectuée : par soucis de représentation, les axes sont mis en échelles logarithmiques. 
@@ -252,8 +299,8 @@ gg_base <- ggplot(tab_densite_occurrence,
            color = statut_lrr)) +
   geom_point(size = 3,
              shape = 16) +
-  labs(title = "Densités surfaciques moyennes vs Pourcentage d'occurrence par espèce sur les 30 dernières années",
-       subtitle = "Région Bretagne",
+  labs(title = "Densités surfaciques moyennes vs Pourcentage d'occurrence par espèce sur les 20 dernières années",
+       subtitle = "Région Bourgogne-Franche-Comté",
        x = "Densité surfacique moyenne",
        y = "Pourcentage d'occurrence") +
   scale_color_manual(values = wesanderson::wes_palette("AsteroidCity1")[3:5],
@@ -306,5 +353,3 @@ save(especes_lrr_2015,
 
 
   Irz, P., Mondy, C., Richard, B. Bonnafoux, L. (2024). aspe: An R package to analyse and visualise river fish data in France. R package version 0.4.1, https://github.com/PascalIrz/aspe/
-
-  Vigneron, T., Germis, G., Baglinère, J.-L., Catroux, H., Caudal, A.-L. (2017). Les poissons d’eau douce menacés en Bretagne. In Siorat F, Le Mao P, Yésou P, eds. Conservation de la faune et de la flore : Listes rouges et responsabilité de la Bretagne. *Penn ar Bed* 227, 60 - 79. 

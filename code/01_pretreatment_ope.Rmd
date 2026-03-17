@@ -35,7 +35,7 @@ Script : 01_pretreatment_ope
 
   L'objectif de cette étude est d'évaluer les tendances démographiques des poissons d'eau douce de de Bourgogne-Franche-comté. Ce travail vient en appui de la création de la liste rouge régionale de la région Bourgogne-Franche-comté.
 
-  Ce script vise à constituer un premier jeu de données regroupant une sélection de stations à étudier, tirées de la base nationale ASPE (regroupant l'ensemble des données piscicoles disponibles en France). Ces données serviront à construire des séries temporelles représentatives des dynamiques de population de poissons d'eau douce de Bourgogne-Franche-comté. Elles permettrons ainsi une première évaluation simple et globale des dynamiques populationnelles des poissons d'eau douce de Bourgogne-Franche-comté.. 
+  Ce script vise à constituer un premier jeu de données regroupant une sélection de stations à étudier, tirées de la base nationale ASPE (regroupant l'ensemble des données piscicoles disponibles en France). Ces données serviront à construire des séries temporelles représentatives des dynamiques de population de poissons d'eau douce de Bourgogne-Franche-comté. Elles permettrons ainsi une première évaluation simple et globale des dynamiques populationnelles des poissons d'eau douce de Bourgogne-Franche-comté.
 
 # Installation 
 
@@ -67,15 +67,6 @@ rdata_tables <- misc_nom_dernier_fichier(
   pattern = "^tables")
 load(rdata_tables) # Chargement des données 
 ```
-
-# Chargement de la table aspe des données de mesures individuelles 
-```{r Chargement des données espèces}
-#mei_table <- misc_nom_dernier_fichier(
-#  repertoire = "../../../../Liste_rouge_BFC/raw_data/mei_1_2026_02_26_16_31_28.145166.rdata",
-#  pattern = "^mei")
-#load(mei_table) # Chargement des données 
-```
-
 
 ```{r Chargement des palettes de couleur}
 pal <- wes_palette("AsteroidCity1") # Chargement des palettes de couleur
@@ -203,19 +194,29 @@ passerelle <- passerelle %>%
 
   Il existe plusieurs réseaux de pêche en France. Chacune des stations (*sta_id*) et des points de prélèvements (*pop_id*) peuvent correspondre à un ou plusieurs types de réseaux de pêche. Ces différents réseaux sont identifiables par leur *obj_libelle* renseignés dans la base *aspe*. Nous ajoutons cette information dans notre jeu de données à l'aide la passerelle (*mef_ajouter_objectif()*), et nous sélectionnons seulement les réseaux souhaités pour l'étude : ici le RCS, le RHP et le RRP.
 
+### Test NA values 
+
+```{r test NA values stations avant sélection reseaux,echo = T}
+#passerelle_na <- passerelle %>% 
+#  group_by(sta_id) %>% 
+#  filter(is.na(sta_id)) %>% 
+#  ungroup()
+#passerelle_na 
+```
+
 ```{r Sélection réseaux de pêches} 
 passerelle <- passerelle %>%
-  mef_ajouter_objectif()  
-  #filter(obj_libelle %in% mes_reseaux )   # Paramètres - Sélection des réseaux de pêche
+  mef_ajouter_objectif()  %>%
+  filter(obj_libelle %in% mes_reseaux)   # Paramètres - Sélection des réseaux de pêche
 ```
 
 ### But des différents réseaux sélectionnés : RHP, RCS et RRP
 
-  Le Réseau Hydrobiologique et Piscicole (RHP) a été mis en place dans les années 1990. Il a pour but **d’évaluer l’état et l’évolution des peuplements piscicoles** et de **caractériser les perturbations subies par les écosystèmes aquatiques continentaux**. En Bourgogne-Franche-Comté, il s’appuie sur un suivi régulier de "x " stations représentatives des différents types de cours d’eau et de divers degrés de perturbations anthropiques (Vigneron *et al.*, 2006). Le suivi de certaines stations RHP a été interrompu en 2011 compte tenu de la construction du programme de surveillance de la Directive Cadre sur l’Eau. 
+  Le Réseau Hydrobiologique et Piscicole (RHP) a été mis en place dans les années 1990. Il a pour but **d’évaluer l’état et l’évolution des peuplements piscicoles** et de **caractériser les perturbations subies par les écosystèmes aquatiques continentaux**.  
 
   Le Réseau de Contrôle de Surveillance (RCS), mis en place depuis 2007, géré par l’OFB, est composé de 86 stations (dont certaines stations appartiennent au RHP). Il vise, par un **suivi bisannuel**, à **évaluer l’état écologique des milieux**. 
 
-  Le Réseau de Référence Pérenne (RRP), mis en place en 2013, est conçu pour **évaluer sur le long terme les tendances d’état des milieux naturels**, i.e. pas ou peu anthropisés. Il est composé de 17 stations de référence, intégrant l’échantillonnage de certaines anciennes stations RHP mais aussi de nouvelles stations. 
+  Le Réseau de Référence Pérenne (RRP), mis en place en 2013, est conçu pour **évaluer sur le long terme les tendances d’état des milieux naturels**, i.e. pas ou peu anthropisés. 
 
 
 ## Types de pêche 
@@ -225,12 +226,23 @@ passerelle <- passerelle %>%
 
 ```{r Sélection types de pêche}
 ope_pro_libelle <- passerelle %>%
-  mef_ajouter_type_protocole()%>%
-  #filter(pro_libelle %in% mes_types_de_peche) %>%  # Paramètres - Sélection des types de pêches 
-  select(sta_id:ope_id, pro_libelle) %>% 
+  mef_ajouter_type_protocole() %>%
+  filter(pro_libelle %in% mes_types_de_peche) %>%  # Paramètres - Sélection des types de pêches      
+  select(sta_id:ope_id, pro_libelle) %>%
   distinct()
+
 ```
 
+
+## Informations quantitative : stations, pêches, protocoles...
+
+```{r Nombre de stations au total}
+#ope_pro_libelle %>%
+#  group_by(sta_id) %>% 
+#  summarise(n=n()) %>% 
+#  ungroup() %>% 
+#  summarise(total=n())
+```
 
 ## Opérations de pêche
 
@@ -439,6 +451,47 @@ ope_selection %>% # Représentation graphique des stations sélectionnées et de
   scale_y_continuous(breaks = seq(min(ope_selection$annee), max(ope_selection$annee), by = 3))
 ```
 
+```{r Nombre de stations selectionnées}
+#ope_selection %>%
+#  group_by(sta_id) %>% 
+#  summarise(n=n()) %>% 
+#  ungroup() %>% 
+#  summarise(total=n())
+```
+## Correction du dataframe : protocole non homogène
+
+Dans les stations suivantes un changements de protocole c'est effectué dans la série temporelles : 
+
+-**La Rivière De Druyes à Andryes** :  1 **pêche complète** en 2016 au lieu d'une **pêche partielle par points**
+
+-**L'ouanne à Saint-Martin-Sur-Ouanne** : melange de pleins de pêche **pêche complète** et de **pêche partielle par points**
+
+-**Savoureuse à Vieux-Charmont** : 
+
+-**Doubs à Colombier-Fontaine 1** : pêche par ambiance à supprimer : Attention 10 ans de suivis => 9ans 
+
+On observe dans les series temporelles qu'il y a des stations qui sont prospecter avec des protocoles différents, ce qui n'est pas censé être le cas. On détecte alors dans le jeu de données les stations avec des protocoles différents et les stocke dans un tableau *ope_error_protocol*: 
+```{r detection stations avec erreur, plusieurs protocoles}
+ope_error_protocol <- ope_selection %>%
+  select(sta_id,pro_libelle, pop_libelle) %>% 
+  group_by(sta_id) %>% 
+  filter(n_distinct(pro_libelle) > 1) %>% 
+  ungroup() %>% 
+  count(pop_libelle, pro_libelle) %>% 
+  pivot_wider(
+    names_from = pro_libelle,
+    values_from = n, 
+    values_fill = 0
+  )
+```
+
+```{r tableau stations avec erreur protocoles}
+ope_error_protocol %>%
+  flextable::flextable() %>%
+  flextable::autofit() %>%
+  flextable::colformat_int(j = c(1, 3), big.mark = " ")
+```
+
 
 ## Effort de pêche
 
@@ -463,10 +516,6 @@ sta_id_ope_selection <- ope_selection_sta %>%
   ungroup() #%>% # Pour la visualisation graphique je n'ai besoin que d'un seul exemple d'ope_id par station
  # mutate(taille_point = scales::rescale((nb_ope_par_sta), to = c(10, 19)))
 
-```
-
-```{r}
-#summary(sta_id_ope_selection)
 ```
 
 
@@ -536,7 +585,6 @@ pop_plusieurs_sta <- pop_plusieurs_sta %>%
 Nombre de points (`pop_id`) correspondant à plusieurs stations (`sta_id`) : `r pop_plusieurs_sta`
 
 
-
 ### 1 station = 1 point de prélèvement ?
 
   Nous vérifions qu'une station (*sta_id*)  est bien rattachée à un point de prélèvement (*pop_id*). Si ce n'est pas le cas, il ne s'agit pas d'une erreur du jeu de données. Cependant, une optimisation potentielle peut être réalisée. 
@@ -574,7 +622,7 @@ sta_plusieurs_pop %>%
 
 # Sauvegarde 
 
-Sauvegarde pour le script suivant (sélection des espèces) : script 03_analyse_selection_especes.
+Sauvegarde pour le script suivant (sélection des espèces) : script 03_Selection_especes.
 
 ```{r Sauvegarde}
 save(pop_serie_tempo,
@@ -584,7 +632,7 @@ save(pop_serie_tempo,
      file = "../processed_data/selection_pop_ope.rda")
 ```
 
-Sauvegarde pour la création de la carte de situation : script 01_production_carte_selection_station.
+Sauvegarde pour la création de la carte de situation : script 02_production_carte_selection_station.
 
 ```{r Sauvegarde 2}
 save(sta_id_ope_selection,

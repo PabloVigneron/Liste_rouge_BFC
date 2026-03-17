@@ -29,9 +29,9 @@ knitr::opts_chunk$set(echo = TRUE,
                       warning = FALSE)
 ```
 
-# Objectif : Dynamique de population des poissons d'eau douce de Bretagne 
+# Objectif : Dynamique de population des poissons d'eau douce de Bourgogne-Franche-Comté
 
-Script : 01_production_carte_selection_station
+Script : 02_production_carte_selection_station
 
   Après avoir sélectionné les différentes stations / points de prélèvements et opérations de pêches de l'aire géographique ciblée, une carte globale est réalisée.  
 

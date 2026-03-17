@@ -1,0 +1,241 @@
+---
+title: "25_pretreatment_criteres_lrr_uicn"
+author: "PabloVigneron"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Objectif : Dynamique de population des poissons d'eau douce de Bretagne
+
+Script : 25_pretreatment_criteres_lrr_uicn
+
+  Ce script a pour objectif de réaliser des pré-traitements avant l'application de la méthodologie de la liste rouge régionale (UICN France, 2012) sur les données. Ce script contient 1 grande étape : la **sélection des espèces à évaluer** et **l'observation des espèces au sein des stations sélectionnées** - selon le déroulement de la méthodologie UICN. 
+
+
+# Installation 
+
+## Chargement des packages, des fonctions et des données
+
+```{r Chargement des packages}
+library(tidyverse)
+library(readxl)
+```
+
+```{r chargement des données}
+load(file = "../processed_data/assemblage_tab_par_ope.rda")
+load(file = "../processed_data/calcul_indicateurs_regionaux.rda")
+```
+
+```{r Chargement Excel}
+## Fichier Excel contenant les différentes espèces de la région ainsi que leurs temps de générations, leurs statuts d'endémisme à la région
+reg_espece <- read_excel("../raw_data/selection_taxon_lrr.xlsx")
+```
+
+```{r Chargement palette de couleur}
+# Définir une palette de couleurs personnalisée
+my_palette <- c("grey", heat.colors(99))
+```
+
+# Application méthodologie UICN
+## Sélection des espèces - cas de la Bretagne 
+
+
+En Bretagne, 8 espèces indigènes présentes des données insufisantes : 
+
+- Alose feinte : données manquantes; présence côtière, peu ou pas d'observation en eau douce, hybridation possible avec la grande alose;
+
+- Flet : migrateur aux données manquantes; espèce qui n'est pas étudiée et qui l'a été seulement pour caractériser la qualité des estuaires alors qu'elle fait partie de la communauté françaises des poissons diadromes;
+
+- Lamproie fluviatile : manque de données; lamproie de planer et lamproie fluviatile pourraient être deux formes biologiques d'une même espèce (résidente en eau douce et marine);
+
+- Mulet porc : migrateur aux données manquantes; espèce qui n'a été que très peu étudiée  alors qu'elle fait partie de la communauté française des poissons diadromes;
+
+- Tanche : peu de données; espèce très inféodées aux végétaux aquatiques peu représentés dans les potamons bretons (Vilaine - Oust); occurrence de 26 % dans les données CSP-Onema avec une aire de répartition orientale; les analyses statistiques sur le RHP ne montrent pas d'évolutions significatives à l'échelle régionale; cette espèce se reproduit, comme le brochet dans des annexes de la plaine alluviale mais à une période plus tardive au printemps; les conditions de réussite semblent ainsi moins défavorables que pour le brochet;
+
+- Vandoise rostrée :parasitisme laissant supposé un impact sur les populations, mais peu documenté et pas chiffré; le domaine typoloigique de la vandoise est assez réduit en Bretagne (épipotamon et hyporhithron); occurence de 26 % sur réseau de contrôle de surveillance (env 100 stations); les chronologies RHP montrent des résultats très fluctuants (variabilité naturelle des reproduction des cyprinidés ???); cependant on observe des effectifs non négligeables dans des milieux assez dégradés; l'impact du parasitisme a probablement peu de chance de menacer l'espèce à court terme; la menace principale est l'étagement présent en BZH mais depuis longtemps et pas suceptible d'évoluer dans le mauvais sens (tendance plutôt à la suppression de seuils);
+
+
+- Epinoche, Grande Alose et carpes communes : trop peu de données renseignées sur ces espèces durant les pêches.
+
+Ces espèces sont donc renseignées comme "DD" dans la colonne "statut_lrr" du dataframe :
+
+```{r Mise en place DD}
+esp_DD <- c("ALF", "BRB", "BRE", "CCO", "EPI", "EPT", "FLE","MUP", "LPR", "LPM","TAN", "ALA", "GRE","ABL", "ROT")
+reg_espece$statut_lrr <- NA # Création d'une colonne statut_lrr
+reg_espece$statut_lrr <- ifelse(reg_espece$esp_code_alternatif %in% esp_DD, "DD", NA)
+reg_espece$statut_lrr <- ifelse(reg_espece$esp_code_alternatif %in% esp_DD | reg_espece$statut_esp %in% c("introduite","erratique"), "DD", NA)
+reg_espece$statut_lrr <- ifelse(is.na(reg_espece$statut_lrr), "Applicable", reg_espece$statut_lrr)
+
+```
+
+
+### Bilan des espèces évaluées 
+
+On réalise une liste bilan des espèces qui vont donc être évaluées :
+
+```{r Liste espèce à traiter}
+# Définir la liste des espèces indigènes à traiter pour l'évaluation des critères UICN
+mes_especes <- reg_espece %>% 
+  filter (statut_esp == "indigene",
+          statut_lrr == "Applicable") %>% 
+  pull(esp_code_alternatif)
+```
+
+
+## Temps de génération des espèces évaluées
+
+  Les critères de classification de l’UICN nécessitent l’utilisation d’un temps de génération spécifique à chacun des taxons étudiés. La durée d’une génération correspond à l’âge moyen des parents de la cohorte actuelle, c’est-à-dire des parents des nouveau-nés dans la population (UICN, 2012). D’après l’UICN (2012), le risque de disparition « à court terme » d’une espèce fait référence à une période de dix ans ou à trois générations pour les espèces dont la durée de trois générations dépasse les dix ans. L’utilisation de cette période de référence comme standard méthodologique permet d’assurer une comparaison jugée comme « sereine » entre échelles ou territoires (Vigneron et al., 2017). Les temps de génération des espèces étudiées ainsi que leur temps d’étude pour ce travail sont établi dans la colone *periode_etude_lrr* pour chaque espèce évaluée à partir des temps de générations : 
+
+```{r Tableau liste espece a traiter}
+reg_espece <- reg_espece %>% 
+  filter(statut_lrr == "Applicable")
+
+reg_espece <- reg_espece %>%
+  mutate(periode_etude_lrr = ifelse(3 * temps_generation >= 10, 3 * temps_generation, 10)) %>% 
+  mutate(annee_debut = 2023 - periode_etude_lrr) %>%
+  mutate(periode_etude = paste(annee_debut, "2023", sep = "-"))
+```
+
+```{r Tableau liste espece a traiter 2}
+tab_reg_espece <- dplyr::select(reg_espece, 
+                                esp_nom_commun, 
+                                esp_code_alternatif, 
+                                temps_generation, 
+                                periode_etude_lrr, 
+                                periode_etude)
+
+colnames(tab_reg_espece) <- c("Nom commun", "Nom de code", "Temps de génération","Durée d'étude LRR","Période d'étude LRR")
+
+tab_reg_espece %>% 
+  flextable::flextable() %>% 
+  flextable::autofit() %>% 
+  flextable::colformat_int(j = c(1, 3), big.mark = " ")
+
+```
+
+
+## Occurrences des espèces par station
+
+### Mise en forme des données
+
+Création d'un dataframe avec toutes les combinaisons possibles d'années, indicateurs, stades et esp_code_alternatif, à l'échelle régionale :
+
+```{r Ajout des Présences / Absences reg_indicateur}
+combinaisons_esp_sta <- expand.grid(annee = unique(reg_indicateur$annee),
+                            indicateur = unique(reg_indicateur$indicateur),
+                            stade = unique(reg_indicateur$stade),
+                            esp_code_alternatif = unique(reg_indicateur$esp_code_alternatif))
+```
+
+```{r Fusion combinaison}
+# Fusionner le tableau des combinaisons avec le tableau original en ajoutant des valeurs manquantes avec valeur 0
+reg_indicateur_complet <- combinaisons_esp_sta %>%
+  left_join(reg_indicateur, by = c("annee", "indicateur", "stade", "esp_code_alternatif")) %>%
+  mutate(valeur = ifelse(is.na(valeur), 0, valeur))
+
+```
+
+
+Création d'un dataframe avec toutes les combinaisons possibles d'années, indicateurs, stades et esp_code_alternatif, à l'échelles des opérations :
+
+```{r Ajout des Présences / Absences ope_indicateur}
+combinaisons_esp_ope <- expand.grid(annee = unique(ope_indicateur$annee),
+                            indicateur = unique(ope_indicateur$indicateur),
+                            stade = unique(ope_indicateur$stade),
+                            esp_code_alternatif = unique(ope_indicateur$esp_code_alternatif),
+                            pop_id = unique(ope_indicateur$pop_id))
+```
+
+
+```{r Fusion combinaisons ope}
+# Fusionner le tableau des combinaisons avec le tableau original en ajoutant des valeurs manquantes avec valeur 0
+ope_indicateur_complet <- combinaisons_esp_ope %>%
+  left_join(ope_indicateur, by = c("annee", "indicateur", "stade", "esp_code_alternatif", "pop_id"))%>%
+  mutate(valeur = ifelse(is.na(valeur), 0, valeur))
+
+```
+
+
+```{r Filtrage et mise en forme}
+# Construction d'un df avec espèce applicable et leurs temps de génération
+reg_periode_etude_lrr <- reg_espece %>%
+  select(esp_code_alternatif,
+                  periode_etude_lrr)
+
+ope_periode_etude_lrr <- reg_espece %>%
+    select(esp_code_alternatif,
+                  periode_etude_lrr)
+
+
+# Maintenant, ope_indicateur_complet contient toutes les combinaisons possibles avec des valeurs de 0 pour celles qui étaient manquantes dans ope_indicateur
+ope_indicateur_complet <- ope_indicateur_complet %>%
+  left_join(ope_periode_etude_lrr, by = "esp_code_alternatif") %>% 
+  filter(esp_code_alternatif %in% mes_especes)
+
+ope_indicateur_complet_effectif <- ope_indicateur_complet %>%
+  filter(indicateur == "effectif_total",
+         stade == "ind")
+
+
+reg_indicateur_complet <- reg_indicateur_complet %>%
+  left_join(reg_periode_etude_lrr, by = "esp_code_alternatif") %>% 
+  filter(esp_code_alternatif %in% mes_especes)
+
+reg_indicateur_complet_effectif <- reg_indicateur_complet %>%
+  filter(indicateur == "effectif_total",
+         stade == "ind")
+
+```
+
+
+
+### Observation des occurrences par station 
+
+On observe plus en détail l'allure de l'occurrence des espèces par station : 
+
+```{r Calcul taux occurrence, fig.height = 25, fig.width = 25}
+
+occur_sta_esp <- ope_indicateur_complet_effectif %>% 
+  filter(stade == "ind",
+         esp_code_alternatif == "ANG") %>%
+  group_by(pop_id, annee, esp_code_alternatif)
+
+# Convertir pop_id en facteur
+occur_sta_esp$pop_id <- factor(occur_sta_esp$pop_id)
+
+# Créer le graphique avec ggplot2 et facettes pour chaque espèce
+ggplot(occur_sta_esp, aes(x = annee, y = pop_id, size = valeur, color = valeur)) +
+  geom_point() +
+  scale_size_continuous(range = c(1, 8)) + # Ajuster la plage de taille des points selon vos préférences
+  scale_color_gradientn(colors = c("grey", heat.colors(99)), na.value = "grey") + # Utiliser une palette de couleurs personnalisée
+  scale_x_continuous(breaks = seq(min(occur_sta_esp$annee), max(occur_sta_esp$annee), by = 1)) +
+  facet_wrap(~ esp_code_alternatif, scales = "free") +
+  theme_bw() +
+  theme(strip.background = element_rect(color = "black", fill = "#faffff"),
+        legend.position = "bottom",
+        panel.background = element_rect(fill = "#faf0e0"),
+        panel.grid.major = element_line(color = "lightgrey", size = 0.1),
+        panel.grid.minor = element_line(color = "lightgrey"),
+        axis.text.x = element_text(angle = 45))
+
+```
+
+
+# Sauvegarde
+
+```{r}
+save(ope_indicateur,
+     reg_espece,
+     ope_indicateur_complet,
+     reg_indicateur_complet,
+     file = "../processed_data/pre_traitement_criteres_lrr_uicn.rda")
+```
+

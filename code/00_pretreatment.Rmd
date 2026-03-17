@@ -91,6 +91,9 @@ mapview(
 )
 
 ```
+```{r}
+summary(sites_geo$reseaux)
+```
 
 # Installer le package aspe
 ```{r}
