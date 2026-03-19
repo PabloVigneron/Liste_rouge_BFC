@@ -57,6 +57,7 @@ library(sf)
 
 ```{r Chargement fonction}
 source(file = "../R/borner_series.R") # Chargement de la fonction borner_series 
+source(file = "../R/detect_pro_errors.R")
 ```
 
 # Chargement des données issues de la base ASPE : 
@@ -72,6 +73,7 @@ load(rdata_tables) # Chargement des données
 pal <- wes_palette("AsteroidCity1") # Chargement des palettes de couleur
 pal2 <- wes_palette("FantasticFox1")
 pal3 <- c("#007844", "#92D050", "#0087C1", "#A97B30","#FCEE21", "#00AEEF", "#1D1D1B", "#B9D9EB")
+pal4 <- wes_palette("GrandBudapest1")
 ```
 
 
@@ -108,9 +110,9 @@ mes_reseaux <- c("RCS – Réseau de Contrôle de Surveillance", # Réseaux de p
                  "RHP – Réseau Hydrobiologique Piscicole")
 
 mes_types_de_peche <- c("Pêche complète à un ou plusieurs passages", # Types de pêches
-                        "Pêche partielle par points (grand milieu)",
-                        "Pêche par ambiances",
-                        "Pêche partielle sur berge")
+                        "Pêche partielle par points (grand milieu)")
+                       # "Pêche par ambiances",
+                        #"Pêche partielle sur berge")
 
 n_mini_annee <- 9 # Nombre minimum d'années des séries de pêches 
 
@@ -138,8 +140,8 @@ mes_depts <- departements_metro_geo %>%
 ```
 
 ```{r}
-mes_depts %>% 
-  mapview::mapview() # Visualisation de la zone géographique sélectionnée 
+#mes_depts %>% 
+#  mapview::mapview() # Visualisation de la zone géographique sélectionnée 
 ```
 
 ## Mise en place d'un buffer
@@ -153,10 +155,10 @@ buffer <- st_buffer(mes_depts, # Mise en place d'un buffer
 ```
 
 ```{r}
-mapview( # Visualisation de l'aire géographique et du buffer ----
-  list(buffer, mes_depts),
-  layer.name = c("Bourgogne-Franche-Comté avec un buffer de 1 km", "Bourgogne-Franche-Comté"),
-  col.regions = list("#0A9F9D", "darkseagreen"))
+#mapview( # Visualisation de l'aire géographique et du buffer ----
+#  list(buffer, mes_depts),
+#  layer.name = c("Bourgogne-Franche-Comté avec un buffer de 1 km", "Bourgogne-Franche-Comté"),
+#  col.regions = list("#0A9F9D", "darkseagreen"))
 ```
 
 
@@ -183,7 +185,7 @@ mapview( # Visualisation des points de prélèvements présents dans l'aire géo
 ```
 
 
-  Dans l'aire géographique sélectionnée, le nombre de points de prélèvements s'élève à 11837 (*pop_id*). Une station (*sta_id*) peut contenir plusieurs points de prélèvements. L'inverse n'est en revanche pas possible - si c'est le cas, voir ci-dessous la partie "Vérification des données". Après visualisation de l'aire géographique et de ses points de prélèvements associés, une sauvegarde des *pop_id* est réalisée dans la passerelle.
+  Dans l'aire géographique sélectionnée, le nombre de points de prélèvements (*pop_id*). Une station (*sta_id*) peut contenir plusieurs points de prélèvements. L'inverse n'est en revanche pas possible - si c'est le cas, voir ci-dessous la partie "Vérification des données". Après visualisation de l'aire géographique et de ses points de prélèvements associés, une sauvegarde des *pop_id* est réalisée dans la passerelle.
 
 ```{r Sauvegarde pop_id}
 passerelle <- passerelle %>%
@@ -266,7 +268,6 @@ ope_selection <- ope_selection %>% # Réduction du jeu de donnée à notre anné
 ```
 
 
-
 ## Caractéristiques des séries temporelles
 
   Nous souhaitons sélectionner les sites (*sta_id*) qui ont été suivis pendant suffisamment longtemps pour constituer des séries temporelles robustes. Nous identifions le nombre d’années de données disponibles par point de prélèvement et appliquons des critères de sélection basés sur la durée et la continuité des suivis. Afin d’obtenir une robustesse statistique suffisante, une sauvegarde des stations avec au moins 10 années de données consécutives sur un même point de prélèvement est appliquée (utilisation de la fonction *borner_series*). 
@@ -301,121 +302,10 @@ ope_selection <- ope_selection %>%
 *ope_selection* contient l'ensemble des stations (*sta_id*),  des points de prélèvements (*pop_id*) et  des opérations de pêche (*ope_id*) que nous étudierons pour contribuer à l'actualisation de la liste rouge régionale de Bretagne des poissons d'eau douce.
 
 
+## Correction du dataframe : protocole non homogène
 
-### Représentation graphique
+Les libellés des points de prélèvements sont mis en forme et ajoutés dans le jeu de données *ope_selection*. 
 
-  Nous réalisons une représentation graphique des séries temporelles constituées. Nous ajoutons les types de pêches (*pro_libelle*) associées aux opérations des séries. En amont, les libellés des points de prélèvements sont mis en forme et ajoutés dans le jeu de données *ope_selection*. 
-
-```{r Ajout libellés points de prélèvements}
-#regles_modification <- tribble( # Définir les règles de modification des libellés
-#  ~ancien_libelle,                        ~nouveau_libelle,
-#  "AIN A MESNOIS 1",                        "Ain à Mesnois 1",
-#  "ALENE A FOURS",                          "Alene à Fours", 
-#  "ALENE à LUZY",                           "Alene à Luzy",
-#  "ALLIER à LANGERON",                      "Allier à Langeron",
-#  "ARCONCE à POISSON",                      "Aronce à Poisson",
-#  "ARROUX à AUTUN",                         "Arroux à Autun",
-#  "BALERNE A NEY 2",                        "Balerne à ney 2",
-#  "BALME A BOURCIA ",                       "Balme à Bourcia",
-#  "BEULETIN A ESMOULIERES 1",               "Beuletin à Esmouileres 1",
-#  "BOURBINCE à VITRY-EN-CHAROLLAIS",        "Bourbince à Vitry-en-charollais",
-#  "BREUCHIN A ORMOICHE 1",                  "Breuchin à Ormoiche",
-#  "BRIZOTTE A AUXONNE",                     "Brizotte à Auxonne",
-#  "CANNE à SAINT-GRATIEN-SAVIGNY",          "Canne à Saint-Gratien-Savigny",
-#  "CLAUGE A LA-LOYE 1",                     "Clauge à La-Loye 1",
-#  "CUSANCIN A BAUME-LES-DAMES 1",           "Cusancin à Beaume-les-Dames 1",
-#  "DESSOUBRE A ST-HIPPOLYTE 1",             "Dessourbe à St-Hippolyte 1",
-#  "DHEUNE A ESSERTENNE", 
-#  "DHEUNE A ST-MARTIN-EN-GATINOIS", 
-#  "DOUBS A COLOMBIER-FONTAINE 1", 
-#  "DOUBS A MOLAY", 
-#  "DOUBS A MORTEAU 1", 
-# "DOUBS A THORAISE 1",
-#  "DOULONNES A PLUMONT 2",
-#  "DREE à SAINT-LEGER-DU-BOIS",
-#  "FOURCHES A AUXON 5",
-#  "FURIEUSE A LA-CHAPELLE-SUR-FURIEUSE 4",
-#  "GLAND A AUDINCOURT 1",
-#  "GOURGEONNE A TINCEY-ET-PONTREBEAU 1",
-#  "GRISON A ETRIGNY",
-#  "GUYE A SIGY-LE-CHATEL",
-#  "L'ARMANÇON A CHENY 1",
-#  "L'OUANNE A SAINT-MARTIN-SUR-OUANNE 1",
-#  "L'OURCE A MENESBLE 1",
-#  "L'YONNE A CHATEAU-CHINON(CAMPAGNE) 3",
-#  "L'YONNE A MONTREUILLON 1",
-#  "L'YONNE A PREGILBERT 1",
-#  "LA CURE A ACCOLAY 1",
-#  "LA CURE A ASQUINS 1",
-#  "LA GROÈME A TERREFONDREE 1",
-#  "La Loire à Lere",
-#  "LA RIVIÈRE DE DRUYES A ANDRYES 1",
-#  "LA SEINE A NOD-SUR-SEINE 1",
-#  "LANTERNE A FLEUREY-LES-FAVERNEY 1",
-#  "LE BRANLIN A MEZILLES 1",
-#  "LE BREVON A BUSSEAUT 1",
-#  "LE CHALAUX A OUROUX-EN-MORVAN 2",
-#  "LE RUISSEAU DE VILLARNON A MONTMOYEN 1",
-#  "LE RUISSEAU DES GOTHS A CHALAUX 1",
-#  "LE SAUZAY A CORVOL-L'ORGUEILLEUX 1",
-#  "LE SEREIN A VIEUX-CHATEAU 2",
-#  "LE THOLON A CHAMPVALLON 1",
-#  "Loire à Beaulon",
-#  "LOIRE à DECIZE",
-#  "LOIRE à NEVERS",
-#  "LOIRE À SURY-PRES-LERE",
-#  "MECHET à SAINT-PRIX",
-#  "MEUZIN A CORGENGOUX 2",
-#  "MORTE A BUCEY-LES-GY 3",
-#  "NIEVRE à COULANGES-LES-NEVERS",
-#  "NIEVRE à DOMPIERRE-SUR-NIEVRE",
-#  "NOHAIN à SAINT-MARTIN-SUR-NOHAIN",
-#  "OGNON A BUSSIERES 1",
-#  "OGNON A HAUT-DU-THEM-CHATEAU-LAMBERT 1",
-#  "OGNON A PESMES 1",
-#  "OUCHE A FLEUREY-SUR-OUCHE 1",
-#  "RAFFENOT A CHATEAUVIEUX-LES-FOSSES",
-#  "RAHIN A AYNANS 1",
-#  "RHIEN A RONCHAMP 1",
-#  "ROMAINE A LA ROMAINE 1",
-#  "RUISSEAU DE NOIRONTE A RUFFEY-LE-CHATEAU",
-#  "SALON A AUTET 1",
-#  "SAONE A APREMONT 1",
-#  "SAONE A AUXONNE 1",
-#  "SAONE A CHARREY-SUR-SAONE",
-#  "SAONE A FLEURVILLE",
-#  "SAONE A GERGY",
-#  "SAONE A JUSSEY 1",
-#  "SAONE A OUROUX-SUR-SAONE",
-#  "SAONE A SCEY-SUR-SAONE-ET-ST-ALBIN 1",
-#  "SAONE A SEURRE",
-#  "SAONE A ST-SYMPHORIEN-D'ANCELLES",
-#  "SAVOUREUSE A VIEUX-CHARMONT",
-#  "SEILLE A LA-TRUCHERE",
-#  "SEILLE A NEVY-SUR-SEILLE 2",
-#  "SOMME à MALTAT",
-#  "SORNIN à SAINT-MAURICE-LES-CHATEAUNEUF",
-#  "TERNIN à CHISSEY-EN-MORVAN",
-#  "THEVEROT A LES-GRAS 1",
-#  "TILLE A CHAMPDOTRE 1",
-#  "TILLE A CUSSEY-LES-FORGES",
-#  "TILLE A TIL-CHATEL 1",
-#  "VALSERINE A LAJOUX 3",
-#  "VENELLE A FONCEGRIVE",
-#  "VIEILLES GRANGES A SORANS-LES-BREUREY 1",
-#  "VOUGE A AUBIGNY-EN-PLAINE"  
-#)
-
-```
-
-```{r Autre méthode Mise à jour des libellés}
-#ope_selection <- ope_selection %>%
-#  left_join(regles_modification, by = c("pop_libelle" = "ancien_libelle")) %>% # Ajout des nouveaux libellés
-#  mutate(n_pop_libelle = coalesce(nouveau_libelle, pop_libelle)) %>%
-#  select(-nouveau_libelle,
-#         -pop_libelle) %>% 
-#  rename(pop_libelle = n_pop_libelle)
-```
 
 ```{r Mise à jour des libellés}
 ope_selection <- ope_selection %>%
@@ -423,11 +313,68 @@ ope_selection <- ope_selection %>%
     pop_libelle = pop_libelle %>%
       str_to_lower %>%
       str_to_title %>%
-      str_replace_all("\\b(A|À)\\b", "à")
+      str_replace_all("\\b(A|À)\\b", "à") %>% 
+      str_remove("\\s*\\d+$")
   )
     
 ```
-Une représentation graphique des séries temporelles constitués est réalisée : 
+
+
+Dans les stations suivantes un changements de protocole c'est effectué dans la série temporelles : 
+
+-**La Rivière De Druyes à Andryes** :  1 **pêche complète** en 2016 au lieu d'une **pêche partielle par points**
+
+-**L'ouanne à Saint-Martin-Sur-Ouanne** : melange de pleins de pêche **pêche complète** et de **pêche partielle par points**
+
+-**Savoureuse à Vieux-Charmont** : 
+
+-**Doubs à Colombier-Fontaine 1** : pêche par ambiance à supprimer : Attention 10 ans de suivis => 9ans 
+
+On observe dans les series temporelles qu'il y a des stations qui sont prospecter avec des protocoles différents, ce qui n'est pas censé être le cas. On détecte et corrige alors dans le jeu de données les stations avec des protocoles différents avec la fonction *detect_pro_errors()*:
+
+
+```{r Correction des erreurs de protocole dans le df}
+ope_selection <- ope_selection %>%
+  detect_pro_errors()  
+
+erreurs <- attr(ope_selection, "erreurs_protocoles") # Verifier les erreurs du df
+
+ope_selection<- ope_selection %>% {
+    attr(., "erreurs_protocoles") <- NULL
+    .
+  } # Suppression de l'attribut après vérifications des erreurs du df 
+
+```
+
+```{r Récréation séries temporelles - fonction borner_serie}
+pop_serie_tempo <- ope_selection %>%
+  borner_series(var_id_site = pop_id,  #Utilisation de la fonction "borner_series"
+                var_temp = annee,
+                max_nb_obs_manquantes = n_max_manquant) # PARAMETRE
+```
+
+```{r Recréation séries temporelles}
+pop_serie_tempo <- pop_serie_tempo %>%
+  filter(n_opes > n_mini_annee) %>% # PARAMETRE
+  select(-annee_mini) %>% 
+  pull(pop_id)
+```
+
+```{r Actualisation ope_selection après modif series}
+ope_selection <- ope_selection %>% 
+  filter(pop_id %in% pop_serie_tempo) # Sélection des pop_id contenus dans la sélection de séries temporelles
+```
+
+```{r Nombre de stations selectionnées}
+#ope_selection %>%
+#  group_by(sta_id) %>%
+#  summarise(n = n()) %>%  
+#  ungroup() %>%
+#  summarise(total = n())
+```
+### Représentation graphique
+
+  Nous réalisons une représentation graphique des séries temporelles constituées. Nous ajoutons les types de pêches (*pro_libelle*) associées aux opérations des séries.
 
 ```{r Représentation séries temporelles, fig.height = 15, fig.width = 20}
 ope_selection %>% # Représentation graphique des stations sélectionnées et des types de pêche associées
@@ -451,49 +398,7 @@ ope_selection %>% # Représentation graphique des stations sélectionnées et de
   scale_y_continuous(breaks = seq(min(ope_selection$annee), max(ope_selection$annee), by = 3))
 ```
 
-```{r Nombre de stations selectionnées}
-#ope_selection %>%
-#  group_by(sta_id) %>% 
-#  summarise(n=n()) %>% 
-#  ungroup() %>% 
-#  summarise(total=n())
-```
-## Correction du dataframe : protocole non homogène
-
-Dans les stations suivantes un changements de protocole c'est effectué dans la série temporelles : 
-
--**La Rivière De Druyes à Andryes** :  1 **pêche complète** en 2016 au lieu d'une **pêche partielle par points**
-
--**L'ouanne à Saint-Martin-Sur-Ouanne** : melange de pleins de pêche **pêche complète** et de **pêche partielle par points**
-
--**Savoureuse à Vieux-Charmont** : 
-
--**Doubs à Colombier-Fontaine 1** : pêche par ambiance à supprimer : Attention 10 ans de suivis => 9ans 
-
-On observe dans les series temporelles qu'il y a des stations qui sont prospecter avec des protocoles différents, ce qui n'est pas censé être le cas. On détecte alors dans le jeu de données les stations avec des protocoles différents et les stocke dans un tableau *ope_error_protocol*: 
-```{r detection stations avec erreur, plusieurs protocoles}
-ope_error_protocol <- ope_selection %>%
-  select(sta_id,pro_libelle, pop_libelle) %>% 
-  group_by(sta_id) %>% 
-  filter(n_distinct(pro_libelle) > 1) %>% 
-  ungroup() %>% 
-  count(pop_libelle, pro_libelle) %>% 
-  pivot_wider(
-    names_from = pro_libelle,
-    values_from = n, 
-    values_fill = 0
-  )
-```
-
-```{r tableau stations avec erreur protocoles}
-ope_error_protocol %>%
-  flextable::flextable() %>%
-  flextable::autofit() %>%
-  flextable::colformat_int(j = c(1, 3), big.mark = " ")
-```
-
-
-## Effort de pêche
+# Effort de pêche
 
   Nous souhaitons visualiser les différents efforts de pêche par points de prélèvements sélectionnés. Il s'agit d'observer si un déséquilibre se dessine entre les stations sélectionnées et l'ensemble du territoire couvert par l'étude.
 
@@ -513,8 +418,8 @@ ope_selection_sta <- ope_selection %>%
 sta_id_ope_selection <- ope_selection_sta %>%
   group_by(sta_id) %>%
   sample_n(1) %>%
-  ungroup() #%>% # Pour la visualisation graphique je n'ai besoin que d'un seul exemple d'ope_id par station
- # mutate(taille_point = scales::rescale((nb_ope_par_sta), to = c(10, 19)))
+  ungroup() %>% 
+  select(sta_id, ope_id, pop_id, nb_ope_par_sta, pop_code_sandre, geometry, DEP, AREA)#%>% # Pour la visualisation graphique je n'ai besoin que d'un seul exemple d'ope_id par station
 
 ```
 
@@ -640,4 +545,3 @@ save(sta_id_ope_selection,
      mes_depts,
      file = "../processed_data/selection_pop_ope_carte.rda")
 ```
-

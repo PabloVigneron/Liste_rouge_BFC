@@ -48,6 +48,8 @@ Script : 03_selection_especes
 library(tidyverse)
 library(aspe)
 library(ggrepel)
+library(janitor)
+library(scales)
 ```
 
 ```{r Chargement des données}
@@ -73,6 +75,46 @@ load(mei_table) # Chargement des données
 
 
 # Chargement de la liste d'espèce de la liste rouge 2016 Bourgogne
+
+```{r Chargement des données taxref}
+base_tax_ref_aspe <- readxl::read_xlsx("../raw_data/ASPE_Suivi référentiel taxon_20250603 (1).xlsx", skip = 3)
+base_tax_ref_uicn <- readr::read_delim('../raw_data/TAXREFv18.txt') 
+```
+
+```{r construire ref taxon uicn}
+tax_ref_uicn <- base_tax_ref_uicn %>%
+  clean_names() %>%
+  select(
+    phylum,
+    classe,
+    ordre,
+    famille,
+    sous_famille,
+    cd_ref,
+    cd_nom,
+    nom_complet,
+    nom_valide,
+    nom_vern,
+    lb_nom,
+    fr
+  ) %>%
+  filter(classe == "Actinopterygii" | classe == "Petromyzonti", fr == "P") %>%
+  select(cd_nom, classe, ordre, famille, nom_complet, nom_vern) %>%
+  rename(code_taxref = cd_nom)
+```
+
+```{r construire ref taxon base aspe}
+tax_ref_aspe <- base_tax_ref_aspe %>%
+  clean_names() %>% 
+  rename(esp_code_alternatif = code_alternatif_aspe,
+         localite = hexagone_h_outre_mer_om, 
+         nom_vernaculaire = nom_commun, 
+         taxon = poisson_p_macro_crustaces_mc_amphibien_a) %>% 
+  filter(localite == "H", 
+         taxon == "P") %>% 
+  select(esp_code_alternatif, nom_vernaculaire, nom_latin, code_taxref, esp_code_alternatif)
+
+```
 
 
 # Constitution du jeu de données
@@ -133,7 +175,6 @@ esp_ope_selection_VAR <- esp_ope_selection %>%
 ```
 
 
-
 ```{r Tri espèces esp_ope_selection}
 esp_ope_selection <- esp_ope_selection %>%
   mutate(esp_code_alternatif =
@@ -144,6 +185,36 @@ esp_ope_selection <- esp_ope_selection %>%
            )) %>%
   filter(!(esp_code_alternatif %in% params$especes_a_retirer)) # Espèces à retirer
 ```
+
+
+
+## Ajout nom espèce - taxref v18 au dataframe
+
+```{r jointure taxref au dataframe}
+
+# Jointure taxref avec ref taxe aspe 
+tax_ref_aspe_test <- tax_ref_aspe %>%
+  left_join(tax_ref_uicn, by = "code_taxref") %>% 
+  select(esp_code_alternatif, nom_vernaculaire, nom_latin, nom_complet)
+
+# Jointure Aspe+taxref avec le df 
+
+esp_ope_selection_test <- esp_ope_selection %>% 
+  left_join(tax_ref_aspe_test, by = "esp_code_alternatif")
+
+```
+
+## Liste d'espèces de BFC à partir de la base ASPE
+
+```{r}
+
+list_esp <- esp_ope_selection_test %>% 
+  select(nom_vernaculaire, nom_latin)
+
+
+```
+
+
 
 
 # Analyse des données espèces
@@ -192,7 +263,6 @@ esp_effectif <- ope_esp_densite %>% # Calcul de l'effectif total pour chaque esp
 
 ```{r Barplot effectif total espèce,  fig.height = 8, fig.width = 10}}
 
-library(scales)
 breaks <- unique(c(seq(0,1,by = 0.1), 
     seq(1,10, 1), seq(10,100, 10)))
 
