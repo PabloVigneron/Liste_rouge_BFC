@@ -3,7 +3,10 @@ title: "03_Selection_especes"
 author: "PabloVigneron"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 params:
-  especes_lrr_2014: !r c("LOT", "LOE", CHE", "BRO","BOU", "ANG", "PER", "BAF", "EPT", "ABH, "BRE", "EPI", "CCO", "CHA", "HOT", "VAI", "TAN", "BLN", "VAN", "TRF", "LPP", "OBR", "ROT", "ABL", "GAR", "IDE", "LOF", "TOX", "GRE", "BRB", "SPI", "GOU", "LPM", "LOR", "LPP")
+  
+  especes_BFC_2014: !r c("LOT","LOE","CHE","BRO","BOU","ANG","PER","BAF","EPT","ABH","BRE","EPI","CCO","CHA","HOT","VAI","TAN","BLN","VAN","TRF","LPP","OBR","ROT","ABL","GAR","IDE","LOF","TOX","GRE","BRB","SPI","GOU","LPM","LOR","LPP")
+  
+  especes_lrr_FC: !r c("LOT", "LOE", "CHE", "BRO", "VAI", "ANG", "ABH", "ABL", "BAF", "TAN", "EPT", "LPP", "TOX", "BLN", "BRE", "TRF", "CCO", "GOU", "HOT", "EPI", "IDE", "ROT", "LOF", "BRB", "GRE", "GAR", "OBR", "VAN", "CHA", "BOU", "APR", "PER", "SPI", "LOR")
   
   especes_a_retirer: !r c("APP","ASA", "OCL", "PCC","PFL", "BRX","CAX","CYP","HBG","CCU","GOX", "LPX") # Sélection des espèces à retirer du jeu de données initial
 output: 
@@ -97,9 +100,11 @@ tax_ref_uicn <- base_tax_ref_uicn %>%
     lb_nom,
     fr
   ) %>%
-  filter(classe == "Actinopterygii" | classe == "Petromyzonti", fr == "P") %>%
-  select(cd_nom, classe, ordre, famille, nom_complet, nom_vern) %>%
-  rename(code_taxref = cd_nom)
+  filter(classe == "Actinopterygii" | classe == "Petromyzonti") %>%
+  select(cd_nom, classe, ordre, famille, nom_complet, nom_vern,lb_nom ) %>%
+  rename(code_taxref = cd_nom, 
+         nom_commun = nom_vern,
+         nom_scientifique = lb_nom)
 ```
 
 ```{r construire ref taxon base aspe}
@@ -121,7 +126,6 @@ liste_esp_bfc <- readxl::read_xlsx("../raw_data/espèces de poisson BFC.xlsx") %
   mutate(esp_code_alternatif = fct_recode(esp_code_alternatif, "GTN" = "GOT"))  # Correction de l'ancien code du gobie à tâche noire de GOT en GTN
 
 ```
-
 
 # Constitution du jeu de données
 
@@ -148,7 +152,7 @@ esp_ope_selection <- passerelle %>% # dataframe contenant toutes les espèces pr
          lop_id,
          esp_code_alternatif,
          annee,
-         ope_surface_calculee) %>% 
+         ope_surface_calculee) %>%
   distinct()
 ```
 
@@ -201,23 +205,22 @@ esp_ope_selection <- esp_ope_selection %>%
 # Jointure taxref avec ref taxe aspe
 tax_ref_aspe <- tax_ref_aspe %>%
   left_join(tax_ref_uicn, by = "code_taxref") %>%
- # mutate(esp_code_alternatif = fct_recode(esp_code_alternatif, "CAA" = "CAD")) %>% # Correction de l'ancien code du Carassin doré de CAD en CAA
-  select(esp_code_alternatif, nom_vernaculaire, nom_latin, nom_complet)
+  select(esp_code_alternatif, ordre, nom_vernaculaire, nom_latin, nom_complet, nom_commun, nom_scientifique, code_taxref)
 
 # Jointure Aspe+taxref avec le df
 
 esp_ope_selection <- esp_ope_selection %>%
   mutate(esp_code_alternatif = fct_recode(esp_code_alternatif, "CAA" = "CAD")) %>% # Correction de l'ancien code du Carassin doré de CAD en CAA
-  left_join(tax_ref_aspe_test, by = "esp_code_alternatif")
+  left_join(tax_ref_aspe, by = "esp_code_alternatif")
 
 ```
 
 
 # Analyse des données espèces
 
-  Nous souhaitons obtenir une vision globale des données contenues dans le dataframe *esp_ope_selection* afin de savoir si les espèces sélectionnées dans la liste rouge régionale 2015 sont bien cohérentes avec les espèces contenues dans ce nouveau jeu de données (ayant eu une décenies de données ajoutées depuis la dernière LRR de Bretagne par Vigneron *et al.*, 2017). 
-
-  Pour obtenir un point de vue générale sur les différentes espèces contenues dans ce jeu de données, un graphique bivarié est réalisé : il représente le pourcentage d'occurrence des espèces en fonction de la densité surfacique moyenne des espèces sur les 30 dernières années. Ce graphique pourra alors nous indiquer quelles espèces sont majoritairement présentes sur le territoire, ainsi que pour lesquelles les donnée disponibles sont suffisantes pour pouvoir étudier leur évolution démographique. 
+  Nous souhaitons obtenir une vision globale des données contenues dans le dataframe *esp_ope_selection* afin de savoir si les espèces sélectionnées dans la liste rouge régionale 2014 sont bien cohérentes avec les espèces contenues dans ce nouveau jeu de données (ayant eu une décenies de données ajoutées depuis la dernière LRR.
+  
+  Pour obtenir un point de vue générale sur les différentes espèces contenues dans ce jeu de données, un graphique bivarié est réalisé : il représente le pourcentage d'occurrence des espèces en fonction de la densité surfacique moyenne des espèces sur les 20 dernières années. Ce graphique pourra alors nous indiquer quelles espèces sont majoritairement présentes sur le territoire, ainsi que pour lesquelles les donnée disponibles sont suffisantes pour pouvoir étudier leur évolution démographique. 
 
 
 ## Densités surfaciques des espèces
@@ -258,26 +261,7 @@ esp_effectif <- ope_esp_densite %>% # Calcul de l'effectif total pour chaque esp
 #  left_join(tax_ref_aspe_test, by = "esp_code_alternatif")
 ```
 
-```{r Barplot effectif total espèce,  fig.height = 8, fig.width = 10}}
-
-breaks <- unique(c(seq(0,1,by = 0.1), 
-    seq(1,10, 1), seq(10,100, 10)))
-
-ggplot(esp_effectif,
-       aes(x = esp_code_alternatif, y = effectif_total, fill = effectif_total)) +
-  geom_col() +
-  scale_fill_gradient(low = "darkseagreen3", high = "darkseagreen4") +
-  theme_minimal() +
-  labs(x = "Espèce", y = "Effectif total") +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    panel.grid.major = element_line(color = "#ffffff"),
-    panel.grid.minor = element_line(color = "#ffffff"),
-    panel.background = element_rect(fill = "#faf0e6")
-  ) 
-```
-
-```{r Barplot effectif total espèce log}
+```{r Barplot effectif total espèce log, fig.height = 8, fig.width = 10}}
 ggplot(esp_effectif,
        aes(x = esp_code_alternatif, y = effectif_total, fill = effectif_total)) +
   geom_col() +
@@ -289,7 +273,7 @@ ggplot(esp_effectif,
   ) +
   coord_flip() +
   theme_minimal() +
-  labs(x = "Espèce", y = "Effectif total") +
+  labs(x = "Espèces", y = "Effectif total") +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
     panel.grid.major = element_line(color = "#ffffff"),
@@ -297,6 +281,8 @@ ggplot(esp_effectif,
     panel.background = element_rect(fill = "#faf0e6")
   )
 ```
+
+
 ## Liste d'espèces complète de BFC à partir de la base ASPE
 
 ```{r jointure nom esp sur liste bfc}
@@ -306,16 +292,73 @@ esp_list <- liste_esp_bfc %>%
 ```
 
 ```{r liste complète des espèces de bfc}
-esp_liste_bfc <- esp_list %>% 
+esp_full_list <- esp_list %>% 
   full_join(esp_effectif, by = "esp_code_alternatif") %>% # jointure effectif à la liste bfc
   filter(!(is.na(Introduction) & is.na(effectif_total))) %>% 
-  select(nom_vernaculaire,nom_latin, nom_complet,esp_code_alternatif, Introduction, effectif_total)
+  select(ordre, nom_vernaculaire,nom_latin, nom_commun, nom_scientifique, nom_complet,esp_code_alternatif, Introduction, effectif_total)
+
 ```
 
 
-## Liste d'espèces de BFC sélectionnées à partir de la base ASPE
+## Liste d'espèces période complete de BFC sélectionnées à partir de la base ASPE
 
 
+```{r ajout d'une sauvegarde espèces période complete de Aspe bfc}
+base_liste_complete_bfc_aspe <- readr::read_delim('../processed_data/liste_complete_aspe_bfc.csv') %>% 
+  select(ordre,nom_vernaculaire, nom_latin, nom_commun, nom_scientifique, nom_complet, Introduction, esp_code_alternatif)
+
+```
+
+```{r jointure df complet esp avec effectif période lrr}
+esp_full_list_eff <- esp_full_list %>% 
+  select(effectif_total, esp_code_alternatif)
+
+liste_complete_bfc_lrr <- base_liste_complete_bfc_aspe %>% 
+ left_join(esp_full_list_eff, by ="esp_code_alternatif") 
+```
+
+## Definition / Verification de l'Autochtonie des espèces
+
+- Lamproie de rivière (p269) : autochtone (présence historique)
+- Alose feinte atlantique (Alosa fallax)(p299): Présence historique 
+- Barbeau méridional(335) ? probablement pas 
+- Carassin doré / Carrassin argenté
+
+- Chabot fluviatile?
+
+
+```{r Chargement de la liste autochtonie}
+liste_bio_autochtonie <- readxl::read_xlsx("../processed_data/liste_complete_lrr_correction.xlsx") %>% 
+  clean_names()
+
+```
+
+
+```{r jointure statut autochtonie à liste esp}
+liste_correc_autochtonie <-  liste_bio_autochtonie %>% 
+  select(esp_code_alternatif, statut_autochtonie, categorie_lr_france_2019)
+
+liste_complete_bfc_lrr <- liste_complete_bfc_lrr %>% 
+  left_join(liste_correc_autochtonie, by = "esp_code_alternatif") %>% 
+  select(ordre, nom_commun, nom_complet, esp_code_alternatif, statut_autochtonie , effectif_total, categorie_lr_france_2019) %>% 
+  rename(nom_vernaculaire_v18 = nom_commun, 
+         nom_scientifique_v18 = nom_complet)
+
+
+```
+
+```{r exporter la liste pour confirmation}
+#write_excel_csv(liste_complete_bfc_lrr, "../processed_data/liste_esp_lrr_bfc.csv")
+```
+
+Après expertise de Gael Denys, voici une liste corrigé d'espèces.
+
+```{r Chargement de la liste autochtonie corrigé gael denys}
+liste_bfc_sp_cor <- readxl::read_xlsx("../processed_data/liste_esp_lrr_bfc_GD.xlsx") %>% 
+  clean_names() %>% 
+  select(esp_code_alternatif, statut_autochtonie, effectif_total, categorie_lr_france_2019, statut_rhin, statut_seine, statut_loire, statut_rhone)
+
+```
 
 
 
@@ -372,10 +415,11 @@ tab_densite_occurrence <- left_join(esp_densite_moyenne, tab_taux_occurrence, by
 
 ```{r Mise en place statut LRR 2014}
 tab_densite_occurrence <- tab_densite_occurrence %>%
-  mutate(statut_lrr = ifelse (esp_code_alternatif %in% params$especes_bfc, 
-                           "Liste Rouge Régionale BFC 2014",
+  mutate(statut_lrr = ifelse (esp_code_alternatif %in% params$especes_lrr_FC, 
+                           "Liste Rouge Régionale FC 2014",
                            "Présente en Bourgogne-Franche-Comté"))
 ```
+
 
 La représentation graphique est effectuée : par soucis de représentation, les axes sont mis en échelles logarithmiques. 
 
@@ -409,7 +453,7 @@ gg_texte_usuel
 
   À partir de ce graphique, nous pouvons éliminer les espèces qui sont trop rares, c'est-à-dire ayant une densité surfacique moyenne et un taux d'occurrence très faibles (pour lesquelles nous n'avons pas assez de données - cela correspond aux espèces situées en bas à gauche du graphique). Les espèces ayant le plus de données sur lesquelles s'appuyer apparaissent en haut à droite du graphique : ce sont les espèces qui ont une forte occurrence ainsi qu'une forte densité surfacique moyenne. 
 
-  Dans le cadre de notre étude, on observe que les espèces étudiées dans la précédente liste rouge régionale (2015) apparaissent pour la quasi-totalité dans la partie supérieure droite du graphique, à l'exception de quelques espèces comme : 
+  Dans le cadre de notre étude, on observe que les espèces étudiées dans la précédente liste rouge régionale (2014) apparaissent pour la quasi-totalité dans la partie supérieure droite du graphique, à l'exception de quelques espèces comme : 
   
   - CAR 
   - IDE 
@@ -418,17 +462,32 @@ gg_texte_usuel
   - ABH
   - SDF
   - LOR 
-  - CAD
-  -
+  - CAA
+  - 
+  Nous réajustons ainsi la sélection des espèces de la précendente liste rouge régionale en éliminant les espèces contenants trop peu de données. La sélection finale des espèces est contenue dans l'objet *mes_especes*. Nous appliquons cette sélection à notre dataframe *esp_ope_selection*.
+
+
+
+# Vérification identification GOU / GOO : 
+Dans les stations du **"Ternin à Chissey-En-Morvan"** : 8837 et du **"Mechet à Saint-Prix"** 8842 : le GOU à été changé vers 2018 en GOO. Avant cette date, les goujons occitan étaient identifiée comme GOU. 
   
-  la carpe commune (CCO), l'épinoche (EPI), la lamproie marine (LPM).Nous réajustons ainsi la sélection des espèces de la précendente liste rouge régionale en éliminant les espèces contenants trop peu de données. La sélection finale des espèces est contenue dans l'objet *mes_especes*. Nous appliquons cette sélection à notre dataframe *esp_ope_selection*.
   
   
+```{r}
+#select_sta_gou <- esp_ope_selection %>% 
+#  filter(sta_id == "8837")
+
+#aspe::gg_temp_peuplement(df = esp_ope_selection, var_id_sta = sta_id)
+```
+
+  
+# Liste finale d'espèces à evaluer - Autochtonie
+
+
+
   
 ```{r Objet espece_lrr_2015 et mes_especes}
-especes_lrr_2015 <- c("ABL","ANG","ALA","BRB","BRE","BRO","CCO","CHA","CHE",
-                      "EPI","EPT","GAR","GOU","GRE","LPP","LPM","LOF","PER",
-                      "ROT","SAT","TAN","TRF","VAI","VAR")
+especes_lrr_2014 <- c("LOT","LOE","CHE","BRO","BOU","ANG","PER","BAF","EPT","ABH","BRE","EPI","CCO","CHA","HOT","VAI","TAN","BLN","VAN","TRF","LPP","OBR","ROT","ABL","GAR","IDE","LOF","TOX","GRE","BRB","SPI","GOU","LPM","LOR","LPP")
 
 mes_especes <- c("ABH", "ABL", "ANG", "BAF", "BLN", "BLE", "BOU", "BRB", "BRE", "BRO", "CHA", "CHE", "EPI", "EPT", "GAR", "GOU", "GOO", "LPP", "LPM", "LOR", "LOF", "LOT", "MUP", "OBR", "PER", "ROT", "SAT", "SPI", "TAN", "TOX", "TRF", "VAI", "VAN")
 ```
