@@ -35,8 +35,6 @@ knitr::opts_chunk$set(echo = TRUE,
                       warning = FALSE)
 ```
 
-# Objectif : Dynamique de population des poissons d'eau douce de BFC
-
 Script : 03_selection_especes
 
   Après avoir sélectionné les points de prélèvements et les opérations de pêche de l'aire géographique ciblée, un tri sur les données des espèces péchées durant ces opérations est réalisé. Il s'agit de retirer du jeu initial les données non nécessaires ou obsolètes pour notre étude. 
@@ -60,7 +58,7 @@ load(file = "../processed_data/selection_pop_ope.rda")
 
 Nous avons besoin de charger la table *aspe* des données de mesures individuelles (cette dernière est lourde, elle peut donc mettre un certain temps à charger).
 
-```{r Chargement des données}
+```{r Chargement des données table}
 rdata_tables <- misc_nom_dernier_fichier(
   repertoire = "../../../../Liste_rouge_BFC/raw_data",
   pattern = "^tables")
@@ -77,6 +75,8 @@ load(mei_table) # Chargement des données
 
 
 # Chargement de la base taxref
+Pour constituer la liste complètes des espèces à évaluer de la liste rouge régionale de BFC, on importe la base **taxref_v18**. 
+Pour pouvoir ajouter les libéllés de nom d'espèces au jeu de donnée de base par la suite, on importe un dataframe avec les codes espèces de la BDD Aspe **esp_code_alternatif**.
 
 ```{r Chargement des données taxref}
 base_tax_ref_aspe <- readxl::read_xlsx("../raw_data/ASPE_Suivi référentiel taxon_20250603 (1).xlsx", skip = 3)
@@ -101,7 +101,7 @@ tax_ref_uicn <- base_tax_ref_uicn %>%
     fr
   ) %>%
   filter(classe == "Actinopterygii" | classe == "Petromyzonti") %>%
-  select(cd_nom, classe, ordre, famille, nom_complet, nom_vern,lb_nom ) %>%
+  select(cd_nom, classe, ordre, famille, nom_valide, nom_vern,lb_nom ) %>%
   rename(code_taxref = cd_nom, 
          nom_commun = nom_vern,
          nom_scientifique = lb_nom)
@@ -120,6 +120,8 @@ tax_ref_aspe <- base_tax_ref_aspe %>%
 
 ```
 
+
+On importe également une liste d'espèces réalisé par l'OFB en 2016 avec les statut d'autochtonie qu'on appelera **liste_esp_bfc**. 
 ```{r importer liste espèce BFC}
 liste_esp_bfc <- readxl::read_xlsx("../raw_data/espèces de poisson BFC.xlsx") %>% 
   rename(esp_code_alternatif = "Code espèce") %>% 
@@ -179,11 +181,6 @@ A finir la prise de décision !!! :
 
 - "GOU"=> "GOO" : à partir d'environ 2018 : changement d'identification le Goujon (GOU) devient le Goujon occitan (GOO)
 
-```{r recherche arrivé VAR}
-esp_ope_selection_VAR <- esp_ope_selection %>% 
-  filter(esp_code_alternatif == "VAR")
-```
-
 
 ```{r Tri espèces esp_ope_selection}
 esp_ope_selection <- esp_ope_selection %>%
@@ -193,25 +190,8 @@ esp_ope_selection <- esp_ope_selection %>%
              # Transformation CCX, CMI et CCU en CCO
              TRUE ~ esp_code_alternatif
            )) %>%
-  filter(!(esp_code_alternatif %in% params$especes_a_retirer)) # Espèces à retirer
-```
-
-
-
-## Ajout nom espèce - taxref v18 au dataframe
-
-```{r jointure taxref au dataframe}
-
-# Jointure taxref avec ref taxe aspe
-tax_ref_aspe <- tax_ref_aspe %>%
-  left_join(tax_ref_uicn, by = "code_taxref") %>%
-  select(esp_code_alternatif, ordre, nom_vernaculaire, nom_latin, nom_complet, nom_commun, nom_scientifique, code_taxref)
-
-# Jointure Aspe+taxref avec le df
-
-esp_ope_selection <- esp_ope_selection %>%
-  mutate(esp_code_alternatif = fct_recode(esp_code_alternatif, "CAA" = "CAD")) %>% # Correction de l'ancien code du Carassin doré de CAD en CAA
-  left_join(tax_ref_aspe, by = "esp_code_alternatif")
+  filter(!(esp_code_alternatif %in% params$especes_a_retirer)) %>% # Espèces à retirer
+  mutate(esp_code_alternatif = fct_recode(esp_code_alternatif, "CAA" = "CAD")) # Correction de l'ancien code du Carassin doré de CAD en CAA
 
 ```
 
@@ -257,11 +237,9 @@ esp_densite_moyenne <- ope_esp_densite %>%
 esp_effectif <- ope_esp_densite %>% # Calcul de l'effectif total pour chaque espèce sur toutes les opérations
   group_by(esp_code_alternatif) %>%
   summarise(effectif_total = sum(effectif)) 
-#%>% #jointure des nom d'espèces
-#  left_join(tax_ref_aspe_test, by = "esp_code_alternatif")
 ```
 
-```{r Barplot effectif total espèce log, fig.height = 8, fig.width = 10}}
+```{r Barplot effectif total espèce log, fig.height = 8, fig.width = 10}
 ggplot(esp_effectif,
        aes(x = esp_code_alternatif, y = effectif_total, fill = effectif_total)) +
   geom_col() +
@@ -282,8 +260,40 @@ ggplot(esp_effectif,
   )
 ```
 
+## Construction du jeu de donnée finale **esp_ope_selection**
 
-## Liste d'espèces complète de BFC à partir de la base ASPE
+Pour construire le df **esp_ope_selection**, pusieurs jeu de donnée vont être fusionné :  
+
+1. **tax_ref_uicn** possède les nom commun et nom complet scientique des espèces de poissons.
+
+2. **tax_ref_aspe** possède les codes espèces de la base aspe permettant des jointures entre tables.
+
+3. **liste_esp_bfc** possède les codes espèces, une liste des espèces de 2016 sur la région avec les statuts d'autochtonies.
+
+4. **base_liste_complete_bfc_aspe** correspond au df de la période complète régionale de la base aspe toute stations confondues, export présent directement dans *processed_data*.
+
+5. **liste_correc_autochtonie** correspond à une liste provisoire issus des fusions des df précédent. Il est présent en export dans *processed_data*
+
+6. **liste_bfc_sp_cor** correspond à un df de toutes les espèces présentes en BFC avec les noms taxref, les codes aspe, les statut d'autochtonie par bassins- versants et quelques corrections. Il est présent en export dans *processed_data*. Il a été construit à partir de la fusion des jeux de données précédents ainsi qu'un ajout de correction manuellement sur de nouvelles colonnes, sur Excel. Il est une correction directe du df précédent **liste_correc_autochtonie**. 
+
+7. **esp_ope_selection** correspond au df de la période *2007-2025* avec les stations sélectionnées pour l'analyse des données.
+
+### Ajout des noms espèces - taxref v18 au dataframe **esp_ope_selection**
+
+On cherche à intégrer les libelle de nom d'espèces taxref à notre dataframe **esp_ope_selection** in fine, pour cela : 
+
+ - On joint le df avec les noms taxref au df avec les codes espèces Aspe
+ - On joindra ce nouveau df **tax_ref_ape** au df **esp_ope_selection**
+ 
+```{r jointure taxref au dataframe}
+
+# Jointure taxref avec ref taxe aspe
+tax_ref_aspe <- tax_ref_aspe %>%
+  left_join(tax_ref_uicn, by = "code_taxref") %>%
+  select(esp_code_alternatif, ordre, nom_vernaculaire, nom_latin, nom_valide, nom_commun, nom_scientifique, code_taxref)
+```
+
+### Liste d'espèces complète 2016 BFC à partir de la base ASPE (période 2007-2025)
 
 ```{r jointure nom esp sur liste bfc}
 esp_list <- liste_esp_bfc %>% 
@@ -295,54 +305,46 @@ esp_list <- liste_esp_bfc %>%
 esp_full_list <- esp_list %>% 
   full_join(esp_effectif, by = "esp_code_alternatif") %>% # jointure effectif à la liste bfc
   filter(!(is.na(Introduction) & is.na(effectif_total))) %>% 
-  select(ordre, nom_vernaculaire,nom_latin, nom_commun, nom_scientifique, nom_complet,esp_code_alternatif, Introduction, effectif_total)
+  select(ordre, nom_vernaculaire,nom_latin, nom_commun, nom_scientifique, nom_valide,esp_code_alternatif, Introduction, effectif_total)
 
 ```
 
 
-## Liste d'espèces période complete de BFC sélectionnées à partir de la base ASPE
+### Liste d'espèces période complete de BFC sélectionnées à partir de la base ASPE
 
 
-```{r ajout d'une sauvegarde espèces période complete de Aspe bfc}
-base_liste_complete_bfc_aspe <- readr::read_delim('../processed_data/liste_complete_aspe_bfc.csv') %>% 
-  select(ordre,nom_vernaculaire, nom_latin, nom_commun, nom_scientifique, nom_complet, Introduction, esp_code_alternatif)
+```{r ajout sauvegarde espèces période complete de Aspe bfc}
+#base_liste_complete_bfc_aspe <- readr::read_delim('../processed_data/liste_complete_aspe_bfc.csv') %>% 
+#  select(ordre,nom_vernaculaire, nom_latin, nom_commun, nom_scientifique, nom_valide, Introduction, esp_code_alternatif)
 
 ```
 
 ```{r jointure df complet esp avec effectif période lrr}
-esp_full_list_eff <- esp_full_list %>% 
-  select(effectif_total, esp_code_alternatif)
+#esp_full_list_eff <- esp_full_list %>% 
+#  select(effectif_total, esp_code_alternatif)
 
-liste_complete_bfc_lrr <- base_liste_complete_bfc_aspe %>% 
- left_join(esp_full_list_eff, by ="esp_code_alternatif") 
+#liste_complete_bfc_lrr <- base_liste_complete_bfc_aspe %>% 
+# left_join(esp_full_list_eff, by ="esp_code_alternatif") 
 ```
 
-## Definition / Verification de l'Autochtonie des espèces
-
-- Lamproie de rivière (p269) : autochtone (présence historique)
-- Alose feinte atlantique (Alosa fallax)(p299): Présence historique 
-- Barbeau méridional(335) ? probablement pas 
-- Carassin doré / Carrassin argenté
-
-- Chabot fluviatile?
-
+### Definition / Verification de l'Autochtonie des espèces
 
 ```{r Chargement de la liste autochtonie}
-liste_bio_autochtonie <- readxl::read_xlsx("../processed_data/liste_complete_lrr_correction.xlsx") %>% 
-  clean_names()
+#liste_bio_autochtonie <- readxl::read_xlsx("../processed_data/liste_complete_lrr_correction.xlsx") %>% 
+#  clean_names()
 
 ```
 
 
 ```{r jointure statut autochtonie à liste esp}
-liste_correc_autochtonie <-  liste_bio_autochtonie %>% 
-  select(esp_code_alternatif, statut_autochtonie, categorie_lr_france_2019)
+#liste_correc_autochtonie <-  liste_bio_autochtonie %>% 
+#  select(esp_code_alternatif, statut_autochtonie, categorie_lr_france_2019)
 
-liste_complete_bfc_lrr <- liste_complete_bfc_lrr %>% 
-  left_join(liste_correc_autochtonie, by = "esp_code_alternatif") %>% 
-  select(ordre, nom_commun, nom_complet, esp_code_alternatif, statut_autochtonie , effectif_total, categorie_lr_france_2019) %>% 
-  rename(nom_vernaculaire_v18 = nom_commun, 
-         nom_scientifique_v18 = nom_complet)
+#liste_complete_bfc_lrr <- liste_complete_bfc_lrr %>% 
+#  left_join(liste_correc_autochtonie, by = "esp_code_alternatif") %>% 
+#  select(ordre, nom_commun, nom_valide, esp_code_alternatif, statut_autochtonie , effectif_total, categorie_lr_france_2019) %>% 
+#  rename(nom_vernaculaire_v18 = nom_commun, 
+ #        nom_scientifique_v18 = nom_valide)
 
 
 ```
@@ -351,7 +353,8 @@ liste_complete_bfc_lrr <- liste_complete_bfc_lrr %>%
 #write_excel_csv(liste_complete_bfc_lrr, "../processed_data/liste_esp_lrr_bfc.csv")
 ```
 
-Après expertise de Gael Denys, voici une liste corrigé d'espèces.
+
+### Après expertise de Gael Denys, voici une liste corrigée d'espèces.
 
 ```{r Chargement de la liste autochtonie corrigé gael denys}
 liste_bfc_sp_cor <- readxl::read_xlsx("../processed_data/liste_esp_lrr_bfc_GD.xlsx") %>% 
@@ -360,11 +363,98 @@ liste_bfc_sp_cor <- readxl::read_xlsx("../processed_data/liste_esp_lrr_bfc_GD.xl
 
 ```
 
+```{r ajout nom espèces actualisés}
+liste_bfc_sp_cor <- liste_bfc_sp_cor %>%
+  left_join(tax_ref_aspe, by = "esp_code_alternatif") %>%
+  select(
+    ordre,
+    nom_valide,
+    nom_vernaculaire,
+    esp_code_alternatif,
+    statut_autochtonie,
+    effectif_total,
+    categorie_lr_france_2019,
+    statut_rhin,
+    statut_seine,
+    statut_loire,
+    statut_rhone,
+    nom_commun
+  ) 
+```
 
+```{r correction des espèces}
+liste_bfc_sp_cor <- liste_bfc_sp_cor %>%
+  filter(!esp_code_alternatif == "TRL") %>% # On ne ^prend pas en compte les ecotypes de truite dans la liste rouge
+  mutate(statut_loire = fct_recode(statut_loire, "endémique" = "endémqiue"))
+```
+
+
+```{r correction des statut autochtonie des espèces}
+liste_bfc_sp_cor <- liste_bfc_sp_cor %>%
+  
+  mutate(autochtonie_new = if_else(if_any(
+    c(statut_rhone, statut_seine, statut_loire),
+    ~ . %in% c(
+      "a priori introduit avant 1500",
+      "endémique",
+      "introduit avant 1500",
+      "natif",
+      "natif*", 
+      "éteint"
+    )
+  ), "autochtone", "allochtone"))
+  
+```
+
+```{r}
+liste_bfc_sp_cor <- liste_bfc_sp_cor %>%
+ # filter(autochtonie_new == "autochtone") %>% 
+  select(ordre,
+    nom_valide,
+   # nom_commun,
+    esp_code_alternatif,
+    autochtonie_new,
+    effectif_total,
+    #statut_rhin,
+   # statut_seine,
+   # statut_loire,
+  #  statut_rhone,
+    categorie_lr_france_2019 
+    )
+```
+
+```{r , fig.height = 8, fig.width = 10}
+table_liste_bfc_sp_cor <- liste_bfc_sp_cor %>% 
+  flextable::flextable() %>%
+  flextable::autofit() %>%
+  flextable::colformat_int(j = c(1, 3), big.mark = " ")
+table_liste_bfc_sp_cor
+```
+
+
+Après avoir construit la liste d'espèces avec les noms d'espèces complets taxrefv18, on peut ajouter notre sélection dans notre jeu de données initiale **esp_ope_selection**.
+```{r Ajouter les statut autochronie des espèces au df}
+liste_bfc_sp_cor_join <- liste_bfc_sp_cor %>% 
+  select(esp_code_alternatif, autochtonie_new)
+
+esp_ope_selection <- esp_ope_selection %>% 
+  left_join(liste_bfc_sp_cor_join, by = "esp_code_alternatif") 
+
+```
+
+
+## Vérification identification GOU / GOO : 
+Dans les stations du **"Ternin à Chissey-En-Morvan"** : 8837 et du **"Mechet à Saint-Prix"** 8842 : le GOU à été changé vers 2018 en GOO. Avant cette date, les goujons occitan étaient identifiée comme GOU. 
+
+```{r exportation de la liste corrigée par GD }
+#write_excel_csv(liste_bfc_sp_cor, "../processed_data/liste_bfc_sp_cor.csv")
+
+```
 
 ## Pourcentage d'occurrence
 
   Le tableau *tab_occurrence* regroupant toutes les combinaisons d'opérations et d'espèces possible est réalisé. Il sera ensuite utilisé pour calculer les pourcentages d'occurrence des espèces présentes dans le jeu de données initiale *esp_ope_selection*. 
+
 
 ```{r Création tab_occurrence}
 ope_id <- unique(esp_ope_selection$ope_id) 
@@ -455,35 +545,13 @@ gg_texte_usuel
 
   Dans le cadre de notre étude, on observe que les espèces étudiées dans la précédente liste rouge régionale (2014) apparaissent pour la quasi-totalité dans la partie supérieure droite du graphique, à l'exception de quelques espèces comme : 
   
-  - CAR 
-  - IDE 
-  - CTI
-  - MUP 
-  - ABH
-  - SDF
-  - LOR 
-  - CAA
-  - 
+  - MUP : Mulet porc : 4 => DD
+  - IDE : Ide mélanote : 
+
   Nous réajustons ainsi la sélection des espèces de la précendente liste rouge régionale en éliminant les espèces contenants trop peu de données. La sélection finale des espèces est contenue dans l'objet *mes_especes*. Nous appliquons cette sélection à notre dataframe *esp_ope_selection*.
 
 
-
-# Vérification identification GOU / GOO : 
-Dans les stations du **"Ternin à Chissey-En-Morvan"** : 8837 et du **"Mechet à Saint-Prix"** 8842 : le GOU à été changé vers 2018 en GOO. Avant cette date, les goujons occitan étaient identifiée comme GOU. 
-  
-  
-  
-```{r}
-#select_sta_gou <- esp_ope_selection %>% 
-#  filter(sta_id == "8837")
-
-#aspe::gg_temp_peuplement(df = esp_ope_selection, var_id_sta = sta_id)
-```
-
-  
 # Liste finale d'espèces à evaluer - Autochtonie
-
-
 
   
 ```{r Objet espece_lrr_2015 et mes_especes}
@@ -504,7 +572,7 @@ esp_ope_selection <- esp_ope_selection %>%
 Sauvegarde pour le script suivant : script 04_pre_traitements_donnees_ope_especes.
 
 ```{r Sauvegarde}
-save(especes_lrr_2015, 
+save(especes_lrr_2014, 
      mes_especes,
      esp_ope_selection,
      file = "../processed_data/selection_especes.rda")

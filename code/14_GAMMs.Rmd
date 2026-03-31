@@ -271,3 +271,4 @@ plot(
 ) #décaler l'échelle afin d'inclure l'ordonnée à l'origine. 
 ```
 
+# 
