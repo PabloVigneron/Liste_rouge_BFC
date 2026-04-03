@@ -1,0 +1,205 @@
+---
+title: "15_GLMM"
+author: "PabloVigneron"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  bookdown::html_document2:
+   fig_caption: yes
+   tab_caption: yes
+   number_sections: yes
+   global_numbering: yes
+   toc: yes
+   toc_float:
+         toc_collapsed: yes
+         toc_depth: 2
+   code_folding: hide
+   css: "style.css"
+#bibliography: .bib
+#link-citations: true
+#cls: apa.cls
+#editor_options: 
+#  markdown: 
+#    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+
+# Objectif : Dynamique de population des poissons d'eau douce de Bretagne
+
+Script : 14_GLMM
+
+  Ce script a pour objectif d'évaluer l'impact des différents réseaux sur les tendances des indicateurs régionaux. Il a également l'objectif de regarder l'impact des changements de protocoles sur les stations au cours des années d'études grâce aux modèles linéaires généralisés à effets mixtes. 
+
+
+# Installation 
+
+## Chargement des packages, fonctions et des données 
+
+```{r Chargement des packages}
+library(lme4)
+library(popdynmodel)
+library(aspe2)
+library(tidyverse)
+library(aspe)
+library(sjstats)
+library(gt)
+```
+
+```{r Chargement des données}
+load(file = "../processed_data/calcul_indicateurs_regionaux.rda") # Chargement des données
+load(file = "../processed_data/selection_pop_ope.rda")
+load(file = "../processed_data/lm_mann_kendall_tendances.rda")
+load(file = "../processed_data/assemblage_tab_par_ope.rda")
+load(file = "../processed_data/donnees_densite_eff_abs.rda")
+```
+
+```{r Chargement des fonctions}
+source(file = "../R/lm_application_modele.R")
+source(file = "../R/lm_calcul_modele.R")
+source(file = "../R/glmm_calcul_modele.R")
+source(file = "../R/glmm_application_modele.R")
+```
+
+```{r Chargement des tables de données}
+rdata_tables <- misc_nom_dernier_fichier(   # Chargement des tables aspe
+  repertoire = "../../../../projets/ASPE/raw_data/rdata",
+  pattern = "^tables")
+load(rdata_tables)
+```
+
+
+
+# Modèles Linéaires Généralisés à effets Mixtes (GLMM)
+
+## Introduction
+
+Les modèles linéaires généralisés à effets mixtes combinent les caractéristiques des modèles linéaires généralisés (modéliser des variables non-normalement distribuées, spécialement des données binaires et de comptage) et des modèles à effets mixtes (modéliser des données groupées). 
+
+Nous utiliserons dans cette étude le package *lme4* pour ajuster des modèles mixtes. La fonction *glmer* de ce package estime les paramètres d’un modèle linéaire généralisé à effets mixtes. Les formules utilisées par *glmer* suivent la forme *reponse ~ predicteurs*, avec une syntaxe spécifique pour les effets aléatoires.
+
+La distribution de Poisson peut être ici utilisée (valeurs entières supérieures ou égales à 0.  glm(y ~ x1 + x2 + ..., data = ..., family = poisson)
+
+
+
+## Pré-traitements GLMM 
+
+  Afin d'appliquer les modèles GLMM, il est nécessaire de construire un jeu de données contenant les valeurs des effectifs, les espèces, les stades, les *pop_id*, mais aussi les types de réseaux, les surfaces d'opérations et les protocoles de pêches. Nous utilisons dans un premier temps, le jeu de données relatifs aux effectifs des opérations de pêches (*ope_effectifs*) car nous souhaitons observer les effets des réseaux et des protocoles sur les résultats des opérations. 
+
+
+```{r Etablir les périodes etudes GLMM}
+liste_periodes_etude <- list(c(2008, 2023), 
+                             c(2005, 2023),
+                             c(1990, 2023),
+                             c(2011, 2023),
+                             c(2013, 2023)) # Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin)
+```
+
+Nous construisons un jeu de données complet :
+
+```{r Construction jeu de données}
+# Ajout du protocole, de la surface d'opération et de la date
+ope_effectif_glm <- ope_effectif_absences %>%
+  mef_ajouter_type_protocole() %>% 
+  mef_ajouter_surf_calc() %>% 
+  mef_ajouter_ope_date() %>% 
+  select(ope_id,
+         stade,
+         ope_surface_calculee,
+         esp_code_alternatif,
+         indicateur,
+         valeur, 
+         ope_date,
+         pro_libelle,
+         annee)
+
+ope_effectif_glm <- ope_effectif_glm %>% #Ajout des pop_id dans le dataframe
+  left_join(y=operation %>% 
+              select(ope_id,
+                     pop_id= ope_pop_id)) %>% 
+  mutate(pop_id = as.factor(pop_id))
+
+ope_effectif_glm <- ope_effectif_glm %>% # Ajout de la date de pêche codée de 1 à 365
+  mutate(julian = lubridate::yday(ope_date)) %>%
+  ungroup() %>% 
+  rename(espece = esp_code_alternatif)
+```
+
+
+
+## Application du modèle GLMM 
+
+  Afin d'exécuter l'analyse, deux fonctions ont été créer : *glmm_calcul_modele* (en charge de calculer les valeurs des modèles GLMM) et *glmm_application_modele* (le but étant d'excécuter la fonction *glm_calcul_modele* pour l'ensemble des combinaisons *periodes-especes-stade-indicateur*). Les analyses prennent en considération les données à l'échelle de l'opération. 
+
+
+```{r Exécution fonction GLMM}
+glmm_resultats <- glmm_application_modele(data = ope_effectif_glm,
+                                          liste_periodes = liste_periodes_etude)
+```
+
+
+```{r Mise en forme sortie fonction GLMM}
+glmm_resultats_annee <- glmm_resultats %>% 
+  filter(row_name == "scale(annee)") %>% 
+  select(periode,
+         esp_code_alternatif,
+         p_value,
+         Estimate,
+         sig) %>% 
+  mutate(trend = case_when(
+      Estimate > 0 ~ "\U2197",
+      Estimate < 0 ~ "\U2198",
+      TRUE ~ "."))
+```
+
+
+```{r Sélection des données résultats GLMM}
+# Filtrer les données selon les critères spécifiés
+glmm_resultats_format <- glmm_resultats_annee %>%
+  filter((esp_code_alternatif == "ANG" & periode == "1990-2023") |
+    (esp_code_alternatif %in% c("CHE", "LPP") & periode == "2005-2023") |
+    (esp_code_alternatif %in% c("BRO", "LOF") & periode == "2008-2023") |
+    (esp_code_alternatif %in% c("VAR", "GAR", "VAI", "PER") & periode == "2011-2023") |
+    (esp_code_alternatif %in% c("SAT", "GOU", "TRF", "CHA") & periode == "2013-2023"))
+```
+
+
+Construction d'un tableau récapitulatif des résultats du modèle GLMM :
+
+```{r Réalisation tableau GLMM}
+tab_glmm_resultats <- glmm_resultats_format %>%
+  select(esp_code_alternatif,
+         periode,
+         trend,
+         sig) %>% 
+  arrange(esp_code_alternatif) %>%   # Ordonner par espèce, indicateur et stade
+  gt() %>%
+  tab_header(
+    title = "Synthèse des tendances des indicateurs des populations de poissons d'eau douce de Bretagne"
+  ) %>%
+  cols_label(
+    esp_code_alternatif = "Code Espèce",
+    trend = "Tendance Regression linéaire",
+    sig = "Significativité") %>%
+  tab_options(table.font.size = "small", data_row.padding = px(4))
+
+# Afficher le tableau
+tab_glmm_resultats
+```
+
+
+# Sauvegarde
+
+```{r Sauvegarde}
+save(glmm_resultats_format,
+     reg_indicateur_lrr_tendances_lm,
+     reg_indicateur_lrr_tendances_mk_st,
+     tab_glmm_resultats,
+     tab_reg_indicateur_lrr_tendances_lm,
+     tab_reg_indicateur_lrr_tendances_mk_st,
+     file = "../processed_data/mk_glmm_lm_tendances.rda")
+```

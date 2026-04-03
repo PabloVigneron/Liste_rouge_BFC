@@ -1,0 +1,65 @@
+---
+title: 05_cartes_evolution_especes"
+author: "PabloVigneron"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  bookdown::html_document2:
+   fig_caption: yes
+   tab_caption: yes
+   number_sections: yes
+   global_numbering: yes
+   toc: yes
+   toc_float:
+         toc_collapsed: yes
+         toc_depth: 2
+   code_folding: hide
+   css: "style.css"
+#bibliography: .bib
+#link-citations: true
+#cls: apa.cls
+#editor_options: 
+#  markdown: 
+#    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+Script : 03_selection_especes
+
+# Installation 
+
+## Chargement des packages et des données 
+
+```{r Chargement des packages}
+library(tidyverse)
+library(aspe)
+library(ggrepel)
+library(janitor)
+library(scales)
+```
+
+```{r Chargement des données}
+load(file = "../processed_data/selection_especes.rda")
+```
+
+Nous avons besoin de charger la table *aspe* des données de mesures individuelles (cette dernière est lourde, elle peut donc mettre un certain temps à charger).
+
+```{r Chargement des données table}
+rdata_tables <- misc_nom_dernier_fichier(
+  repertoire = "../../../../Liste_rouge_BFC/raw_data",
+  pattern = "^tables")
+load(rdata_tables) # Chargement des données 
+```
+
+# Chargement de la table aspe des données de mesures individuelles 
+```{r Chargement des données espèces}
+mei_table <- misc_nom_dernier_fichier(
+  repertoire = "../../../../Liste_rouge_BFC/raw_data",
+  pattern = "^mei")
+load(mei_table) # Chargement des données 
+```
+
