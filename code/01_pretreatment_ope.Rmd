@@ -114,9 +114,9 @@ mes_types_de_peche <- c("Pêche complète à un ou plusieurs passages", # Types 
                        # "Pêche par ambiances",
                         #"Pêche partielle sur berge")
 
-n_mini_annee <- 9 # Nombre minimum d'années des séries de pêches 
+n_mini_annee <- 1 # (9)Nombre minimum d'années des séries de pêches 
 
-n_max_manquant <- 2 # Nombre d'années manquantes maximum consécutives sur les séries de pêches 
+n_max_manquant <- 20 # (2)Nombre d'années manquantes maximum consécutives sur les séries de pêches 
 
 annee_depart <- 2007 # Année de départ de l'étude 
 
@@ -376,7 +376,7 @@ ope_selection <- ope_selection %>%
 
   Nous réalisons une représentation graphique des séries temporelles constituées. Nous ajoutons les types de pêches (*pro_libelle*) associées aux opérations des séries.
 
-```{r Représentation séries temporelles, fig.height = 15, fig.width = 20}
+```{r Représentation séries temporelles, fig.height = 30, fig.width = 25}
 ope_selection %>% # Représentation graphique des stations sélectionnées et des types de pêche associées
   ggplot(aes(x = as.character(pop_libelle),
              y = annee, 

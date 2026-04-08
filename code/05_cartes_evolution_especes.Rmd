@@ -42,9 +42,6 @@ library(janitor)
 library(scales)
 ```
 
-```{r Chargement des données}
-load(file = "../processed_data/selection_especes.rda")
-```
 
 Nous avons besoin de charger la table *aspe* des données de mesures individuelles (cette dernière est lourde, elle peut donc mettre un certain temps à charger).
 
@@ -61,5 +58,77 @@ mei_table <- misc_nom_dernier_fichier(
   repertoire = "../../../../Liste_rouge_BFC/raw_data",
   pattern = "^mei")
 load(mei_table) # Chargement des données 
+```
+
+```{r Chargement des données}
+load(file = "../processed_data/selection_especes.rda")
+load(file = "../processed_data/selection_pop_ope.rda")
+
+```
+
+# Graphique de la série chronologique des abondances ou densités par espèce
+
+
+```{r, fig.height = 20, fig.width = 20}
+aspe::gg_temp_abondance(
+  df = ope_esp_selection,
+  var_espece = esp_code_alternatif,
+  var_abondance = lop_effectif,
+  nb_colonnes = 6)
+```
+
+# Graphique pour représenter l'évolution des effectifs de taxons au cours du temps
+
+
+```{r}
+ope_selection <- ope_selection %>%
+  select(sta_id, ope_id, pop_libelle, pro_libelle)
+
+temp_peuplement <- esp_ope_selection %>%
+  full_join(ope_selection, by =c("ope_id", "annee")) %>% 
+  rename(effectif = lop_effectif)
+```
+
+```{r}
+summary(temp_peuplement)
+```
+
+
+# Nombre d'occurences par années
+
+```{r, fig.height = 12, fig.width = 9, fig.cap = "Annual number of occurrences by species, along with their regression lines."}
+sp_occur_by_year <- sp_densities_trends_pop %>% 
+  filter(density > 0) %>% 
+  group_by(esp_nom_latin, annee) %>% 
+  summarise(n_occur = n_distinct(pop_id)) %>% 
+  mutate(esp_nom_latin = fct_reorder(esp_nom_latin, n_occur)) %>% 
+  left_join(sp_start_date) %>% 
+  filter(!is.na(sp_start_year),
+         annee >= sp_start_year) %>% 
+  select(-sp_start_year)
+
+ggplot(data = sp_occur_by_year,
+       aes(x = annee, y = n_occur)) +
+  geom_point() +
+
+  geom_smooth(method = "lm", se = FALSE, col = "red") +
+  facet_wrap(vars(esp_nom_latin), ncol = 4) +
+  labs(x = "Year", y = "Number of occurrences reported")
+```
+
+
+
+
+
+
+
+```{r}
+gg_temp_peuplement(
+  temp_peuplement,
+  effectif = lop_effectif,
+  var_id_sta = pop_id,
+  var_libelle_sta = pop_libelle,
+  var_especes = esp_code_alternatif
+)
 ```
 

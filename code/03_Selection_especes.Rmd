@@ -231,7 +231,7 @@ esp_densite_moyenne <- ope_esp_densite %>%
 
 ## Effectif des espèces
 
-  Les effectifs de chaque espèce sont calculés, à l'échelle de l'opération, sur les 30 dernières années de données dans *esp_effectif* :
+  Les effectifs de chaque espèce sont calculés, à l'échelle de l'opération, sur les 20 dernières années de données dans *esp_effectif* :
 
 ```{r Calcul effectifs des espèces}
 esp_effectif <- ope_esp_densite %>% # Calcul de l'effectif total pour chaque espèce sur toutes les opérations
@@ -401,34 +401,60 @@ liste_bfc_sp_cor <- liste_bfc_sp_cor %>%
 
 ```{r}
 liste_bfc_sp_cor <- liste_bfc_sp_cor %>%
- # filter(autochtonie_new == "autochtone") %>% 
-  select(ordre,
+  # filter(autochtonie_new == "autochtone") %>%
+  select(
+    ordre,
     nom_valide,
-   # nom_commun,
+    nom_commun,
     esp_code_alternatif,
     autochtonie_new,
-    effectif_total,
+    #effectif_total,
     #statut_rhin,
-   # statut_seine,
-   # statut_loire,
-  #  statut_rhone,
-    categorie_lr_france_2019 
-    )
+    # statut_seine,
+    # statut_loire,
+    #  statut_rhone,
+    categorie_lr_france_2019
+  ) 
 ```
 
-```{r}
-liste_bfc_sp_cor <- liste_bfc_sp_cor %>%
-    mutate(effectif_total = na_if(effectif_total, "NA"))
+```{r suppresion des NA dans la liste}
+# liste_bfc_sp_cor <- liste_bfc_sp_cor %>%
+#     mutate(effectif_total = na_if(effectif_total, "NA"))
 ```
+
+```{r export liste rouge especes pour expertise}
+table_liste_bfc_sp_cor_exp <- liste_bfc_sp_cor %>%
+  rename(
+    "Nom scientifique" = nom_valide,
+    "Code espèce" = esp_code_alternatif,
+    "Statut" = autochtonie_new,
+    "LRR France 2019" = categorie_lr_france_2019, 
+    "Nom vernaculaire" = nom_commun, 
+    "Ordre" = ordre
+  ) %>%
+  arrange(desc(Statut)) 
+
+write_excel_csv(table_liste_bfc_sp_cor_exp, "../processed_data/liste_bfc_sp_cor_exp.csv")
+
+```
+
 
 ```{r , fig.height = 8, fig.width = 10}
 table_liste_bfc_sp_cor <- liste_bfc_sp_cor %>%
-  arrange(desc(autochtonie_new)) %>%
+  rename(
+    "Nom scientifique" = nom_valide,
+    "Code espèce" = esp_code_alternatif,
+    "Statut" = autochtonie_new,
+    "LRR France 2019" = categorie_lr_france_2019
+  ) %>%
+  arrange(desc(Statut)) %>%
   flextable::flextable() %>%
   flextable::autofit() %>%
-  flextable::colformat_int(j = c(1, 3), big.mark = " ")
+  flextable::colformat_int(j = c(1, 3), big.mark = " ") %>% 
+  flextable::style()
 table_liste_bfc_sp_cor
 ```
+
 
 
 Après avoir construit la liste d'espèces avec les noms d'espèces complets taxrefv18, on peut ajouter notre sélection dans notre jeu de données initiale **esp_ope_selection**.
@@ -627,6 +653,7 @@ Sauvegarde pour le script suivant : script 04_pre_traitements_donnees_ope_espece
 save(especes_lrr_2014, 
      mes_especes,
      esp_ope_selection,
+     ope_esp_densite,
      file = "../processed_data/selection_especes.rda")
 ```
 
