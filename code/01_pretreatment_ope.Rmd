@@ -48,6 +48,7 @@ library(aspe) # Traitement de la base aspe
 library(mapview)
 library(COGiter)
 library(sf)
+library(flextable)
 ```
 
 ```{r installation des packages}
@@ -57,7 +58,7 @@ library(sf)
 
 ```{r Chargement fonction}
 source(file = "../R/borner_series.R") # Chargement de la fonction borner_series 
-source(file = "../R/detect_pro_errors.R")
+source(file = "../R/detect_pro_errors.R") # Chargement de la fonction detect_pro_errors 
 ```
 
 # Chargement des données issues de la base ASPE : 
@@ -232,19 +233,8 @@ ope_pro_libelle <- passerelle %>%
   filter(pro_libelle %in% mes_types_de_peche) %>%  # Paramètres - Sélection des types de pêches      
   select(sta_id:ope_id, pro_libelle) %>%
   distinct()
-
 ```
 
-
-## Informations quantitative : stations, pêches, protocoles...
-
-```{r Nombre de stations au total}
-#ope_pro_libelle %>%
-#  group_by(sta_id) %>% 
-#  summarise(n=n()) %>% 
-#  ungroup() %>% 
-#  summarise(total=n())
-```
 
 ## Opérations de pêche
 
@@ -365,13 +355,46 @@ ope_selection <- ope_selection %>%
   filter(pop_id %in% pop_serie_tempo) # Sélection des pop_id contenus dans la sélection de séries temporelles
 ```
 
+## Informations quantitative : nombre de stations, pêches, protocoles...
+
 ```{r Nombre de stations selectionnées}
-#ope_selection %>%
-#  group_by(sta_id) %>%
-#  summarise(n = n()) %>%  
-#  ungroup() %>%
-#  summarise(total = n())
+# nb_sta <- ope_selection %>%
+#   group_by(sta_id) %>%
+#   summarise(n = n()) %>%
+#   ungroup() %>%
+#   summarise(total = n())
+
 ```
+
+```{r tableau recapitulatif du nb ope et nb de stations selectionne}
+summary_tab_ope <- ope_selection %>%
+  group_by(pro_libelle) %>%
+  summarise(
+    total_sta = n_distinct(sta_id),
+    total_ope = n_distinct(ope_id),
+    .groups = "drop"
+  ) %>%
+  select(pro_libelle, total_sta, total_ope)
+
+total_row <- summary_tab_ope %>%
+  summarise(
+    pro_libelle = "TOTAL",
+    total_sta = sum(total_sta, na.rm = TRUE),
+    total_ope = sum(total_ope, na.rm = TRUE)
+  )
+
+summary_ope <- bind_rows(summary_tab_ope, total_row)
+
+final_summary_ope <- flextable(summary_ope) %>%
+  set_header_labels(pro_libelle = "Protocole",
+                    total_sta = "Nombre de stations",
+                    total_ope = "Nombre d'opérations") %>%
+  bold(i = ~ pro_libelle == "TOTAL", bold = TRUE) %>%
+  autofit()
+
+final_summary_ope
+```
+
 ### Représentation graphique
 
   Nous réalisons une représentation graphique des séries temporelles constituées. Nous ajoutons les types de pêches (*pro_libelle*) associées aux opérations des séries.

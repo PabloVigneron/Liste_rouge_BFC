@@ -36,16 +36,16 @@ Nous avons besoin des jeux de données constitués lors des précédents scripts
 
 ```{r Chargement des données}
 load(file = "../processed_data/selection_pop_ope.rda") # Chargement des données pré-enregistrées
-load(file = "../processed_data/pre_traitements_donnees_env.rda")
-load(file = "../processed_data/analyse_selection_especes.rda")
+# load(file = "../processed_data/pre_traitements_donnees_env.rda")
+load(file = "../processed_data/selection_especes.rda")
 load(file = "../processed_data/pre_traitements_donnees_especes.rda")
 ```
 
 ```{r Chargement des tables aspe}
 rdata_tables <- misc_nom_dernier_fichier(
-  repertoire = "../../../../projets/ASPE/raw_data/rdata",
+  repertoire = "../../../../Liste_rouge_BFC/raw_data",
   pattern = "^tables")
-load(rdata_tables)
+load(rdata_tables) # Chargement des données 
 ```
 
 ```{r Chargement des fonctions}

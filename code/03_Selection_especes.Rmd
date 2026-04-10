@@ -236,7 +236,7 @@ esp_densite_moyenne <- ope_esp_densite %>%
 ```{r Calcul effectifs des espèces}
 esp_effectif <- ope_esp_densite %>% # Calcul de l'effectif total pour chaque espèce sur toutes les opérations
   group_by(esp_code_alternatif) %>%
-  summarise(effectif_total = sum(effectif)) 
+  summarise(effectif_total = sum(effectif))
 ```
 
 ```{r Barplot effectif total espèce log, fig.height = 8, fig.width = 10}
@@ -314,32 +314,46 @@ esp_full_list <- esp_list %>%
 
 
 ```{r ajout sauvegarde espèces période complete de Aspe bfc}
-#base_liste_complete_bfc_aspe <- readr::read_delim('../processed_data/liste_complete_aspe_bfc.csv') %>% 
-#  select(ordre,nom_vernaculaire, nom_latin, nom_commun, nom_scientifique, nom_valide, Introduction, esp_code_alternatif)
-
+# base_liste_complete_bfc_aspe <- readr::read_delim('../processed_data/liste_complete_aspe_bfc.csv') %>%
+#   select(
+#     ordre,
+#     nom_vernaculaire,
+#     nom_latin,
+#     nom_commun,
+#     nom_scientifique,
+#     nom_valide,
+#     Introduction,
+#     esp_code_alternatif
+#   )
 ```
 
 ```{r jointure df complet esp avec effectif période lrr}
-#esp_full_list_eff <- esp_full_list %>% 
-#  select(effectif_total, esp_code_alternatif)
-
-#liste_complete_bfc_lrr <- base_liste_complete_bfc_aspe %>% 
-# left_join(esp_full_list_eff, by ="esp_code_alternatif") 
+# esp_full_list_eff <- esp_full_list %>%
+#   select(effectif_total, esp_code_alternatif)
+# 
+# liste_complete_bfc_lrr <- base_liste_complete_bfc_aspe %>%
+#   left_join(esp_full_list_eff, by = "esp_code_alternatif") 
 ```
 
-#
-
 ```{r jointure statut autochtonie à liste esp}
-#liste_correc_autochtonie <-  liste_bio_autochtonie %>% 
-#  select(esp_code_alternatif, statut_autochtonie, categorie_lr_france_2019)
-
-#liste_complete_bfc_lrr <- liste_complete_bfc_lrr %>% 
-#  left_join(liste_correc_autochtonie, by = "esp_code_alternatif") %>% 
-#  select(ordre, nom_commun, nom_valide, esp_code_alternatif, statut_autochtonie , effectif_total, categorie_lr_france_2019) %>% 
-#  rename(nom_vernaculaire_v18 = nom_commun, 
- #        nom_scientifique_v18 = nom_valide)
-
-
+# liste_correc_autochtonie <-  liste_bio_autochtonie %>%
+#   select(esp_code_alternatif,
+#          statut_autochtonie,
+#          categorie_lr_france_2019)
+# 
+# liste_complete_bfc_lrr <- liste_complete_bfc_lrr %>%
+#   left_join(liste_correc_autochtonie, by = "esp_code_alternatif") %>%
+#   select(
+#     ordre,
+#     nom_commun,
+#     nom_valide,
+#     esp_code_alternatif,
+#     statut_autochtonie ,
+#     effectif_total,
+#     categorie_lr_france_2019
+#   ) %>%
+#   rename(nom_vernaculaire_v18 = nom_commun,
+#          nom_scientifique_v18 = nom_valide)
 ```
 
 ```{r exporter la liste pour confirmation}
@@ -428,13 +442,14 @@ table_liste_bfc_sp_cor_exp <- liste_bfc_sp_cor %>%
     "Nom scientifique" = nom_valide,
     "Code espèce" = esp_code_alternatif,
     "Statut" = autochtonie_new,
-    "LRR France 2019" = categorie_lr_france_2019, 
-    "Nom vernaculaire" = nom_commun, 
+    "LRR France 2019" = categorie_lr_france_2019,
+    "Nom vernaculaire" = nom_commun,
     "Ordre" = ordre
   ) %>%
-  arrange(desc(Statut)) 
+  arrange(desc(Statut))
 
-write_excel_csv(table_liste_bfc_sp_cor_exp, "../processed_data/liste_bfc_sp_cor_exp.csv")
+# write_excel_csv(table_liste_bfc_sp_cor_exp,
+#                 "../processed_data/liste_bfc_sp_cor_exp.csv")
 
 ```
 
@@ -458,6 +473,7 @@ table_liste_bfc_sp_cor
 
 
 Après avoir construit la liste d'espèces avec les noms d'espèces complets taxrefv18, on peut ajouter notre sélection dans notre jeu de données initiale **esp_ope_selection**.
+
 ```{r Ajouter les statut autochronie des espèces au df}
 liste_bfc_sp_cor_join <- liste_bfc_sp_cor %>% 
   select(esp_code_alternatif, autochtonie_new)
@@ -483,8 +499,6 @@ liste_bio <- readxl::read_xlsx("../processed_data/liste_complete_lrr_correction.
     longevite_bq,
     longevite_an
   ) 
-
-
 ```
 
 ```{r jointure autochtonie avec liste biologie poissons}
@@ -501,14 +515,14 @@ liste_bio_join <- liste_bio %>%
     maturite_bq,
     longevite_bq,
     longevite_an,
-    effectif_total,
+   # effectif_total,
     categorie_lr_france_2019
   )
 
 liste_bio <- liste_bio_join %>%
   filter(
-    autochtonie_new == "autochtone", 
-    !is.na(effectif_total)
+    autochtonie_new == "autochtone"#, 
+    #!is.na(effectif_total)
     )
 ```
 
@@ -610,6 +624,10 @@ gg_base <- ggplot(tab_densite_occurrence,
 gg_texte_usuel <- gg_base + geom_label_repel() # afin d'éviter les chevauchements entre les différentes étiquettes
 gg_texte_usuel
 ```
+```{r}
+tab_densite_occurrence$esp_code_alternatif
+
+```
 
 
   À partir de ce graphique, nous pouvons éliminer les espèces qui sont trop rares, c'est-à-dire ayant une densité surfacique moyenne et un taux d'occurrence très faibles (pour lesquelles nous n'avons pas assez de données - cela correspond aux espèces situées en bas à gauche du graphique). Les espèces ayant le plus de données sur lesquelles s'appuyer apparaissent en haut à droite du graphique : ce sont les espèces qui ont une forte occurrence ainsi qu'une forte densité surfacique moyenne. 
@@ -635,7 +653,7 @@ gg_texte_usuel
 ```{r Objet espece_lrr_2015 et mes_especes}
 especes_lrr_2014 <- c("LOT","LOE","CHE","BRO","BOU","ANG","PER","BAF","EPT","ABH","BRE","EPI","CCO","CHA","HOT","VAI","TAN","BLN","VAN","TRF","LPP","OBR","ROT","ABL","GAR","IDE","LOF","TOX","GRE","BRB","SPI","GOU","LPM","LOR","LPP")
 
-mes_especes <- c("ABH", "ABL", "ANG", "BAF", "BLN", "BLE", "BOU", "BRB", "BRE", "BRO", "CHA", "CHE", "EPI", "EPT", "GAR", "GOU", "GOO", "LPP", "LPM", "LOR", "LOF", "LOT", "MUP", "OBR", "PER", "ROT", "SAT", "SPI", "TAN", "TOX", "TRF", "VAI", "VAN")
+mes_especes <- c("ABL", "ANG", "ASP", "BAF", "BBG", "BLE", "BLN", "BOU", "BRB", "BRE", "BRO", "CAA", "CAG",  "CAS", "CCO", "CDR", "CHA", "CHE",  "EPI", "EPT","GAR", "GDL", "GOO", "GOU", "GRE", "GTN", "HOT","LOF", "LOR", "LOT", "LPM", "LPP",  "OBR", "PCH", "PER", "PES", "PSR",  "ROT", "SAN", "SAT", "SIL", "SPI", "TAC", "TAN", "TOX", "TRF", "VAI", "VAN", "VAR")
 ```
 
 
@@ -644,6 +662,11 @@ esp_ope_selection <- esp_ope_selection %>%
   filter(esp_code_alternatif %in% mes_especes)
 ```
 
+
+```{r Filtrage espèce tab_occurence}
+tab_occurrence_esp <- tab_occurrence %>% 
+  filter(esp_code_alternatif%in% mes_especes)
+```
 
 # Sauvegarde 
 
@@ -654,6 +677,7 @@ save(especes_lrr_2014,
      mes_especes,
      esp_ope_selection,
      ope_esp_densite,
+     tab_occurrence_esp,
      file = "../processed_data/selection_especes.rda")
 ```
 

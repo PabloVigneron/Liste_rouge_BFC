@@ -71,7 +71,7 @@ load(file = "../processed_data/selection_pop_ope.rda")
 
 ```{r, fig.height = 20, fig.width = 20}
 aspe::gg_temp_abondance(
-  df = ope_esp_selection,
+  df = esp_ope_selection,
   var_espece = esp_code_alternatif,
   var_abondance = lop_effectif,
   nb_colonnes = 6)
@@ -96,16 +96,36 @@ summary(temp_peuplement)
 
 # Nombre d'occurences par années
 
-```{r, fig.height = 12, fig.width = 9, fig.cap = "Annual number of occurrences by species, along with their regression lines."}
-sp_occur_by_year <- sp_densities_trends_pop %>% 
-  filter(density > 0) %>% 
-  group_by(esp_nom_latin, annee) %>% 
+
+
+```{r creation d'un graphique d'occurences des espèces sur la région}
+occu_test <- esp_ope_selection %>% 
+  select(ope_id, lop_id, esp_code_alternatif,annee) 
+
+test <- esp_ope_selection %>% 
+  left_join(passerelle, by = c("ope_id", "lop_id"))
+
+
+# test <- tab_occurrence_esp %>% 
+#   left_join(occu_test, by = c( "ope_id", "esp_code_alternatif")) 
+# 
+# test <- test %>% 
+#   mutate(n_occur = if_else(!is.na(annee), 1, 0))
+
+
+```
+
+```{r, fig.height = 30, fig.width = 20, fig.cap = "Annual number of occurrences by species, along with their regression lines."}
+
+sp_occur_by_year <- test %>% 
+  group_by(esp_code_alternatif, annee) %>% 
   summarise(n_occur = n_distinct(pop_id)) %>% 
-  mutate(esp_nom_latin = fct_reorder(esp_nom_latin, n_occur)) %>% 
-  left_join(sp_start_date) %>% 
-  filter(!is.na(sp_start_year),
-         annee >= sp_start_year) %>% 
-  select(-sp_start_year)
+  mutate(esp_nom_latin = fct_reorder(esp_code_alternatif, n_occur)) 
+  # left_join(sp_start_date) 
+# %>% 
+  # filter(!is.na(sp_start_year),
+  #        annee >= sp_start_year) %>% 
+  # select(-sp_start_year)
 
 ggplot(data = sp_occur_by_year,
        aes(x = annee, y = n_occur)) +
@@ -116,12 +136,6 @@ ggplot(data = sp_occur_by_year,
   labs(x = "Year", y = "Number of occurrences reported")
 ```
 
-
-
-
-
-
-
 ```{r}
 gg_temp_peuplement(
   temp_peuplement,
@@ -130,5 +144,119 @@ gg_temp_peuplement(
   var_libelle_sta = pop_libelle,
   var_especes = esp_code_alternatif
 )
+```
+
+
+```{r}
+# fig_suivi_2 <- ggarrange(suivi_tregor, suivi_printemps,suivi_hiver,
+#                        labels = c("A", "B", "C"),
+#                     ncol = 3, nrow = 1, 
+#                     common.legend = TRUE) 
+#                    # layout_matrix = rbind(c(1,NA,3), c(NA,2,NA)))
+# 
+# fig_suivi_2
+```
+
+```{r}
+base_j25 <- base_j25 %>%
+  mutate(annee = year(date_visite))
+
+# Définir la plage complète d'années à afficher
+annees_completes <- 2010:2023  # modifie cette plage si nécessaire
+
+# Toutes les combinaisons site x année
+all_combos <- expand_grid(
+  code_site = unique(base_j25$code_site),
+  annee = annees_completes
+)
+
+# Joindre et ajouter les statuts finaux
+obs_complete <- all_combos %>%
+  left_join(
+    base_j25 %>% dplyr::select(code_site, annee, statut_observation),
+    by = c("code_site", "annee")
+  ) %>%
+  mutate(
+    statut_final = case_when(
+      statut_observation == "Présent" ~ "Présent",
+      statut_observation == "Absent" ~ "Absent",
+      TRUE ~ "Non prospecté"
+    )
+  )
+
+# Créer le graphique
+suivi_tregor <- ggplot(obs_complete, aes(x = annee, y = code_site, fill = statut_final)) +
+  geom_tile(color = "white", linewidth = 0.3) +
+  scale_fill_manual(
+    values = c(
+      "Présent" = "darkseagreen3",
+      "Absent" = "indianred1",
+      "Non prospecté" = "grey80"
+    )
+  ) +
+  labs(x = "Année",
+       y = "Site",
+       title = "Secteur Petit Trégor",
+       fill = "Statut d'observation") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    panel.border = element_rect(color = "black", fill = NA),
+    legend.background = element_rect(fill = "grey95", color = "black"),
+    axis.text.y = element_text(size = 8)  # au besoin, adapte la taille de texte
+  )
+```
+
+```{r}
+
+combi <- expand_grid(annee = annees_completes)
+
+resume <- esp_ope_selection %>%
+  group_by(annee) %>%
+  summarise(
+    n_obs = n(),
+    n_presences = sum(occurence == "1"),
+    pc_presences = n_presences / n_obs,
+    .groups = "drop"
+  )
+
+resume_complet <- combi %>%
+  left_join(resume, by = "annee") %>%
+  replace_na(list(
+    n_obs = 0,
+    n_presences = 0,
+    pc_presences = 0
+  )) 
+
+ggplot(resume_complet,
+       aes(x = factor(annee), y = pc_presences)) +
+  geom_point(stat = "identity", position = position_dodge()) +
+  geom_text(
+    aes(label = scales::percent(pc_presences, accuracy = 1)),
+    position = position_dodge(width = 0.9),
+    vjust = -0.3,
+    size = 3
+  )+
+  labs(x = "Année",
+       y = "Pourcentage de présence de la loutre",
+       fill = "Passage",
+       title = "Présence de la loutre par année - Secteur Petit Trégor") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1),
+                     limits = c(0, 1)) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    panel.border = element_rect(
+      color = "black",
+      fill = NA,
+      linewidth = 0.5
+    ),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.background = element_rect(fill = "grey94", color = "white"),
+    plot.background = element_rect(fill = "white", color = NA),
+    legend.background = element_rect(fill = "grey94", color = "black"),
+    panel.grid.major = element_line(color = "white"),
+    panel.grid.minor = element_line(color = "white")
+  )
 ```
 

@@ -114,9 +114,9 @@ mes_types_de_peche <- c("Pêche complète à un ou plusieurs passages", # Types 
                        "Pêche par ambiances")
                         #"Pêche partielle sur berge")
 
-n_mini_annee <- 6 # Nombre minimum d'années des séries de pêches 
+n_mini_annee <- 1 # Nombre minimum d'années des séries de pêches 
 
-n_max_manquant <- 2 # Nombre d'années manquantes maximum consécutives sur les séries de pêches 
+n_max_manquant <- 20 # Nombre d'années manquantes maximum consécutives sur les séries de pêches 
 
 annee_depart <- 2007 # Année de départ de l'étude 
 
@@ -285,7 +285,7 @@ pop_serie_tempo <- ope_selection %>%
 
 ```{r Création séries temporelles}
 pop_serie_tempo <- pop_serie_tempo %>%
-  filter(n_opes < n_mini_annee) %>% # PARAMETRE
+  filter(n_opes > n_mini_annee) %>% # PARAMETRE
   select(-annee_mini) %>% 
   pull(pop_id)
 ```
@@ -335,49 +335,49 @@ On observe dans les series temporelles qu'il y a des stations qui sont prospecte
 
 
 ```{r Correction des erreurs de protocole dans le df}
-#ope_selection <- ope_selection %>%
-#  detect_pro_errors()  
+ope_selection <- ope_selection %>%
+  detect_pro_errors()
 
-#erreurs <- attr(ope_selection, "erreurs_protocoles") # Verifier les erreurs du df
+erreurs <- attr(ope_selection, "erreurs_protocoles") # Verifier les erreurs du df
 
-#ope_selection<- ope_selection %>% {
-#    attr(., "erreurs_protocoles") <- NULL
-#    .
-#  } # Suppression de l'attribut après vérifications des erreurs du df 
+ope_selection <- ope_selection %>% {
+  attr(., "erreurs_protocoles") <- NULL
+  .
+} # Suppression de l'attribut après vérifications des erreurs du df
 
 ```
 
 ```{r Récréation séries temporelles - fonction borner_serie}
-#pop_serie_tempo <- ope_selection %>%
-#  borner_series(var_id_site = pop_id,  #Utilisation de la fonction "borner_series"
-#                var_temp = annee,
-#                max_nb_obs_manquantes = n_max_manquant) # PARAMETRE
+pop_serie_tempo <- ope_selection %>%
+  borner_series(var_id_site = pop_id,  #Utilisation de la fonction "borner_series"
+                var_temp = annee,
+                max_nb_obs_manquantes = n_max_manquant) # PARAMETRE
 ```
 
 ```{r Recréation séries temporelles}
-#pop_serie_tempo <- pop_serie_tempo %>%
-#  filter(n_opes > n_mini_annee) %>% # PARAMETRE
-#  select(-annee_mini) %>% 
-#  pull(pop_id)
+pop_serie_tempo <- pop_serie_tempo %>%
+  filter(n_opes > n_mini_annee) %>% # PARAMETRE
+  select(-annee_mini) %>% 
+  pull(pop_id)
 ```
 
 ```{r Actualisation ope_selection après modif series}
-#ope_selection <- ope_selection %>% 
-#  filter(pop_id %in% pop_serie_tempo) # Sélection des pop_id contenus dans la sélection de séries temporelles
+ope_selection <- ope_selection %>% 
+  filter(pop_id %in% pop_serie_tempo) # Sélection des pop_id contenus dans la sélection de séries temporelles
 ```
 
 ```{r Nombre de stations selectionnées}
-#ope_selection %>%
-#  group_by(sta_id) %>%
-#  summarise(n = n()) %>%  
-#  ungroup() %>%
-#  summarise(total = n())
+ope_selection %>%
+  group_by(sta_id) %>%
+  summarise(n = n()) %>%  
+  ungroup() %>%
+  summarise(total = n())
 ```
 ### Représentation graphique
 
   Nous réalisons une représentation graphique des séries temporelles constituées. Nous ajoutons les types de pêches (*pro_libelle*) associées aux opérations des séries.
 
-```{r Représentation séries temporelles, fig.height = 8, fig.width = 12}
+```{r Représentation séries temporelles, fig.height = 30, fig.width = 25}
 ope_selection %>%  # Représentation graphique des stations sélectionnées et des types de pêche associées
   ggplot(aes(x = as.character(pop_libelle),
              y = annee, 
