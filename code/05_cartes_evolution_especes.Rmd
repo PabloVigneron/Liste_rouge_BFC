@@ -67,13 +67,23 @@ load(file = "../processed_data/selection_pop_ope.rda")
 ```
 
 # Graphique de la série chronologique des abondances ou densités par espèce
+```{r}
+summary(temp_df)
+```
+
+
+```{r, ajouter annee au df densite}
+ope_esp_densite_cal <- ope_esp_densite_cal %>%
+  left_join(esp_ope_selection, by = c("ope_id", "esp_code_alternatif")) %>%
+  select(ope_id, esp_code_alternatif, annee, valeur)
+```
 
 
 ```{r, fig.height = 20, fig.width = 20}
 aspe::gg_temp_abondance(
-  df = esp_ope_selection,
+  df = ope_esp_densite_cal ,
   var_espece = esp_code_alternatif,
-  var_abondance = lop_effectif,
+  var_abondance = valeur,
   nb_colonnes = 6)
 ```
 
@@ -89,10 +99,6 @@ temp_peuplement <- esp_ope_selection %>%
   rename(effectif = lop_effectif)
 ```
 
-```{r}
-summary(temp_peuplement)
-```
-
 
 # Nombre d'occurences par années
 
@@ -103,7 +109,10 @@ occu_test <- esp_ope_selection %>%
   select(ope_id, lop_id, esp_code_alternatif,annee) 
 
 test <- esp_ope_selection %>% 
-  left_join(passerelle, by = c("ope_id", "lop_id"))
+  left_join(passerelle, by = c("ope_id", "lop_id")) %>% 
+  left_join(liste_bfc_sp_cor, by = "esp_code_alternatif") %>%# Ajout libelle , noms d'espèces
+  select(ope_id, lop_effectif, lop_id, esp_code_alternatif, annee, pop_id, nom_valide)
+ 
 
 
 # test <- tab_occurrence_esp %>% 
@@ -117,21 +126,17 @@ test <- esp_ope_selection %>%
 
 ```{r, fig.height = 30, fig.width = 20, fig.cap = "Annual number of occurrences by species, along with their regression lines."}
 
-sp_occur_by_year <- test %>% 
-  group_by(esp_code_alternatif, annee) %>% 
-  summarise(n_occur = n_distinct(pop_id)) %>% 
-  mutate(esp_nom_latin = fct_reorder(esp_code_alternatif, n_occur)) 
-  # left_join(sp_start_date) 
-# %>% 
-  # filter(!is.na(sp_start_year),
-  #        annee >= sp_start_year) %>% 
-  # select(-sp_start_year)
+sp_occur_by_year <- test %>%
+  group_by(esp_code_alternatif, annee) %>%
+  summarise(n_occur = n_distinct(pop_id)) %>%
+  mutate(esp_nom_latin = fct_reorder(esp_code_alternatif, n_occur))
 
-ggplot(data = sp_occur_by_year,
-       aes(x = annee, y = n_occur)) +
+ggplot(data = sp_occur_by_year, aes(x = annee, y = n_occur)) +
   geom_point() +
-
-  geom_smooth(method = "lm", se = FALSE, col = "red") +
+  
+  geom_smooth(method = "lm",
+              se = FALSE,
+              col = "red") +
   facet_wrap(vars(esp_nom_latin), ncol = 4) +
   labs(x = "Year", y = "Number of occurrences reported")
 ```

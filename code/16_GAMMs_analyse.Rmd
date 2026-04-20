@@ -1,0 +1,327 @@
+---
+title: "16_GAMMs_analyse"
+author: "PabloVigneron"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  bookdown::html_document2:
+   fig_caption: yes
+   tab_caption: yes
+   number_sections: yes
+   global_numbering: yes
+   toc: yes
+   toc_float:
+         toc_collapsed: yes
+         toc_depth: 2
+   code_folding: hide
+   css: "style.css"
+#bibliography: .bib
+#link-citations: true
+#cls: apa.cls
+#editor_options: 
+#  markdown: 
+#    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+# Chargement des packages, des fonctions et des données
+
+```{r Chargement des packages}
+library(tidyverse)
+library(wesanderson) # Palette de couleur
+library(aspe) # Traitement de la base aspe
+library(mgcv) # modele GAMMs
+library(gratia)
+library(patchwork)
+
+```
+
+```{r Chargement des données}
+load(file = "../processed_data/selection_especes.rda")
+load(file = "../processed_data/selection_pop_ope.rda")
+```
+
+```{r Chargement des tables aspe}
+rdata_tables <- misc_nom_dernier_fichier(
+  repertoire = "../../../../Liste_rouge_BFC/raw_data",
+  pattern = "^tables")
+load(rdata_tables) # Chargement des données 
+```
+
+Script : 1_GAMMs_analyse
+
+Ce script a pour objectif d'estimer les tendances des populations piscicoles d'eau douce de Bourgogne-Franche-Comté. Ceci se fera au moyen d'analyse statistiques de  Generalized Additive Mixte Models (GAMMs). La particularité de ces modèles par rapport à des GLMM, c'est qu'on va pouvoir intétgrer des fonctions smooth qui vont permettre de "coller" au distribution des prédictionsdes variables explicatives du modèles. Des effets d'autocorrélation spatiale et temporelles peuvent être alors possiblement inclus dans les modèles.
+
+
+## Definition des types de variables 
+
+- Loi de Poisson / 
+
+- variables explicatives
+
+```{r}
+# a <- plot(esp_ope_selection_cha$valeur~esp_ope_selection_cha$annee)
+```
+
+
+
+## Autocorelation spatiale - semi-variogramme
+
+```{r}
+# plot(variogram(valeur ~ annee, localisations = ~ X + Y, data, cutoff = 50))
+```
+
+
+```{r}
+# ggplot(exp_variogram_data, aes(x = distance, y = gamma)) +
+#   geom_point() +
+#   geom_line() +
+#   labs(x = "Lag (h)", y = "Semivariance") +
+#   theme_minimal()
+```
+
+
+## Autocorelation temporelle - plot
+
+
+```{r}
+acf(residuals(mod$lme, type = "normalized"), lag.max = 20)# Autocorrélation temporelle — tient compte des effets aléatoires
+```
+```{r}
+acf(residuals(mod$gam, type = "pearson"), lag.max = 40) # Diagnostic du smooth — ne tient pas compte de la structure mixte
+```
+```{r}
+acf(residuals(mod$gam, type = "response"), lag.max = 40) #Résidus bruts sur l'échelle de la réponse
+```
+
+## Poser le modèle 
+
+```{r}
+ope_selection_test <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id)
+```
+
+
+```{r}
+esp_ope_selection_cha <- esp_ope_selection %>%
+  filter(esp_code_alternatif == "CHA") %>%
+  mef_ajouter_type_protocole() %>% 
+  left_join(ope_selection_test, by = "ope_id") %>% 
+  rename(valeur = lop_effectif, 
+         annee = annee.x) %>%
+  mutate(
+    valeur = as.numeric(valeur) ,
+    annee = as.numeric(annee),
+    ope_surface_calculee = as.numeric(ope_surface_calculee) ,
+    pro_libelle = as.factor(pro_libelle),
+    pop_id = as.factor(pop_id), 
+    sta_id = as.factor(sta_id)
+  ) 
+  
+
+```
+
+
+```{r}
+mod <- gamm(
+  valeur ~ s(annee, k = 15) + s(ope_surface_calculee, k = 15)  + pro_libelle,
+  random = list(sta_id =  ~ 1),
+  data = esp_ope_selection_cha,
+  family = poisson,
+  method = "REML")
+```
+
+```{r}
+summary(esp_ope_selection_cha)
+```
+
+```{r}
+coef(mod$gam)
+```
+
+```{r}
+summary(mod$gam)
+```
+
+## Indépendance du modèles au data
+
+```{r plots résidus}
+gam.check(mod$gam)
+
+```
+
+
+
+```{r}
+summary(mod$gam)
+```
+
+
+```{r}
+anova(mod$gam)
+```
+
+
+-> verifier le k'/edf : edf doit être << k'
+
+Verifier la concurvity
+
+```{r}
+concurvity(mod$gam)
+```
+
+
+## application du modèle 
+
+```{r representation graphique standard}
+draw(mod)
+
+```
+
+```{r}
+sm <- smooth_estimates(mod) |>
+  add_confint()
+sm
+```
+
+```{r}
+# add partial residuals to data
+esp_ope_selection_cha <- esp_ope_selection_cha |>
+  add_partial_residuals(mod$gam)
+names(esp_ope_selection_cha)
+```
+
+```{r representation graphique custom ggplot2}
+p_sx2 <- sm  %>%
+  filter(.smooth == "s(annee)")  %>%
+  ggplot() +
+  geom_rug(
+    aes(x = annee),
+    data = ,
+    sides = "b",
+    length = grid::unit(0.02, "npc")
+  ) +
+  geom_ribbon(aes(ymin = .lower_ci, ymax = .upper_ci, x = annee), alpha = 0.2) +
+  geom_point(
+    aes(x = annee, y = `s(annee)`),
+    data = esp_ope_selection_cha,
+    cex = 1.5,
+    colour = "steelblue3"
+  ) +
+  geom_line(aes(x = annee, y = .estimate), lwd = 1.2) +
+  labs(y = "Partial effect", title = "s(annee)")
+
+p_sx0 <- sm  %>%
+  filter(.smooth == "s(ope_surface_calculee)")  %>%
+  ggplot() +
+  geom_rug(
+    aes(x = ope_surface_calculee),
+    data = esp_ope_selection_cha,
+    sides = "b",
+    length = grid::unit(0.02, "npc")
+  ) +
+  geom_ribbon(aes(ymin = .lower_ci, ymax = .upper_ci, x = ope_surface_calculee), alpha = 0.2) +
+  geom_point(
+    aes(x = ope_surface_calculee, y = `s(ope_surface_calculee)`),
+    data = esp_ope_selection_cha,
+    cex = 1.5,
+    colour = "steelblue3"
+  ) +
+  geom_line(aes(x = ope_surface_calculee, y = .estimate), lwd = 1.2) +
+  labs(y = "Partial effect", title = "s(x0)")
+
+p_sx0 + p_sx2 + plot_layout(ncol = 2)
+
+```
+
+
+```{r}
+coef(mod)
+
+```
+```{r}
+library(arm)
+binnedplot(fitted(mod), residuals(mod, type = "response"))
+```
+
+
+##glmm
+
+```{r}
+library(lme4)
+library(RVAideMemoire)
+
+
+```
+
+```{r}
+model_3 <- glmer(valeur ~ as.factor(annee) + ope_surface_calculee + pro_libelle+ (1|sta_id),  data = esp_ope_selection_cha,  family = poisson(link ="log"))
+```
+
+
+```{r}
+plotresid(model_3)
+```
+
+```{r}
+summary(model_3)
+```
+
+
+```{r}
+overdisp.glmer(model_3)
+```
+# GLM zero enflee 
+
+```{r}
+library(glmmTMB)
+```
+
+```{r}
+mod3.3 <- glmmTMB(valeur ~annee + ope_surface_calculee + pro_libelle,  data = esp_ope_selection_cha,  family = poisson(link ="log"), 
+ziformula = ~ 1)
+```
+
+```{r}
+mod3.4 <- glmmTMB(
+    valeur ~ annee + ope_surface_calculee + pro_libelle,
+    family = nbinom2(link = "log"),
+    data = esp_ope_selection_cha,
+    ziformula = ~ 1
+  )
+```
+
+```{r}
+mod3.5 <- glmmTMB(
+valeur ~ annee + ope_surface_calculee + pro_libelle,
+family = truncated_poisson(link = "log"),
+data = esp_ope_selection_cha,
+ziformula = ~ 1
+)
+```
+
+```{r}
+mod3.6 <- glmmTMB(
+valeur ~ annee + ope_surface_calculee + pro_libelle,
+family = truncated_nbinom2(link = "log"),
+data = esp_ope_selection_cha,
+ziformula = ~ 1
+)
+```
+
+```{r}
+AIC(mod3.3, mod3.4, mod3.5, mod3.6)
+```
+```{r}
+plotresid(mod3.3
+          )
+```
+
+```{r}
+summary(mod3.3)
+```
+

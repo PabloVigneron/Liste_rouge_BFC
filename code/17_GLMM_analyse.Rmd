@@ -1,0 +1,90 @@
+---
+title: "17_GLMM_analyse"
+author: "PabloVigneron"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  bookdown::html_document2:
+   fig_caption: yes
+   tab_caption: yes
+   number_sections: yes
+   global_numbering: yes
+   toc: yes
+   toc_float:
+         toc_collapsed: yes
+         toc_depth: 2
+   code_folding: hide
+   css: "style.css"
+#bibliography: .bib
+#link-citations: true
+#cls: apa.cls
+#editor_options: 
+#  markdown: 
+#    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+
+# Objectif : Dynamique de population des poissons d'eau douce de Bretagne
+
+Script : 14_GLMM
+
+  Ce script a pour objectif d'évaluer l'impact des différents réseaux sur les tendances des indicateurs régionaux. Il a également l'objectif de regarder l'impact des changements de protocoles sur les stations au cours des années d'études grâce aux modèles linéaires généralisés à effets mixtes. 
+
+
+# Installation 
+
+## Chargement des packages, fonctions et des données 
+
+```{r Chargement des packages}
+library(lme4)
+library(popdynmodel)
+library(aspe2)
+library(tidyverse)
+library(aspe)
+library(sjstats)
+library(gt)
+```
+
+```{r Chargement des données}
+load(file = "../processed_data/calcul_indicateurs_regionaux.rda") # Chargement des données
+load(file = "../processed_data/selection_pop_ope.rda")
+load(file = "../processed_data/lm_mann_kendall_tendances.rda")
+load(file = "../processed_data/assemblage_tab_par_ope.rda")
+load(file = "../processed_data/donnees_densite_eff_abs.rda")
+```
+
+```{r Chargement des fonctions}
+source(file = "../R/lm_application_modele.R")
+source(file = "../R/lm_calcul_modele.R")
+source(file = "../R/glmm_calcul_modele.R")
+source(file = "../R/glmm_application_modele.R")
+```
+
+```{r Chargement des tables de données}
+rdata_tables <- misc_nom_dernier_fichier(   # Chargement des tables aspe
+  repertoire = "../../../../projets/ASPE/raw_data/rdata",
+  pattern = "^tables")
+load(rdata_tables)
+```
+
+
+
+# Modèles Linéaires Généralisés à effets Mixtes (GLMM)
+
+
+# Sauvegarde
+
+```{r Sauvegarde}
+save(glmm_resultats_format,
+     reg_indicateur_lrr_tendances_lm,
+     reg_indicateur_lrr_tendances_mk_st,
+     tab_glmm_resultats,
+     tab_reg_indicateur_lrr_tendances_lm,
+     tab_reg_indicateur_lrr_tendances_mk_st,
+     file = "../processed_data/mk_glmm_lm_tendances.rda")
+```

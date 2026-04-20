@@ -140,7 +140,7 @@ mes_depts <- departements_metro_geo %>%
   filter (DEP %in% c( "21","25","39", "58", "70","71","89")) # Sélection de l'aire géographique : choix des départements 
 ```
 
-```{r}
+```{r Visualisation de la zone géographique sélectionnée}
 #mes_depts %>% 
 #  mapview::mapview() # Visualisation de la zone géographique sélectionnée 
 ```
@@ -198,14 +198,6 @@ passerelle <- passerelle %>%
   Il existe plusieurs réseaux de pêche en France. Chacune des stations (*sta_id*) et des points de prélèvements (*pop_id*) peuvent correspondre à un ou plusieurs types de réseaux de pêche. Ces différents réseaux sont identifiables par leur *obj_libelle* renseignés dans la base *aspe*. Nous ajoutons cette information dans notre jeu de données à l'aide la passerelle (*mef_ajouter_objectif()*), et nous sélectionnons seulement les réseaux souhaités pour l'étude : ici le RCS, le RHP et le RRP.
 
 ### Test NA values 
-
-```{r test NA values stations avant sélection reseaux,echo = T}
-#passerelle_na <- passerelle %>% 
-#  group_by(sta_id) %>% 
-#  filter(is.na(sta_id)) %>% 
-#  ungroup()
-#passerelle_na 
-```
 
 ```{r Sélection réseaux de pêches} 
 passerelle <- passerelle %>%
@@ -318,7 +310,7 @@ Dans les stations suivantes un changements de protocole c'est effectué dans la 
 
 -**Savoureuse à Vieux-Charmont** : 
 
--**Doubs à Colombier-Fontaine 1** : pêche par ambiance à supprimer : Attention 10 ans de suivis => 9ans 
+-**Doubs à Colombier-Fontaine 1** : pêche par ambiance à supprimer
 
 On observe dans les series temporelles qu'il y a des stations qui sont prospecter avec des protocoles différents, ce qui n'est pas censé être le cas. On détecte et corrige alors dans le jeu de données les stations avec des protocoles différents avec la fonction *detect_pro_errors()*:
 
@@ -335,6 +327,8 @@ ope_selection<- ope_selection %>% {
   } # Suppression de l'attribut après vérifications des erreurs du df 
 
 ```
+
+Après avoir supprimer les erreurs de protocole dans le jeu de donnée, on actualise les series temporelles **pop_serie_borner**.
 
 ```{r Récréation séries temporelles - fonction borner_serie}
 pop_serie_tempo <- ope_selection %>%
@@ -399,24 +393,37 @@ final_summary_ope
 
   Nous réalisons une représentation graphique des séries temporelles constituées. Nous ajoutons les types de pêches (*pro_libelle*) associées aux opérations des séries.
 
-```{r Représentation séries temporelles, fig.height = 30, fig.width = 25}
+```{r Représentation séries temporelles, fig.height = 44, fig.width = 28}
 ope_selection %>% # Représentation graphique des stations sélectionnées et des types de pêche associées
-  ggplot(aes(x = as.character(pop_libelle),
-             y = annee, 
-             fill= pro_libelle),
-         legend.background = element_rect(fill="#ffffff")) + 
-  scale_fill_manual(values= pal) +
+  ggplot(
+    aes(
+      x = as.character(pop_libelle),
+      y = annee,
+      fill = pro_libelle
+    ),
+    legend.background = element_rect(fill = "#ffffff")
+  ) +
+  scale_fill_manual(values = pal) +
   geom_tile() +
-  labs(title = "Les points de prélèvements sélectionnés et les types de pêches associées",
-       subtitle = "Région Bourgogne-Franche-Comté", 
-       x ="",
-       y = "Années",
-       fill = "Type de pêche") + 
-  theme_light(base_size = 11) +
-  theme(panel.grid.major = element_line(color="#ffffff", size = 0.1),
-        panel.grid.minor = element_line(color = "#ffffff"),
-        panel.background = element_rect(fill="#faf0e6"),
-        legend.position = "bottom") +
+  labs(
+    title = "Les points de prélèvements sélectionnés et les types de pêches associées",
+    subtitle = "Région Bourgogne-Franche-Comté",
+    x = "",
+    y = "Années",
+    fill = "Type de pêche"
+  ) +
+  theme_light(base_size = 18) +
+  theme(
+    panel.grid.major = element_line(color = "#ffffff", size = 0.1),
+    panel.grid.minor = element_line(color = "#ffffff"),
+    panel.background = element_rect(fill = "#faf0e6"),
+    legend.position = "bottom",
+    legend.text = element_text(size = 18),
+    # taille labels pro_libelle
+    legend.title = element_text(size = 15),
+    # taille titre légende
+    axis.text.y = element_text(size = 16) # taille noms stations
+  ) +
   coord_flip() +
   scale_y_continuous(breaks = seq(min(ope_selection$annee), max(ope_selection$annee), by = 3))
 ```
@@ -475,7 +482,6 @@ mapview(
 passerelle <- passerelle %>% # Enregistrement des opérations de pêches retenues dans la passerelle
   filter(ope_id %in% ope_selection$ope_id)
 ```
-
 
 
 # Vérification du jeu de données 
@@ -547,6 +553,26 @@ sta_plusieurs_pop %>%
   flextable::colformat_int(j = c(1, 3), big.mark = " ")
 ```
 
+
+### Correction et actualisation des df avant sauvegarde
+
+Pour contextualiser, la station du **Doubs à Mouthe - Le petit Sarrageois**, avait sont point de prélèvement en amont d'une scierie. Le point de prélèvement macroinvertébré aquatique était en aval, il a donc été changé  et placé en aval à partir de 2014.
+
+Concernant la station **Acolin à Saint-Germain-Chasseney** pour des probèmes d'accès au point de prelèvement sur un terrain privé et une perte d'autorisation d'aller sur site, la décision à été prise de changé la localisation du point de prélèvement. 
+
+Ces deux stations sont donc **retirée de l'analyse**.
+
+```{r retirer les stations problématiques du df et actualisation ope_selection}
+ope_selection <- ope_selection %>%
+  filter(!sta_id == "8913", !sta_id == "19409") %>% 
+  filter(pop_id %in% pop_serie_tempo) # Sélection des pop_id contenus dans la sélection de séries temporelles
+```
+
+
+```{r Actualisation de la selection des operations passerelle}
+passerelle <- passerelle %>% # Enregistrement des opérations de pêches retenues dans la passerelle
+  filter(ope_id %in% ope_selection$ope_id)
+```
 
 # Sauvegarde 
 

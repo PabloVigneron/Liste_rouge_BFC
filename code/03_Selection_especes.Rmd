@@ -177,7 +177,7 @@ A finir la prise de décision !!! :
 
 - "VAR" : arrivé de la vandoise rostrée où modification de l'identification de "VAN"?
 
-- "ROI" Rotengle italien ?
+- "ROI" Rotengle italien 
 
 - "GOU"=> "GOO" : à partir d'environ 2018 : changement d'identification le Goujon (GOU) devient le Goujon occitan (GOO)
 
@@ -653,18 +653,30 @@ tab_densite_occurrence$esp_code_alternatif
 ```{r Objet espece_lrr_2015 et mes_especes}
 especes_lrr_2014 <- c("LOT","LOE","CHE","BRO","BOU","ANG","PER","BAF","EPT","ABH","BRE","EPI","CCO","CHA","HOT","VAI","TAN","BLN","VAN","TRF","LPP","OBR","ROT","ABL","GAR","IDE","LOF","TOX","GRE","BRB","SPI","GOU","LPM","LOR","LPP")
 
-mes_especes <- c("ABL", "ANG", "ASP", "BAF", "BBG", "BLE", "BLN", "BOU", "BRB", "BRE", "BRO", "CAA", "CAG",  "CAS", "CCO", "CDR", "CHA", "CHE",  "EPI", "EPT","GAR", "GDL", "GOO", "GOU", "GRE", "GTN", "HOT","LOF", "LOR", "LOT", "LPM", "LPP",  "OBR", "PCH", "PER", "PES", "PSR",  "ROT", "SAN", "SAT", "SIL", "SPI", "TAC", "TAN", "TOX", "TRF", "VAI", "VAN", "VAR")
+mes_especes <- c("ABL","ANG","BAF","BLN","BRB", "BRE","BRO","CCO","CHA","CHE", "EPI", "EPT", "GAR", "GOU","HOT","LOF",   "LOR", "LOT","LPM" ,"LPP", "OBR", "PER", "ROT", "SAT", "SPI", "TAN", "TOX", "TRF","VAI","VAN","VAR")
 ```
+
 
 
 ```{r Filtrage espèce esp_ope_selection}
 esp_ope_selection <- esp_ope_selection %>% 
+  filter(autochtonie_new == "autochtone") %>%
   filter(esp_code_alternatif %in% mes_especes)
 ```
+
+```{r}
+table(esp_ope_selection$esp_code_alternatif)
+```
+  "ABL"   "ANG"   "BAF"   "BLN"   "BRB"  "BRE"   "BRO"   "CCO"   "CHA"   "CHE"   "EPI"   "EPT"   "GAR"   "GOU"  "HOT"   "LOF"   "LOR"   "LOT"   "LPM"   "LPP"   "OBR"   "PER"   "ROT"   "SAT"   "SPI"   "TAN"   "TOX"   "TRF"   "VAI"   "VAN"   "VAR" 
 
 
 ```{r Filtrage espèce tab_occurence}
 tab_occurrence_esp <- tab_occurrence %>% 
+  filter(esp_code_alternatif%in% mes_especes)
+```
+
+```{r}
+ope_esp_densite_cal <- ope_esp_densite_cal %>% 
   filter(esp_code_alternatif%in% mes_especes)
 ```
 
@@ -673,12 +685,15 @@ tab_occurrence_esp <- tab_occurrence %>%
 Sauvegarde pour le script suivant : script 04_pre_traitements_donnees_ope_especes.
 
 ```{r Sauvegarde}
-save(especes_lrr_2014, 
-     mes_especes,
-     esp_ope_selection,
-     ope_esp_densite,
-     tab_occurrence_esp,
-     file = "../processed_data/selection_especes.rda")
+save(
+  especes_lrr_2014,
+  mes_especes,
+  esp_ope_selection,
+  ope_esp_densite_cal,
+  tab_occurrence_esp,
+  liste_bfc_sp_cor,
+  file = "../processed_data/selection_especes.rda"
+)
 ```
 
 
