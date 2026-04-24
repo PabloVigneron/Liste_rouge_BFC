@@ -1,6 +1,6 @@
 ---
-title: "06_pre_traitements-donnees_env"
-subtitle: "Pré-traitements des données environnementales"
+title: "LRR des poissons d'eau douce de BFC"
+subtitle: "21_pre_traitements-donnees_env"
 author: "PabloVigneron"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
@@ -15,9 +15,7 @@ knitr::opts_chunk$set(echo = TRUE,
                       warning = FALSE)
 ```
 
-# Objectif : Dynamique de population des poissons d'eau douce de Bretagne
-
-Script : 05_pre_traitements_donnees_env
+Script : 21_pre_traitements_donnees_env
 
   Il s'agit de réaliser les pré-traitements des données environnementales utilisées pour l'étude. Cette étape permet notamment de détecter et de corriger les erreurs ou incohérences présentes dans le jeu de données relatives aux variables environnementales, contribuant ainsi à la mise en qualité des données.
 

@@ -1,5 +1,6 @@
 ---
-title: "17_GLMM_analyse"
+title: "LRR des poissons d'eau douce de BFC"
+subtitle: "43_analyse_GLMM"
 author: "PabloVigneron"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output: 
@@ -29,9 +30,9 @@ knitr::opts_chunk$set(echo = TRUE,
 ```
 
 
-# Objectif : Dynamique de population des poissons d'eau douce de Bretagne
+# Objectif : Dynamique de population des poissons d'eau douce de BFC
 
-Script : 14_GLMM
+Script : 43_analyse_GLMM
 
   Ce script a pour objectif d'évaluer l'impact des différents réseaux sur les tendances des indicateurs régionaux. Il a également l'objectif de regarder l'impact des changements de protocoles sur les stations au cours des années d'études grâce aux modèles linéaires généralisés à effets mixtes. 
 

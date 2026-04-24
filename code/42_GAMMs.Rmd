@@ -1,5 +1,6 @@
 ---
-title: "14_GAMMs"
+title: "LRR des poissons d'eau douce de BFC"
+subtitle: "14_GAMMs"
 author: "PabloVigneron"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output: 

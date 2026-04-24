@@ -1,6 +1,6 @@
 ---
-title: "Liste Rouge Régionale des poissons d'eau douce de Bretagne"
-subtitle: "Pré-traitements des données des opérations et des données individuelles des espèces"
+title: "LRR des poissons d'eau douce de BFC"
+subtitle: "20_pre_traitements_donnees_ope_especes"
 author: "PabloVigneron"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 params:
@@ -19,7 +19,7 @@ knitr::opts_chunk$set(echo = TRUE,
 
 # Objectif : Dynamique de population des poissons d'eau douce de Bretagne 
 
-Script : 04_pre_traitements_donnees_ope_especes
+Script : 20_pre_traitements_donnees_ope_especes
 
 
   Il s'agit de réaliser une étape de pré-traitements et de mise en qualité des données sur la sélection des opérations réalisée précedemment. Il s'agit également de réaliser une mise en qualité des données individuelles des espèces propres à chacune des opérations. Il s'agit notamment d'observer les valeurs aberrantes contenues dans les mesures individuelles des poissons (mesures de tailles / poids / ...). 
@@ -105,12 +105,6 @@ source(file = "../R/classe_couleur_erreur.R")
 
 
 ```{r Construction_df_tailles_maturite}
-# especes_lrr_2014 <- data.frame(especes_lrr_2014) %>%
-#   rename(esp_code_alternatif = especes_lrr_2014)
-# 
-# traits_biologiques <- traits_biologiques %>%
-#   left_join(especes_lrr_2014, by = "esp_code_alternatif")
-
 traits_biologiques <- traits_biologiques %>% # Construction d'un jeu de données contenant les tailles de maturité
   select(esp_code_alternatif, taille_maturite_ref)
 ```
@@ -129,7 +123,8 @@ mei_for_join <- temp_df %>%
 ```{r Creation_df_mei_ope_selection}
 mei_ope_selection <- passerelle %>%
   mef_ajouter_ope_date() %>%
-  left_join(mei_for_join , by = "lop_id") %>% #ajouter les mei manuellement
+  left_join(y = mei_for_join) %>% 
+  # left_join(mei_for_join , by = "lop_id") %>% #ajouter les mei manuellement
   # mef_ajouter_mei() %>%
   mef_ajouter_lots() %>%
   mef_ajouter_type_protocole() %>%
@@ -151,14 +146,6 @@ mei_ope_selection <- passerelle %>%
     annee,
     tlo_libelle
   )
-```
-
-```{r}
-# mei_ope_selection <- mei_ope_selection %>%
-#   mutate(tyl_libelle = as.factor(tyl_libelle))
-# 
-# 
-# summary(mei_ope_selection)
 ```
 
 # Modif provisoire : Pour le df final script GLMM et GAMMS

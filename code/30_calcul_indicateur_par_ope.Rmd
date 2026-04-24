@@ -1,5 +1,6 @@
 ---
-title: "10_calcul_indicateur_par_ope"
+title: "LRR des poissons d'eau douce de BFC"
+subtitle: "30_calcul_indicateur_par_ope"
 author: "PabloVigneron"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
@@ -14,9 +15,7 @@ knitr::opts_chunk$set(echo = TRUE,
                       warning = FALSE)
 ```
 
-# Objectif : Dynamique de population des poissons d'eau douce de Bretagne
-
-Script : 10_calcul_indicateurs_par_ope
+Script : 30_calcul_indicateurs_par_ope
 
   Pour rappel, cette étude se divise en plusieurs parties. Dans un premier temps, il s'agit de produire un tableau de bord combinant divers indicateurs simples, à l'échelle de chaque opération de pêche. 
 
@@ -30,13 +29,14 @@ Script : 10_calcul_indicateurs_par_ope
 ```{r Chargement des packages}
 library(tidyverse)
 library(aspe)
+library(dplyr)
 ```
 
 Nous avons besoin des jeux de données constitués lors des précédents scripts. 
 
 ```{r Chargement des données}
 load(file = "../processed_data/selection_pop_ope.rda") # Chargement des données pré-enregistrées
-# load(file = "../processed_data/pre_traitements_donnees_env.rda")
+load(file = "../processed_data/pre_traitements_donnees_env.rda")
 load(file = "../processed_data/selection_especes.rda")
 load(file = "../processed_data/pre_traitements_donnees_especes.rda")
 ```
@@ -79,7 +79,7 @@ ope_effectif_ind <- mei_ope_selection %>%
             .groups = 'drop') %>%
   mutate(indicateur = "effectif_total",
          stade = "ind") %>%
-  select(ope_id,
+  dplyr::select(ope_id,
     esp_code_alternatif,
     indicateur,
     valeur,
@@ -98,7 +98,7 @@ ope_effectif_stade <- mei_ope_selection %>%
   summarise(valeur = sum(valeur_effectif),
             indicateur = "effectif_total",
             .groups = 'drop') %>%
-  select(ope_id,
+  dplyr::select(ope_id,
          esp_code_alternatif,
     indicateur,
     valeur,
@@ -115,7 +115,7 @@ Création d'un dataframe avec toutes les combinaisons possibles d'*ope_id*, *esp
 ```{r Création tableau effectif total par ope et stade avec NA}
 ope_effectif_ind <- ope_effectif_ind %>% 
   left_join(ope_selection) %>% 
-  select(-sta_id,
+  dplyr::select(-sta_id,
          -pro_libelle,
          -ope_date,
          -pop_libelle)
@@ -129,7 +129,7 @@ ope_effectif_absences <- ope_full %>%
   mutate(valeur = ifelse(is.na(valeur), 0, valeur),
     indicateur = 'effectif_total',
     stade = "ind") %>% 
-  select(ope_id,
+  dplyr::select(ope_id,
          esp_code_alternatif,
          indicateur,
          valeur,
@@ -148,7 +148,7 @@ ope_biomasse <- mei_ope_selection %>% # Calcul de la biomasse par opération san
            stade) %>%
   summarise(valeur=sum(poids_tp, na.rm = TRUE)) %>% 
   mutate(indicateur= "biomasse") %>% 
-  select(ope_id,
+  dplyr::select(ope_id,
          esp_code_alternatif,
          indicateur,
          valeur,
@@ -176,7 +176,7 @@ ope_biomasse <- ope_biomasse %>%
 ```{r Ajout des données de surfaces calculées}
 mei_ope_selection <- mei_ope_selection %>% 
   left_join (y=operation %>% 
-               select (ope_id, 
+               dplyr::select (ope_id, 
                        ope_surface_calculee, # Ajout surfaces échantillonnées 
                        passage$pas_numero))
 ```
@@ -235,6 +235,13 @@ ope_pc_juv <- ope_effectif %>%
 
 Le calcul de pourcentage de juvéniles par opération est effectué. Les résultats sont stockés dans le jeu de données *ope_pc_juv*.
 
+# CODE PROVISOIRE !!! SUPPRESSION DES LIGNES SANS STADE(NA)
+```{r}
+# ope_pc_juv <- ope_pc_juv %>%
+#   mutate(stade = as.factor(stade)) %>%
+#   filter(!is.na(stade))
+```
+
 ```{r Calcul pourcentage juvéniles}
 ope_pc_juv <- ope_pc_juv %>% 
   ungroup() %>% 
@@ -245,10 +252,11 @@ ope_pc_juv <- ope_pc_juv %>%
            fill = list(valeur = 0)) %>% 
     group_by(ope_id,
              esp_code_alternatif) %>% 
-  mutate(valeur = (valeur [stade == "juv"] / valeur [stade == "ind"])*100) %>% 
+  dplyr::mutate(valeur = (valeur [stade == "juv"] / valeur [stade == "ind"])*100) %>% 
   filter(stade == "ind",
          !is.nan(valeur))
 ```
+
 
 
 ## Indicateurs sur les mesures individuelles par opération de pêche

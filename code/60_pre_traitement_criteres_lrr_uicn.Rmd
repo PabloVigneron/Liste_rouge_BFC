@@ -1,5 +1,6 @@
 ---
-title: "25_pretreatment_criteres_lrr_uicn"
+title: "LRR des poissons d'eau douce de BFC"
+subtitle: "60_pretreatment_criteres_lrr_uicn"
 author: "PabloVigneron"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
@@ -15,7 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Objectif : Dynamique de population des poissons d'eau douce de Bretagne
 
-Script : 25_pretreatment_criteres_lrr_uicn
+Script : 60_pretreatment_criteres_lrr_uicn
 
   Ce script a pour objectif de réaliser des pré-traitements avant l'application de la méthodologie de la liste rouge régionale (UICN France, 2012) sur les données. Ce script contient 1 grande étape : la **sélection des espèces à évaluer** et **l'observation des espèces au sein des stations sélectionnées** - selon le déroulement de la méthodologie UICN. 
 

@@ -1,5 +1,6 @@
 ---
-title: "03_Selection_especes"
+title: "LRR des poissons d'eau douce de BFC"
+subtitle: "10_selection_especes"
 author: "PabloVigneron"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 params:
@@ -35,7 +36,7 @@ knitr::opts_chunk$set(echo = TRUE,
                       warning = FALSE)
 ```
 
-Script : 03_selection_especes
+Script : 10_selection_especes
 
   Après avoir sélectionné les points de prélèvements et les opérations de pêche de l'aire géographique ciblée, un tri sur les données des espèces péchées durant ces opérations est réalisé. Il s'agit de retirer du jeu initial les données non nécessaires ou obsolètes pour notre étude. 
 
@@ -485,47 +486,6 @@ esp_ope_selection <- esp_ope_selection %>%
 
 
 
-### Definition / Verification de l'Autochtonie des espèces / Temps de génération des espèces
-
-```{r Chargement de la liste biologie espèces}
-liste_bio <- readxl::read_xlsx("../processed_data/liste_complete_lrr_correction.xlsx") %>%
-  clean_names() %>%
-  select(
-    esp_code_alternatif,
-    maturite_m,
-    maturite_f,
-    maturite_an,
-    maturite_bq,
-    longevite_bq,
-    longevite_an
-  ) 
-```
-
-```{r jointure autochtonie avec liste biologie poissons}
-liste_bio_join <- liste_bio %>%
-  left_join(liste_bfc_sp_cor, by = "esp_code_alternatif") %>%
-  select(
-   # ordre,
-    nom_valide,
-    esp_code_alternatif,
-    autochtonie_new,
-    maturite_m,
-    maturite_f,
-    maturite_an,
-    maturite_bq,
-    longevite_bq,
-    longevite_an,
-   # effectif_total,
-    categorie_lr_france_2019
-  )
-
-liste_bio <- liste_bio_join %>%
-  filter(
-    autochtonie_new == "autochtone"#, 
-    #!is.na(effectif_total)
-    )
-```
-
 
 
 ## Vérification identification GOU / GOO : 
@@ -680,9 +640,69 @@ ope_esp_densite_cal <- ope_esp_densite_cal %>%
   filter(esp_code_alternatif%in% mes_especes)
 ```
 
+
+
+### Definition / Verification de l'Autochtonie des espèces / Temps de génération des espèces
+
+```{r Chargement de la liste biologie espèces}
+liste_bio <- readxl::read_xlsx("../processed_data/liste_complete_lrr_correction.xlsx") %>%
+  clean_names() %>%
+  select(
+    esp_code_alternatif,
+    maturite_m,
+    maturite_f,
+    maturite_an,
+    maturite_bq,
+    longevite_bq,
+    longevite_an
+  ) %>% 
+  filter(esp_code_alternatif%in% mes_especes)
+```
+
+```{r jointure autochtonie avec liste biologie poissons}
+# liste_bio_join <- liste_bio %>%
+#   left_join(liste_bfc_sp_cor, by = "esp_code_alternatif") %>%
+#   select(
+#     # ordre,
+#     nom_valide,
+#     esp_code_alternatif,
+#     autochtonie_new,
+#     maturite_m,
+#     maturite_f,
+#     maturite_an,
+#     maturite_bq,
+#     longevite_bq,
+#     longevite_an,
+#     # effectif_total,
+#     categorie_lr_france_2019
+#   )
+# 
+# liste_bio <- liste_bio_join %>%
+#   filter(
+#     autochtonie_new == "autochtone"#,
+#     #!is.na(effectif_total)
+#   )
+```
+
+
+```{r}
+traits_biologiques <- readxl::read_xlsx("../raw_data/traits_biologiques.xlsx")
+
+traits_biologiques <- traits_biologiques %>%
+  select(esp_code_alternatif, temps_generation, age_maturite)
+
+```
+
+```{r jointure autochtonie avec liste biologie poissons}
+liste_bio_join <- liste_bio %>%
+  left_join(traits_biologiques) 
+  
+```
+
+
 # Sauvegarde 
 
-Sauvegarde pour le script suivant : script 04_pre_traitements_donnees_ope_especes.
+Sauvegarde pour le script suivant : script 20_pre_traitements_donnees_ope_especes.
 
 ```{r Sauvegarde}
 save(

@@ -1,5 +1,6 @@
 ---
-title: "01_pretreatment_ope"
+title: "LRR des poissons d'eau douce de BFC"
+subtitle: "00_selection_pop_ope"
 author: "PabloVigneron"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output: 
@@ -29,9 +30,7 @@ knitr::opts_chunk$set(echo = TRUE,
                       warning = FALSE)
 ```
 
-# Objectif : Dynamique de population des poissons d'eau douce de Bourgogne Franche-comté (BFC)
-
-Script : 01_pretreatment_ope
+Script : 00_selection_pop_ope
 
   L'objectif de cette étude est d'évaluer les tendances démographiques des poissons d'eau douce de de Bourgogne-Franche-comté. Ce travail vient en appui de la création de la liste rouge régionale de la région Bourgogne-Franche-comté.
 
@@ -574,9 +573,14 @@ passerelle <- passerelle %>% # Enregistrement des opérations de pêches retenue
   filter(ope_id %in% ope_selection$ope_id)
 ```
 
+```{r}
+sta_id_ope_selection <- sta_id_ope_selection %>% 
+  filter(ope_id %in% ope_selection$ope_id)
+```
+
 # Sauvegarde 
 
-Sauvegarde pour le script suivant (sélection des espèces) : script 03_Selection_especes.
+Sauvegarde pour le script suivant (sélection des espèces) : script 10_Selection_especes.
 
 ```{r Sauvegarde}
 save(pop_serie_tempo,
@@ -593,4 +597,10 @@ save(sta_id_ope_selection,
      buffer,
      mes_depts,
      file = "../processed_data/selection_pop_ope_carte.rda")
+```
+
+```{r exporter pour cartographie QGIS}
+# sta_id_ope_selection %>%
+#   sf::st_drop_geometry() %>%
+#   readr::write_excel_csv("../processed_data/sta_id_ope_selection.csv")
 ```

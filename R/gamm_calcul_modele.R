@@ -25,23 +25,21 @@ gamm_calcul_modele <- function(data, mon_espece) {
   }
   
   
-  model <- try(gam(
-    valeur ~ s(annee),
-    +ope_surface_calculee,
-    +pro_libelle,
-    +s(price),
-    +(1 |pop_id),
+  model <- try(gamm(
+    valeur ~ s(annee) + s(ope_surface_calculee)  + pro_libelle,
+    random = list(sta_id =  ~ 1),
     data = filtered_data,
-    family = poisson(link = "log"),
+    family = poisson,
     method = "REML"
   ),
-  silent = TRUE)
+  silent = TRUE
+  )
   
   if (inherits(model, "try-error")) {
     return(NULL)
   }
   
-  res <- summary(model)$coefficients %>%
+  res <- summary(model$gam)$coefficients %>%
     as.data.frame() %>%
     rename(p_value = `Pr(>|z|)`) %>%
     mutate(sig = case_when(

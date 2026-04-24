@@ -1,5 +1,6 @@
 ---
-title: "00_pretreatment"
+title: "LRR des poissons d'eau douce de BFC"
+subtitle: "01_pretreatment"
 author: "PabloVigneron"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output: 
@@ -25,7 +26,7 @@ output:
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```
-
+Script : 01_pretreatment
 
 ```{r}
 #Importation des packages
@@ -91,51 +92,8 @@ mapview(
 )
 
 ```
+
 ```{r}
 summary(sites_geo$reseaux)
 ```
 
-# Installer le package aspe
-```{r}
-#devtools::install_github("pascalirz/aspe")
-```
-
-Pour des raisons de problème de proxy, le package "aspe" a été téléchargé manuellement à partir d'un document ".tar". 
-```{r}
-#install.packages("C:/Users/pablo.vigneron/Downloads/PascalIrz-aspe-v0.5.2-6-gec29cc2(2).tar.gz", repos = NULL, type = "source")
-```
-
-#Stocker les informations de connexion dans son R environnement 
-```{r}
-## 1° - ouvrir le fichier de configuration de l'environnement R avec la fonction du package usethis (installer le package si nécessaire).
-usethis::edit_r_environ()
-
-```
-
-#Importation de la base depuis l'IDG
-
-```{r}
-# connexion à l'IDG
-# ! veillez à disposer des informations de connexion et un droit d'accès
-aspe_db <- imp_connecter_aspe_idg()
-
-# importation des tables de la base aspe
-imp_importer_aspe_idg(aspe_db)
-```
-
-```{r}
-export_tables_rdata('../processed-data')
-```
-
-
-# importation tableau espèces TAXREF
-
-```{r}
-taxref <- 
-  read_table('../raw_data/TAXREFv18.txt')
-  
-```
-
-```{r}
-summary(taxref)
-```

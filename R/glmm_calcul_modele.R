@@ -28,7 +28,7 @@ glmm_calcul_modele <- function(data, mon_espece) {
     valeur ~ annee +
       ope_surface_calculee +
       pro_libelle +
-      (1 | pop_id) +
+      (1 | pop_id), 
       data = filtered_data,
     family = poisson(link = "log"),
   ),

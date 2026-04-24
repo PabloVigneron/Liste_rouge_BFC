@@ -1,6 +1,6 @@
 ---
-title: "Liste Rouge Régionale des poissons d'eau douce de Bretagne"
-subtitle: "Calcul des indicateurs régionaux"
+title: "LRR des poissons d'eau douce de BFC"
+subtitle: "31_calcul_indicateurs_regionaux"
 author: "PabloVigneron"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
@@ -15,10 +15,7 @@ knitr::opts_chunk$set(echo = TRUE,
                       warning = FALSE)
 ```
 
-
-# Objectif : Dynamique de population des poissons d'eau douce de Bretagne
-
-Script : 12_calcul_indicateurs_regionaux
+Script : 31_calcul_indicateurs_regionaux
 
   Dans le script précèdent (*10_calcul_indicateurs_par_ope*), nous avons produit un tableau de bord combinant divers indicateurs simples à l'échelle de chaque opération de pêche. Ce premier tableau de bord est représentatif de la dynamique de population des poissons d'eau douce pour une année *n* à un point de prélèvement donné. La seconde étape consiste à réaliser le même travail, mais à une échelle régionale.
 
@@ -180,7 +177,7 @@ reg_taux_evol_1990 <- calcul_taux_evol(df = reg_indicateur,
 print(reg_taux_evol_1990)
 ```
 
-Nous avons donc, à la fin de ce script, un tableau de bord d'indicateurs simples à l'échelle régionale. Nous allons pouvoir analyser les différentes tendances des indicateurs sur la période 1990-2023 dans le prochain script (12_analyse_indicateurs_regionaux). 
+Nous avons donc, à la fin de ce script, un tableau de bord d'indicateurs simples à l'échelle régionale. Nous allons pouvoir analyser les différentes tendances des indicateurs sur la période 1990-2023 dans le prochain script (?_analyse_indicateurs_regionaux). 
 
 
 # Sauvegarde
