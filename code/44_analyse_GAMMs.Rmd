@@ -103,14 +103,14 @@ Ce script a pour objectif d'estimer les tendances des populations piscicoles d'e
 
 
 ```{r}
-# ope_selection_test <- ope_selection %>%
-#   dplyr::select(ope_id, pop_id, sta_id)
+ope_selection_test <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id)
 ```
 
 
 ```{r}
 esp_ope_selection_cha <- esp_ope_selection %>%
-  filter(esp_code_alternatif == "CHA") %>%
+  filter(esp_code_alternatif == "VAI") %>%
   mef_ajouter_type_protocole() %>%
   left_join(ope_selection_test, by = "ope_id") %>%
   rename(valeur = lop_effectif,
@@ -128,13 +128,13 @@ esp_ope_selection_cha <- esp_ope_selection %>%
 
 
 ```{r}
-# mod <- gamm(
-#   valeur ~ s(annee, k = 15) + s(ope_surface_calculee, k = 15)  + pro_libelle,
-#   random = list(sta_id =  ~ 1),
-#   data = esp_ope_selection_cha,
-#   family = poisson,
-#   method = "REML"
-# )
+mod <- gamm(
+  valeur ~ s(annee, k = 15) + s(ope_surface_calculee, k = 15)  + pro_libelle,
+  random = list(sta_id =  ~ 1),
+  data = esp_ope_selection_cha,
+  family = poisson,
+  method = "REML"
+)
 ```
 ## Pré-traitements GAMM
 ```{r Chargement des fonctions}
@@ -143,41 +143,56 @@ source(file = "../R/gamm_application_modele.R")
 ```
  
 ```{r Etablir les périodes etudes GAMM}
-liste_periodes_etude <- list(c(2007, 2025), 
-                             c(2015, 2025)) # Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin)
+# liste_periodes_etude <- list(c(2007, 2025), 
+#                              c(2015, 2025)) # Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin)
 ```
 
 Nous construisons un jeu de données complet :
 
 ```{r Construction jeu de données}
 # Ajout du protocole, de la surface d'opération et de la date
-ope_effectif_gamm <- ope_effectif_absences %>%
-  mef_ajouter_type_protocole() %>% 
-  mef_ajouter_surf_calc() %>% 
-  mef_ajouter_ope_date() %>% 
-  select(ope_id,
-         stade,
-         ope_surface_calculee,
-         esp_code_alternatif,
-         indicateur,
-         valeur, 
-         ope_date,
-         pro_libelle,
-         annee)
-
-ope_effectif_gamm <- ope_effectif_gamm %>% #Ajout des pop_id dans le dataframe
-  left_join(y=operation %>% 
-              select(ope_id,
-                     pop_id= ope_pop_id)) %>% 
-  mutate(pop_id = as.factor(pop_id))
-
-ope_effectif_gamm <- ope_effectif_gamm %>% # Ajout de la date de pêche codée de 1 à 365
-  mutate(julian = lubridate::yday(ope_date)) %>%
-  ungroup() %>% 
-  rename(espece = esp_code_alternatif)
+# ope_effectif_gamm <- ope_effectif_absences %>%
+#   mef_ajouter_type_protocole() %>%
+#   mef_ajouter_surf_calc() %>%
+#   mef_ajouter_ope_date() %>%
+#   select(ope_id,
+#          stade,
+#          ope_surface_calculee,
+#          esp_code_alternatif,
+#          indicateur,
+#          valeur,
+#          ope_date,
+#          pro_libelle,
+#          annee)
+# 
+# ope_effectif_gamm <- ope_effectif_gamm %>% #Ajout des pop_id dans le dataframe
+#   left_join(y=operation %>%
+#               select(ope_id,
+#                      pop_id= ope_pop_id)) %>%
+#   mutate(pop_id = as.factor(pop_id))
+# 
+# ope_effectif_gamm <- ope_effectif_gamm %>% # Ajout de la date de pêche codée de 1 à 365
+#   mutate(julian = lubridate::yday(ope_date)) %>%
+#   ungroup() %>%
+#   rename(espece = esp_code_alternatif)
 ```
 
+```{r}
+# esp_ope_selection_cha <- ope_effectif_gamm %>%
+#   left_join(ope_selection_test, by = "ope_id") %>%
+#   filter(espece == "TRF") %>%
+#   rename(annee = annee.x) 
+```
 
+```{r}
+mod <- gamm(
+  valeur ~ s(annee, k = 15) + s(ope_surface_calculee, k = 15)  + pro_libelle,
+  random = list(sta_id =  ~ 1),
+  data = esp_ope_selection_cha,
+  family = poisson,
+  method = "REML"
+)
+```
 
 ## Application du modèle GLMM 
 
@@ -185,127 +200,139 @@ ope_effectif_gamm <- ope_effectif_gamm %>% # Ajout de la date de pêche codée d
 
 
 ```{r Exécution fonction GLMM}
-gamm_resultats <- gamm_application_modele(data = ope_effectif_gamm,
-                                          liste_periodes = liste_periodes_etude)
+# gamm_resultats <- gamm_application_modele(data = ope_effectif_gamm,
+#                                           liste_periodes = liste_periodes_etude)
 ```
 
 
 ```{r Mise en forme sortie fonction GLMM}
-gamm_resultats_annee <- gamm_resultats %>% 
-  filter(row_name == "annee") %>% 
-  select(periode,
-         esp_code_alternatif,
-         p_value,
-         Estimate,
-         sig) %>% 
-  mutate(trend = case_when(
-      Estimate > 0 ~ "\U2197",
-      Estimate < 0 ~ "\U2198",
-      TRUE ~ "."))
+# gamm_resultats_annee <- gamm_resultats %>% 
+#   filter(row_name == "annee") %>% 
+#   select(periode,
+#          esp_code_alternatif,
+#          p_value,
+#          Estimate,
+#          sig) %>% 
+#   mutate(trend = case_when(
+#       Estimate > 0 ~ "\U2197",
+#       Estimate < 0 ~ "\U2198",
+#       TRUE ~ "."))
 ```
 
 
 ```{r Sélection des données résultats GLMM}
-# Filtrer les données selon les critères spécifiés
-gamm_resultats_format <- gamm_resultats_annee %>%
-  filter((esp_code_alternatif == "ANG" & periode == "2007-2025") |
-    (esp_code_alternatif %in% c(c("ABL","BAF","BLN","BRB", "BRE","BRO","CCO","CHA","CHE", "EPI", "EPT", "GAR", "GOU","HOT","LOF",   "LOR", "LOT","LPM" ,"LPP", "OBR", "PER", "ROT", "SAT", "SPI", "TAN", "TOX", "TRF","VAI","VAN","VAR")) & periode == "2007-2025") 
+# # Filtrer les données selon les critères spécifiés
+# gamm_resultats_format <- gamm_resultats_annee %>%
+#   filter((esp_code_alternatif == "ANG" & periode == "2007-2025") |
+#     (esp_code_alternatif %in% c(c("ABL","BAF","BLN","BRB", "BRE","BRO","CCO","CHA","CHE", "EPI", "EPT", "GAR", "GOU","HOT","LOF",   "LOR", "LOT","LPM" ,"LPP", "OBR", "PER", "ROT", "SAT", "SPI", "TAN", "TOX", "TRF","VAI","VAN","VAR")) & periode == "2007-2025"))
 ```
 
 
 Construction d'un tableau récapitulatif des résultats du modèle GLMM :
 
 ```{r Réalisation tableau GLMM}
-tab_gamm_resultats <- gamm_resultats_format %>%
-  select(esp_code_alternatif,
-         periode,
-         trend,
-         sig) %>% 
-  arrange(esp_code_alternatif) %>%   # Ordonner par espèce, indicateur et stade
-  gt() %>%
-  tab_header(
-    title = "Synthèse des tendances des indicateurs des populations de poissons d'eau douce de BFC"
-  ) %>%
-  cols_label(
-    esp_code_alternatif = "Code Espèce",
-    trend = "Tendance gamm",
-    sig = "Significativité") %>%
-  tab_options(table.font.size = "small", data_row.padding = px(4))
-
-# Afficher le tableau
-tab_gamm_resultats
+# tab_gamm_resultats <- gamm_resultats_format %>%
+#   select(esp_code_alternatif,
+#          periode,
+#          trend,
+#          sig) %>% 
+#   arrange(esp_code_alternatif) %>%   # Ordonner par espèce, indicateur et stade
+#   gt() %>%
+#   tab_header(
+#     title = "Synthèse des tendances des indicateurs des populations de poissons d'eau douce de BFC"
+#   ) %>%
+#   cols_label(
+#     esp_code_alternatif = "Code Espèce",
+#     trend = "Tendance gamm",
+#     sig = "Significativité") %>%
+#   tab_options(table.font.size = "small", data_row.padding = px(4))
+# 
+# # Afficher le tableau
+# tab_gamm_resultats
 ```
 
 
 # Graphiques pour voir les relations entre va réponse et va explicatives
 
 ```{r}
-esp_ope_selection <- esp_ope_selection %>% 
-   mef_ajouter_type_protocole() %>% 
-  rename(valeur = lop_effectif)
+# esp_ope_selection <- esp_ope_selection %>% 
+#    mef_ajouter_type_protocole() %>% 
+#   rename(valeur = lop_effectif)
 ```
 
 ```{r}
-valeur_annee <- ggplot(esp_ope_selection, aes(x = annee , y = valeur)) +
-  geom_point() +
-  geom_smooth(method = "lm") +
-  labs(title = "y ~ X")
-valeur_annee
+# valeur_annee <- ggplot(esp_ope_selection, aes(x = annee , y = valeur)) +
+#   geom_point() +
+#   geom_smooth(method = "lm") +
+#   labs(title = "y ~ X")
+# valeur_annee
 ```
 
 
 ```{r}
-valeur_ope_surface <- ggplot(esp_ope_selection, aes(x = ope_surface_calculee , y = valeur)) +
-  geom_point() +
-  geom_smooth(method = "lm") +
-  labs(title = "y ~ X")
-valeur_ope_surface
+# valeur_ope_surface <- ggplot(esp_ope_selection, aes(x = ope_surface_calculee , y = valeur)) +
+#   geom_point() +
+#   geom_smooth(method = "lm") +
+#   labs(title = "y ~ X")
+# valeur_ope_surface
 ```
 
 
 
-
+ 
 
 ```{r}
-valeur_pro <- ggplot(esp_ope_selection, aes(x = pro_libelle , y = valeur )) +
-  geom_boxplot() 
-valeur_pro
+# valeur_pro <- ggplot(esp_ope_selection, aes(x = pro_libelle , y = valeur)) +
+#   geom_boxplot()
+# valeur_pro
 ```
 
 
 # Graphiques pour voir les relations entre va réponse et va explicatives : CHA
 
+
 ```{r}
-valeur_annee_cha <- ggplot(esp_ope_selection, aes(x = annee , y = valeur)) +
-  geom_point() +
-  geom_smooth(method = "lm") +
-  labs(title = "y ~ X"))
+pal <- wes_palette("AsteroidCity1")
+```
+
+
+
+```{r ,fig.height = 6, fig.width = 10}
+valeur_annee_cha <- ggplot(
+  esp_ope_selection_cha,
+  mapping = aes(x = annee, y = valeur)) +
+    geom_point() +
+    # scale_color_manual(values = pal) +
+    theme_classic(base_size = 12) +
+    geom_smooth(method = "lm") +
+    labs(title = "y ~ X")
+  
 valeur_annee_cha
 ```
 
 
 ```{r}
-valeur_ope_surface_cha <- ggplot(esp_ope_selection, aes(x = ope_surface_calculee , y = valeur)) +
-  geom_point() +
-  geom_smooth(method = "lm") +
-  labs(title = "y ~ X"))
-valeur_ope_surface_cha
+# valeur_ope_surface_cha <- ggplot(esp_ope_selection, aes(x = ope_surface_calculee , y = valeur)) +
+#   geom_point() +
+#   geom_smooth(method = "lm") +
+#   labs(title = "y ~ X")
+# valeur_ope_surface_cha
 ```
 
 ```{r}
-valeur_pro_cha <- ggplot(esp_ope_selection, aes(x = pro_libelle , y = valeur )) +
-  geom_boxplot() 
-valeur_pro_cha
+# valeur_pro_cha <- ggplot(esp_ope_selection, aes(x = pro_libelle , y = valeur )) +
+#   geom_boxplot() 
+# valeur_pro_cha
 ```
 
 # Analyses GAMMs
 
 ```{r}
-summary(ope_effectif_glm)
+# summary(ope_effectif_glm)
 ```
 
 ```{r}
-coef(mod$gam)
+# coef(mod$gam)
 ```
 
 ```{r}
@@ -366,7 +393,7 @@ anova(mod$gam)
 Verifier la concurvity
 
 ```{r}
-concurvity(mod$gam)
+concurvity(mod$gam, full = T)
 ```
 
 
@@ -385,12 +412,12 @@ sm
 
 ```{r}
 # add partial residuals to data
-esp_ope_selection_cha <- ope_effectif_glm |>
+esp_ope_selection_cha <- esp_ope_selection_cha |>
   add_partial_residuals(mod$gam)
 names(esp_ope_selection_cha)
 ```
 
-```{r representation graphique custom ggplot2}
+```{r representation graphique custom ggplot2, fig.height = 6, fig.width = 12 }
 p_sx2 <- sm  %>%
   filter(.smooth == "s(annee)")  %>%
   ggplot() +
@@ -427,7 +454,7 @@ p_sx0 <- sm  %>%
     colour = "steelblue3"
   ) +
   geom_line(aes(x = ope_surface_calculee, y = .estimate), lwd = 1.2) +
-  labs(y = "Partial effect", title = "s(x0)")
+  labs(y = "Partial effect", title = "s(ope_surface_calculee)")
 
 p_sx0 + p_sx2 + plot_layout(ncol = 2)
 
@@ -443,11 +470,6 @@ coef(mod$gam)
 ```{r}
 anova(mod$gam)
 ```
-```{r}
-plot(mod, all.terms = TRUE, pages = 1, residuals = TRUE, pch = 1,
-     shift = coef(mod)[1], seWithMean = TRUE)
-```
-
 
 ##glmm
 
@@ -459,7 +481,7 @@ library(RVAideMemoire)
 ```
 
 ```{r}
-model_3 <- glmer(valeur ~ annee + ope_surface_calculee + pro_libelle+ (1|sta_id),  data = esp_ope_selection_cha,  family = poisson(link ="log"))
+model_3 <- glmer(valeur ~ annee + ope_surface_calculee + pro_libelle  +(1|sta_id),  data = esp_ope_selection_cha,  family = poisson(link ="log"))
 ```
 
 
@@ -470,11 +492,36 @@ plotresid(model_3)
 ```{r}
 summary(model_3)
 ```
+```{r}
+anova(model_3)
+```
+
 
 
 ```{r}
 overdisp.glmer(model_3)
 ```
+### Quasi binomiale négative 
+
+```{r}
+model_4 <- glmer.nb(valeur ~ annee + ope_surface_calculee + pro_libelle+ (1|sta_id),  data = esp_ope_selection_cha,  family = poisson(link = "log")
+)
+
+```
+
+
+```{r}
+plotresid(model_4)
+```
+
+```{r}
+overdisp.glmer(model_4)
+
+```
+
+
+
+
 # GLM zero enflee 
 
 ```{r}
