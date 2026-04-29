@@ -5,10 +5,18 @@ author: "PabloVigneron"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 params:
   passage_a_retirer: !r c("2","3") # Sélection du nombre de passage souhaité ; Remarque : si je souhaite enlever les 1ers passages, sélection "0","1"
-output:
+output: 
   bookdown::html_document2:
-    toc: true
-    toc_float: true
+   fig_caption: yes
+   tab_caption: yes
+   number_sections: yes
+   global_numbering: yes
+   toc: yes
+   toc_float:
+         toc_collapsed: yes
+         toc_depth: 2
+   code_folding: hide
+   css: "style.css"
 ---
 
 ```{r setup, include=FALSE}
@@ -469,6 +477,12 @@ mei_ope_selection <- mei_ope_selection %>% # Remplacement des NA dans mei_id par
 ```
 
 
+```{r resume du df mei_ope_selection}
+mei_ope_selection <- mei_ope_selection %>% 
+  mutate(stade = as.factor(stade))
+summary(mei_ope_selection)
+
+```
 
 # Sauvegarde
 

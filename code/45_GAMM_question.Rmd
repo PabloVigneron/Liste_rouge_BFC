@@ -46,6 +46,7 @@ library(RVAideMemoire)
 load(file = "../processed_data/selection_especes.rda")
 load(file = "../processed_data/selection_pop_ope.rda")
 load(file = "../processed_data/donnees_densite_eff_abs.rda")
+load(file = "../processed_data/selection_pop_ope.rda")
 ```
 
 ```{r Chargement des tables aspe}
@@ -55,6 +56,9 @@ rdata_tables <- misc_nom_dernier_fichier(
 load(rdata_tables) # Chargement des données 
 ```
 
+```{r chargement de la palette de couleur}
+pal <- wes_palette("AsteroidCity1")
+```
 
 Script : 45_GAMM_question
 
@@ -63,12 +67,12 @@ Script : 45_GAMM_question
 L’objectif principal de l'étude est d'évaluer les tendances démographiques des espèces de poissons d'eau douce à l'échelle de la région Bourgogne Franche-comté. Des séries chronologiques longues enregistrant plus d’une dizaine d’années ou 3 générations (critère A UICN) de données seront utilisées (sur un total disponible d’une vingtaine d'années). Ce travail s’inscrit dans la perspective de la création de la Liste rouge régionale des poissons d’eau douce de Bourgogne Franche-Comté et compte une trentaine d'espèces à évaluer.
 
 
-L’OFB a mis en place depuis 1990 des réseaux de suivi temporel de l’état des milieux aquatiques à partir des peuplements de poissons. Les échantillonnages sont réalisé tout les ans où tout les deux ans en fonction des réseaux pluriannuels des stations identiques selon deux protocoles distincts : 
+L’OFB a mis en place depuis 1990 des réseaux de suivi temporel de l’état des milieux aquatiques à partir des peuplements de poissons. Les échantillonnages sont réalisés tous les ans ou tout les deux ans en fonction des réseaux pluriannuels des stations identiques selon deux protocoles distincts : 
 - pêche par points 
 - pêche complète
 
 
-Les tendances temporelles seront estimé par une analyse statistiques de Modèles Linéaires Généralisé Mixtes (GLMM) ou de 
+Les tendances temporelles seront estimées par une analyse statistiques de Modèles Linéaires Généralisé Mixtes (GLMM) ou de 
 Modèles Additifs Généralisé Mixtes (GAMMs).
 
 ## Représentation des series temporelles par stations (163)

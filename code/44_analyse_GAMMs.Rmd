@@ -38,13 +38,16 @@ library(aspe) # Traitement de la base aspe
 library(mgcv) # modele GAMMs
 library(gratia)
 library(patchwork)
-
+library(sf)
+library(leaflet)
 ```
 
 ```{r Chargement des données}
 load(file = "../processed_data/selection_especes.rda")
 load(file = "../processed_data/selection_pop_ope.rda")
 load(file = "../processed_data/donnees_densite_eff_abs.rda")
+load(file = "../processed_data/selection_pop_ope_carte.rda")
+load(file = "../processed_data/pre_traitements_donnees_especes.rda")
 ```
 
 ```{r Chargement des tables aspe}
@@ -74,32 +77,36 @@ Ce script a pour objectif d'estimer les tendances des populations piscicoles d'e
 
 ```{r Construction jeu de données}
 # Ajout du protocole, de la surface d'opération et de la date
-# ope_effectif_glm <- ope_effectif_absences %>%
-#   mef_ajouter_type_protocole() %>% 
-#   mef_ajouter_surf_calc() %>% 
-#   mef_ajouter_ope_date() %>% 
-#   select(ope_id,
-#          stade,
-#          ope_surface_calculee,
-#          esp_code_alternatif,
-#          indicateur,
-#          valeur, 
-#          ope_date,
-#          pro_libelle,
-#          annee)
-# 
-# ope_effectif_glm <- ope_effectif_glm %>% #Ajout des pop_id dans le dataframe
-#   left_join(y=operation %>% 
-#               select(ope_id,
-#                      pop_id= ope_pop_id)) %>% 
-#   mutate(pop_id = as.factor(pop_id))
-# 
-# ope_effectif_glm <- ope_effectif_glm %>% # Ajout de la date de pêche codée de 1 à 365
-#   mutate(julian = lubridate::yday(ope_date)) %>%
-#   ungroup() %>% 
-#   rename(espece = esp_code_alternatif)
+ope_effectif_glm <- ope_effectif_absences %>%
+  mef_ajouter_type_protocole() %>%
+  mef_ajouter_surf_calc() %>%
+  mef_ajouter_ope_date() %>%
+  select(ope_id,
+         stade,
+         ope_surface_calculee,
+         esp_code_alternatif,
+         indicateur,
+         valeur,
+         ope_date,
+         pro_libelle,
+         annee)
+
+ope_effectif_glm <- ope_effectif_glm %>% #Ajout des pop_id dans le dataframe
+  left_join(y=operation %>%
+              select(ope_id,
+                     pop_id= ope_pop_id)) %>%
+  mutate(pop_id = as.factor(pop_id))
+
+ope_effectif_glm <- ope_effectif_glm %>% # Ajout de la date de pêche codée de 1 à 365
+  mutate(julian = lubridate::yday(ope_date)) %>%
+  ungroup() %>%
+  rename(espece = esp_code_alternatif) %>% 
+  mutate(stade = as.factor(stade))
 ```
 
+```{r}
+summary(ope_effectif_glm)
+```
 
 
 ```{r}
@@ -110,7 +117,7 @@ ope_selection_test <- ope_selection %>%
 
 ```{r}
 esp_ope_selection_cha <- esp_ope_selection %>%
-  filter(esp_code_alternatif == "VAI") %>%
+  filter(esp_code_alternatif == "ANG") %>%
   mef_ajouter_type_protocole() %>%
   left_join(ope_selection_test, by = "ope_id") %>%
   rename(valeur = lop_effectif,
@@ -122,8 +129,13 @@ esp_ope_selection_cha <- esp_ope_selection %>%
     pro_libelle = as.factor(pro_libelle),
     pop_id = as.factor(pop_id),
     sta_id = as.factor(sta_id)
-  )
+  ) 
 
+```
+
+
+```{r}
+summary(esp_ope_selection_cha)
 ```
 
 
@@ -132,10 +144,19 @@ mod <- gamm(
   valeur ~ s(annee, k = 15) + s(ope_surface_calculee, k = 15)  + pro_libelle,
   random = list(sta_id =  ~ 1),
   data = esp_ope_selection_cha,
-  family = poisson,
+  family = poisson(link = "log"),
   method = "REML"
 )
 ```
+
+
+```{r}
+gam.check(mod$gam)
+```
+
+
+
+
 ## Pré-traitements GAMM
 ```{r Chargement des fonctions}
 source(file = "../R/gamm_calcul_modele.R")
@@ -184,15 +205,6 @@ Nous construisons un jeu de données complet :
 #   rename(annee = annee.x) 
 ```
 
-```{r}
-mod <- gamm(
-  valeur ~ s(annee, k = 15) + s(ope_surface_calculee, k = 15)  + pro_libelle,
-  random = list(sta_id =  ~ 1),
-  data = esp_ope_selection_cha,
-  family = poisson,
-  method = "REML"
-)
-```
 
 ## Application du modèle GLMM 
 
@@ -308,6 +320,87 @@ valeur_annee_cha <- ggplot(
     labs(title = "y ~ X")
   
 valeur_annee_cha
+```
+
+
+
+```{r}
+ope_effectif_glm <- ope_effectif_glm %>% 
+  filter(espece == "TRF", 
+         stade == "ind")
+```
+
+
+```{r}
+summary(esp_ope_selection_cha)
+```
+```{r}
+total_valeur_cha <- esp_ope_selection_cha %>% 
+  group_by(annee) %>% 
+  summarise(effectif_total = sum(valeur), .groups = "drop")
+
+ggplot(total_valeur_cha, mapping = aes(x = annee, y = effectif_total)) +
+  geom_point() +
+  geom_line()+
+  geom_smooth(method = "lm") +
+  theme_grey(base_size = 12)
+
+
+```
+
+```{r ,fig.height = 6, fig.width = 10}
+valeur_annee_cha <- ggplot(
+  ope_effectif_glm,
+  mapping = aes(x = annee, y = valeur)) +
+    geom_point() +
+    # scale_color_manual(values = pal) +
+    theme_classic(base_size = 12) +
+    geom_smooth(method = "lm") +
+    labs(title = "y ~ X")
+  
+valeur_annee_cha
+```
+
+```{r}
+summary(ope_effectif_glm)
+```
+
+
+
+```{r ,fig.height = 6, fig.width = 10}
+valeur_pro_cha <- ggplot(esp_ope_selection_cha, mapping = aes(x = pro_libelle, y = valeur)) +
+  geom_boxplot() +
+  scale_color_manual(values = pal) +
+  theme_classic(base_size = 12) 
+  # geom_smooth(method = "lm") +
+  # labs(title = "y ~ X")
+  
+valeur_pro_cha
+```
+
+```{r Visualisation effort pêche}
+esp_ope_selection_cha <- sta_id_ope_selection %>% 
+  st_join(sta_id_ope_selection, by = "ope_id") 
+
+mapview(
+  list(buffer, mes_depts),
+  # Visualisation de l'effort de pêche
+  layer.name = c("Buffer_1_km", "Bourgogne-Franche-Comté"),
+  col.regions = list("darkseagreen4", "darkseagreen1")
+) +
+  mapview(
+    sta_id_ope_selection,
+    layer.name = "Nombre operation par station",
+    # size_var = "nb_ope_par_sta",
+    # cex = "sta_id",
+    cex = "nb_ope_par_sta",
+    lwd = 0.2,
+    zcol = "nb_ope_par_sta",
+   # col.regions = "#D693E0",
+    alpha = 0.8,
+    legend = TRUE,
+    labels = list(text = sta_id_ope_selection$nb_ope_par_sta, cex = 1.5)
+  )
 ```
 
 
@@ -501,6 +594,7 @@ anova(model_3)
 ```{r}
 overdisp.glmer(model_3)
 ```
+
 ### Quasi binomiale négative 
 
 ```{r}
@@ -529,46 +623,180 @@ library(glmmTMB)
 ```
 
 ```{r}
-mod3.3 <- glmmTMB(valeur ~annee + ope_surface_calculee + pro_libelle,  data = esp_ope_selection_cha,  family = poisson(link ="log"), 
-ziformula = ~ 1)
+mod3.3 <- glmmTMB(
+  valeur ~ annee + ope_surface_calculee + pro_libelle + (1 |
+                                                           sta_id) ,
+  data = esp_ope_selection_cha,
+  family = poisson(link = "log"),
+  ziformula = ~ 1
+)
 ```
 
 ```{r}
 mod3.4 <- glmmTMB(
-    valeur ~ annee + ope_surface_calculee + pro_libelle,
-    family = nbinom2(link = "log"),
-    data = esp_ope_selection_cha,
-    ziformula = ~ 1
-  )
+  valeur ~ annee + ope_surface_calculee + pro_libelle + (1 | sta_id) ,
+  family = nbinom2(link = "log"),
+  data = esp_ope_selection_cha,
+  ziformula = ~ 1
+)
 ```
 
 ```{r}
 mod3.5 <- glmmTMB(
-valeur ~ annee + ope_surface_calculee + pro_libelle,
-family = truncated_poisson(link = "log"),
-data = esp_ope_selection_cha,
-ziformula = ~ 1
+  valeur ~ annee + ope_surface_calculee + pro_libelle + (1 | sta_id) ,
+  family = truncated_poisson(link = "log"),
+  data = esp_ope_selection_cha,
+  ziformula = ~ 1
 )
 ```
 
 ```{r}
 mod3.6 <- glmmTMB(
-valeur ~ annee + ope_surface_calculee + pro_libelle,
-family = truncated_nbinom2(link = "log"),
-data = esp_ope_selection_cha,
-ziformula = ~ 1
+  valeur ~ annee + ope_surface_calculee + pro_libelle + (1 | sta_id) ,
+  family = truncated_nbinom2(link = "log"),
+  data = esp_ope_selection_cha,
+  ziformula = ~ 1
 )
 ```
 
 ```{r}
 AIC(mod3.3, mod3.4, mod3.5, mod3.6)
 ```
+
 ```{r}
-plotresid(mod3.3
-          )
+plotresid(mod3.4)
+```
+
+
+```{r}
+plotresid(mod3.5)
 ```
 
 ```{r}
-summary(mod3.3)
+plotresid(mod3.6)
+```
+```{r}
+summary(mod3.6)
+
+```
+```{r}
+library(car)
+Anova(mod3.5)
+```
+
+
+```{r}
+summary(mod3.4)
+```
+```{r}
+library(ggh4x)
+```
+
+```{r}
+#Creation du df par especes avec leffectif total
+total_valeur_cha <- ope_effectif_glm %>%
+  group_by(annee, espece, indicateur) %>%
+  summarise(effectif_total = sum(valeur), .groups = "drop") %>% 
+  select(espece, annee, effectif_total)
+
+# ajout des labels des indicateurs
+
+indicateur_labels <- c(
+  "effectif_total" = "Effectif total"
+)
+ggplot(total_valeur_cha, mapping = aes(x = annee, y = effectif_total)) +
+  # facet_grid2(
+  #   espece ~ indicateur,
+  #   scales = "free",
+  #   independent = "y",
+  #   labeller = labeller(indicateur = "effectif total")) +
+      geom_point(shape = 1, size = 2) +
+      geom_line(linetype = 3, size = 0.9) +
+      labs(x = "Années", y = "Effectif total") +
+      geom_smooth(method = "lm", color = "darkred") +
+      theme_grey(base_size = 12) 
+
+```
+
+```{r, fig.height = 30, fig.width = 15}
+
+#Creation du df par especes avec effectif total
+total_valeur_esp <- ope_effectif_glm %>%
+  group_by(annee, espece, indicateur) %>%
+  summarise(effectif_total = sum(valeur), .groups = "drop") %>% 
+  select(espece, annee, effectif_total, indicateur)
+
+
+
+effectif_total_esp <- ggplot(total_valeur_esp, aes(x = annee, y = effectif_total)) +
+  facet_wrap2(
+    espece ~ indicateur,
+    ncol = 3,
+    scales = "free_y",
+    axes = "all",
+    trim_blank = T
+  ) +
+  geom_point(shape = 1, size = 2) +
+  geom_line(linetype = 3, linewidth = 0.9) +
+  labs(x = "Années", y = "Effectif total") +
+  geom_smooth(method = "lm", color = "darkred") +
+  theme_grey(base_size = 12) +
+  theme(
+    strip.background = element_rect(color = "black", fill = "#faffff"),
+    legend.position = "bottom",
+    panel.background = element_rect(fill = "#faf0e0"),
+    panel.grid.major = element_line(color = "lightgrey", size = 0.1),
+    panel.grid.minor = element_line(color = "lightgrey")
+  ) 
+
+effectif_total_esp
+```
+
+```{r, fig.height = 30, fig.width = 15}
+esp_ope_selection_graph <- esp_ope_selection %>%
+  # filter(esp_code_alternatif == "ANG") %>%
+  mef_ajouter_type_protocole() %>%
+  left_join(ope_selection_test, by = "ope_id") %>%
+  rename(valeur = lop_effectif,
+         annee = annee.x) %>%
+  mutate(
+    valeur = as.numeric(valeur) ,
+    annee = as.numeric(annee),
+    ope_surface_calculee = as.numeric(ope_surface_calculee) ,
+    pro_libelle = as.factor(pro_libelle),
+    pop_id = as.factor(pop_id),
+    sta_id = as.factor(sta_id)
+  ) %>% 
+  mutate(indicateur = "effectif_total") 
+
+#Creation du df par especes avec effectif total
+total_valeur_esp <- esp_ope_selection_graph %>%
+  group_by(annee, esp_code_alternatif, indicateur) %>%
+  summarise(effectif_total = sum(valeur), .groups = "drop") %>% 
+  select(esp_code_alternatif, annee, effectif_total,indicateur)
+
+# Creation du graph
+effectif_total_esp <- ggplot(total_valeur_esp, aes(x = annee, y = effectif_total)) +
+  facet_wrap2(
+    esp_code_alternatif ~ indicateur,
+    ncol = 3,
+    scales = "free_y",
+    axes = "all",
+    trim_blank = T
+  ) +
+  geom_point(shape = 1, size = 2) +
+  geom_line(linetype = 3, linewidth = 0.9) +
+  labs(x = "Années", y = "Effectif total") +
+  geom_smooth(method = "lm", color = "darkred") +
+  theme_grey(base_size = 12) +
+  theme(
+    strip.background = element_rect(color = "black", fill = "#faffff"),
+    legend.position = "bottom",
+    panel.background = element_rect(fill = "#faf0e0"),
+    panel.grid.major = element_line(color = "lightgrey", size = 0.1),
+    panel.grid.minor = element_line(color = "lightgrey")
+  ) 
+
+effectif_total_esp
 ```
 

@@ -126,14 +126,12 @@ ope_full <- mef_ajouter_abs(ope_effectif_ind,
                       var_effectif = valeur)
 
 ope_effectif_absences <- ope_full %>%
-  mutate(valeur = ifelse(is.na(valeur), 0, valeur),
+  mutate(
+    valeur = ifelse(is.na(valeur), 0, valeur),
     indicateur = 'effectif_total',
-    stade = "ind") %>% 
-  dplyr::select(ope_id,
-         esp_code_alternatif,
-         indicateur,
-         valeur,
-         stade)
+    stade = "ind"
+  ) %>%
+  dplyr::select(ope_id, esp_code_alternatif, indicateur, valeur, stade)
 ```
 
 

@@ -613,7 +613,7 @@ tab_densite_occurrence$esp_code_alternatif
 ```{r Objet espece_lrr_2015 et mes_especes}
 especes_lrr_2014 <- c("LOT","LOE","CHE","BRO","BOU","ANG","PER","BAF","EPT","ABH","BRE","EPI","CCO","CHA","HOT","VAI","TAN","BLN","VAN","TRF","LPP","OBR","ROT","ABL","GAR","IDE","LOF","TOX","GRE","BRB","SPI","GOU","LPM","LOR","LPP")
 
-mes_especes <- c("ABL","ANG","BAF","BLN","BRB", "BRE","BRO","CCO","CHA","CHE", "EPI", "EPT", "GAR", "GOU","HOT","LOF",   "LOR", "LOT","LPM" ,"LPP", "OBR", "PER", "ROT", "SAT", "SPI", "TAN", "TOX", "TRF","VAI","VAN","VAR")
+mes_especes <- c("ABL","ANG","BAF","BLN","BRB", "BRE","BRO","CCO","CHA","CHE", "EPI", "EPT", "GAR", "GOU","HOT","LOF","LOR", "LOT","LPM" ,"LPP", "OBR", "PER", "ROT", "SAT", "SPI", "TAN", "TOX", "TRF","VAI","VAN","VAR")
 ```
 
 
@@ -693,12 +693,15 @@ traits_biologiques <- traits_biologiques %>%
 
 ```
 
-```{r jointure autochtonie avec liste biologie poissons}
+```{r}
 liste_bio_join <- liste_bio %>%
   left_join(traits_biologiques) 
   
 ```
 
+```{r exporter la liste des temps de générations}
+# write_excel_csv(liste_bio_join, "../processed_data/temps_de_generation_pro.csv")
+```
 
 # Sauvegarde 
 
