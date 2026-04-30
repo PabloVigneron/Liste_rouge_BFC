@@ -116,12 +116,14 @@ ope_selection_test <- ope_selection %>%
 
 
 ```{r}
+geometry_join
 esp_ope_selection_cha <- esp_ope_selection %>%
-  filter(esp_code_alternatif == "ANG") %>%
+  # filter(esp_code_alternatif == "ANG") %>%
   mef_ajouter_type_protocole() %>%
   left_join(ope_selection_test, by = "ope_id") %>%
   rename(valeur = lop_effectif,
-         annee = annee.x) %>%
+         annee = annee.x) %>% 
+  left_join(sta_id_ope_selection, by = "sta_id") %>% 
   mutate(
     valeur = as.numeric(valeur) ,
     annee = as.numeric(annee),
@@ -740,14 +742,14 @@ effectif_total_esp <- ggplot(total_valeur_esp, aes(x = annee, y = effectif_total
   geom_line(linetype = 3, linewidth = 0.9) +
   labs(x = "Années", y = "Effectif total") +
   geom_smooth(method = "lm", color = "darkred") +
-  theme_grey(base_size = 12) +
+  # theme_grey(base_size = 12) +
   theme(
-    strip.background = element_rect(color = "black", fill = "#faffff"),
+    strip.background = element_rect(color = "grey85", fill = "grey85"),
     legend.position = "bottom",
-    panel.background = element_rect(fill = "#faf0e0"),
-    panel.grid.major = element_line(color = "lightgrey", size = 0.1),
-    panel.grid.minor = element_line(color = "lightgrey")
-  ) 
+    panel.background = element_rect(fill = "grey92"),
+    panel.grid.major = element_line(color = "#faffff", size = 0.1),
+    panel.grid.minor = element_line(color = "#faffff")
+  )
 
 effectif_total_esp
 ```
@@ -784,18 +786,19 @@ effectif_total_esp <- ggplot(total_valeur_esp, aes(x = annee, y = effectif_total
     axes = "all",
     trim_blank = T
   ) +
-  geom_point(shape = 1, size = 2) +
-  geom_line(linetype = 3, linewidth = 0.9) +
+  geom_point(shape = 21, size = 2) +
+  geom_line(linetype = 3, linewidth = 0.5) +
   labs(x = "Années", y = "Effectif total") +
-  geom_smooth(method = "lm", color = "darkred") +
-  theme_grey(base_size = 12) +
+  geom_smooth(method = "loess", se = F, color ="darkred") +  # Add loess trend lines
+  # geom_smooth(method = "lm", color = "darkred") +
+  # theme_light(base_size = 12) +
   theme(
-    strip.background = element_rect(color = "black", fill = "#faffff"),
+    strip.background = element_rect(color = "grey85", fill = "grey85"),
     legend.position = "bottom",
-    panel.background = element_rect(fill = "#faf0e0"),
-    panel.grid.major = element_line(color = "lightgrey", size = 0.1),
-    panel.grid.minor = element_line(color = "lightgrey")
-  ) 
+    panel.background = element_rect(fill = "grey92"),
+    panel.grid.major = element_line(color = "#faffff", size = 0.1),
+    panel.grid.minor = element_line(color = "#faffff")
+  )
 
 effectif_total_esp
 ```

@@ -1,0 +1,98 @@
+---
+title: "LRR des poissons d'eau douce de BFC"
+subtitle: "00_importation_base_aspe"
+author: "PabloVigneron"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  bookdown::html_document2:
+   fig_caption: yes
+   tab_caption: yes
+   number_sections: yes
+   global_numbering: yes
+   toc: yes
+   toc_float:
+         toc_collapsed: yes
+         toc_depth: 2
+   code_folding: hide
+   css: "style.css"
+#bibliography: .bib
+#link-citations: true
+#cls: apa.cls
+#editor_options: 
+#  markdown: 
+#    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+Script : 00_importation_base_aspe
+
+L'objectif de ce script est de se connecter à l'IDG (= Infrastructure de Données Géographiques) de l'OFB afin de pouvoir télécharger une sauvegarde la base Aspe entièrement. Le BRGM réalise une nouvelle sauvegarde de la base Aspe tous les jours. Après avoir téléchargé la base aspe, on l'enregistrera dans un fichier Rdata pour faciliter son utilisation par la suite. A noter que cet accès via l’IDG est restreint aux agents de l’OFB, ayant préalablement été inscrits comme utilisateurs ; se fait à partir du réseau interne de l’OFB (ou via le VPN à l’externe) et nécessite de disposer des paramètres de connexion à la base IDG (adresse, login,…).
+
+L'entièreté des informations d'importation de la base Aspe se trouve dans la fiche intitulé "01b_importation_tables_idg" présent sur la page github.io du package R aspe réalisé par Benoit Richard et Pascal Irz et Cédric Mondy. <https://pascalirz.github.io/aspe/articles/aspe_01b_importation_tables_idg.html#importation-de-la-base-depuis-lidg>
+
+```{r telechargement du package aspe}
+# install.packages("devtools")
+# devtools::install_github("pascalirz/aspe")
+```
+Remarque : si l'installation ne fonctionne pas, cela peut être dû au proxy du réseau OFB. Pour contrer ce problème, télécharger le package directement sur la page du github <https://github.com/PascalIrz/aspe> puis utiliser la fonction suivante pour installer directement le package en format ".tar". 
+
+# Installer et charger le package aspe
+```{r methode alternative telechargement du package aspe}
+#install.packages("attempt")
+#install.packages("C:/.../nomdufichier.tar", repos = NULL, type ="source")
+```
+
+```{r chargement packages}
+library(aspe)
+library(dplyr)
+library(usethis)
+```
+
+# Stocker les informations de connexion dans son R environnement 
+
+Pour stocker les informations dans votre environnement R, vous pouvez procéder comme ceci :
+```{r}
+## 1° - ouvrir le fichier de configuration de l'environnement R avec la fonction du package usethis (installer le package si nécessaire).
+usethis::edit_r_environ()
+
+## 2° - dans la fenêtre ouverte intitulée '.Renviron', 
+# sauvegarder les lignes suivantes avec le bon paramétrage
+BDD_IDG_HOST = "URL_DE_LA_BDD"
+BDD_IDG_LOGIN = "IDENTIFIANT_POUR_CONNEXION_A_LA_BDD"
+BDD_IDG_PWD = "MDP_POUR_CONNEXION_A_LA_BDD"
+BDD_IDG_PORT = "LE_PORT_DE_LA_BDD"
+BDD_IDG_ASPE_NAME = 'NOM_DE_LA_BDD'
+```
+
+Au redémarrage, vérifier les informations stockées en tapant ces lignes suivantes :
+```{r}
+## 3° - ces informations doivent être visibles dans la console R :
+Sys.getenv('BDD_IDG_HOST')
+Sys.getenv('BDD_IDG_LOGIN')
+Sys.getenv('BDD_IDG_PWD')
+Sys.getenv('BDD_IDG_PORT')
+Sys.getenv('BDD_IDG_ASPE_NAME')
+```
+
+# Importation de la base depuis l’IDG 
+
+```{r}
+# connexion à l'IDG
+# ! veillez à disposer des informations de connexion et un droit d'accès
+aspe_db <- imp_connecter_aspe_idg()
+
+# importation des tables de la base aspe
+imp_importer_aspe_idg(aspe_db)
+```
+
+# Exporter dans le repertoire de travail les tables de la bdd aspe en fichier rdata
+
+
+```{r}
+export_tables_rdata()
+```

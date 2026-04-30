@@ -117,23 +117,26 @@ traits_biologiques <- traits_biologiques %>% # Construction d'un jeu de données
   select(esp_code_alternatif, taille_maturite_ref)
 ```
 
-
-```{r}
-mei_for_join <- temp_df %>%
-  rename(lop_id = mei_lop_id)
-
-```
-
 ## Création d'un jeu de données des mesures individuelles
 
   Il s'agit maintenant de créer un dataframe contenant l'ensemble des données individuelles relatives aux espèces sélectionnées ainsi qu'aux opérations de pêches contenues dans la passerelle (cf script 00_selection_pop_ope et 03_analyse_selection_especes). La taille des poissons est indiquée en millimètre et le poids en gramme. Dans ce nouveau jeu de données *mei_ope_selection*, nous ne retenons que les données en lien avec le dataframe *esp_ope_selection* (espèces sélectionnées lors du dernier script). 
 
+```{r jointure manuelle mei}
+# mei_for_join <- temp_df %>%
+#   rename(lop_id = mei_lop_id)
+
+```
+
+```{r renommer temp_df en mesure_individuelle}
+mesure_individuelle <- temp_df # renommer temp_df en mesure_individuelle pour pouvoir utiliser correctement les fonctions du package Aspe 
+```
+
 ```{r Creation_df_mei_ope_selection}
 mei_ope_selection <- passerelle %>%
   mef_ajouter_ope_date() %>%
-  left_join(y = mei_for_join) %>% 
+  # left_join(y = mei_for_join) %>% 
   # left_join(mei_for_join , by = "lop_id") %>% #ajouter les mei manuellement
-  # mef_ajouter_mei() %>%
+  mef_ajouter_mei() %>%
   mef_ajouter_lots() %>%
   mef_ajouter_type_protocole() %>%
   mef_ajouter_passage() %>% # Ajout des passages de pêches
@@ -160,8 +163,8 @@ mei_ope_selection <- passerelle %>%
 
 Attention **lop_effectif** correspond à l'effectis totale du lots !! Prenons l'exemple d'un lot de 4 CHA, on retrouvera 4 lignes avec chacune la valeur de 4 pour l'effectif. Pour le df finale, il faut que chaque effectif correspondent à 1 seul effectif par ligne !!!
 ```{r}
-mei_ope_selection_test <- mei_ope_selection %>% 
-  mutate(lop_effectif_r = if_else(lop_effectif >= 1, 1, 0))
+# mei_ope_selection_test <- mei_ope_selection %>% 
+#   mutate(lop_effectif_r = if_else(lop_effectif >= 1, 1, 0))
 ```
 
 
@@ -236,7 +239,7 @@ mei_ope_selection <- mei_ope_selection %>%
 
 # Relation tailles / poids
 
-  La mise en place des relations tailles / poids est réalisée grâce au package *apse* et au tutoriel *Construire des relations taille- poids*, réalisé par **Mr Pascal Irz** (https://rpubs.com/kamoke/729779). Cette relation nous permet de relier la longueur d'un poisson à son poids. Les mesures de poids sont rarement prises lors des pêches mais son pourtant nécessaires dans le calcul d'indicateurs simples comme pour les biomasses. Ainsi, nous utilisons cette relation afin d'obtenir des valeurs de poids indicatives remplaçant les valeurs *NA* de poids dans notre jeu de données *mei_ope_selection*. Elles seront alors remplacées par des estimations de poids en fonction de la taille du poissons : *poids_tp*.  
+  La mise en place des relations tailles / poids est réalisée grâce au package *apse* et au tutoriel *Construire des relations taille- poids*, réalisé par **Mr Pascal Irz** (<https://rpubs.com/kamoke/729779>). Cette relation nous permet de relier la longueur d'un poisson à son poids. Les mesures de poids sont rarement prises lors des pêches mais son pourtant nécessaires dans le calcul d'indicateurs simples comme pour les biomasses. Ainsi, nous utilisons cette relation afin d'obtenir des valeurs de poids indicatives remplaçant les valeurs *NA* de poids dans notre jeu de données *mei_ope_selection*. Elles seront alors remplacées par des estimations de poids en fonction de la taille du poissons : *poids_tp*.  
 
 ```{r Application relation taille_poids}
 mei_taille_poids <- aspe::data_taille_poids %>% # Utilisation des relations taille - poids du package aspe
@@ -301,8 +304,8 @@ mei_ope_selection <- mei_ope_selection %>%
 
 ```{r Ajout mesures poids}
 mei_ope_selection <- mei_ope_selection %>% # Ajout des mesures de poids existantes
-  left_join(y = mei_for_join ) %>% #ajouter les mei manuellement
-   # mef_ajouter_mei() %>% #Ajout des données individuelles de poids
+  # left_join(y = mei_for_join ) %>% #ajouter les mei manuellement
+   mef_ajouter_mei() %>% #Ajout des données individuelles de poids
   select(ope_id:poids_tp, mei_poids)
 ```
 

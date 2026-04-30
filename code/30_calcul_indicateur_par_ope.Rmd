@@ -240,19 +240,51 @@ Le calcul de pourcentage de juvéniles par opération est effectué. Les résult
 #   filter(!is.na(stade))
 ```
 
+```{r}
+# ope_pc_juv_control <- ope_pc_juv %>% 
+#   mutate(indicateur = as.factor(indicateur),
+#          stade = as.factor(stade), 
+#          esp_code_alternatif = as.factor(esp_code_alternatif))
+# summary(ope_pc_juv_control)
+```
+
+```{r calcul pourcentage de juv amelioré}
+# ope_pc_juv <- ope_pc_juv %>%
+#   ungroup() %>%
+#   # 1. Exclure les stades NA et les valeurs manquantes
+#   filter(!is.na(stade), !is.na(valeur)) %>%
+#   # 2. Agréger les doublons
+#   group_by(ope_id, esp_code_alternatif, stade) %>%
+#   summarise(valeur = sum(valeur, na.rm = TRUE), .groups = "drop") %>%
+#   # 3. Compléter les combinaisons manquantes
+#   complete(ope_id,
+#            esp_code_alternatif,
+#            stade,
+#            fill = list(valeur = 0)) %>%
+#   # 4. Pivoter en large : une colonne par stade
+#   pivot_wider(names_from = stade,
+#               values_from = valeur,
+#               values_fill = 0) %>%
+#   # 5. Calculer le pourcentage directement
+#   mutate(valeur = (juv / ind) * 100) %>%
+#   filter(!is.nan(valeur), !is.infinite(valeur))
+```
+
+## code noam suite
+
 ```{r Calcul pourcentage juvéniles}
-ope_pc_juv <- ope_pc_juv %>% 
-  ungroup() %>% 
-  complete(ope_id,
-           esp_code_alternatif,
-           stade,
-           indicateur,
-           fill = list(valeur = 0)) %>% 
-    group_by(ope_id,
-             esp_code_alternatif) %>% 
-  dplyr::mutate(valeur = (valeur [stade == "juv"] / valeur [stade == "ind"])*100) %>% 
-  filter(stade == "ind",
-         !is.nan(valeur))
+# ope_pc_juv <- ope_pc_juv %>% 
+#   ungroup() %>% 
+#   complete(ope_id,
+#            esp_code_alternatif,
+#            stade,
+#            indicateur,
+#            fill = list(valeur = 0)) %>% 
+#     group_by(ope_id,
+#              esp_code_alternatif) %>% 
+#   dplyr::mutate(valeur = (valeur [stade == "juv"] / valeur [stade == "ind"])*100) %>% 
+#   filter(stade == "ind",
+#          !is.nan(valeur))
 ```
 
 
