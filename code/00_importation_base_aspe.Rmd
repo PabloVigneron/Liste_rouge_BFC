@@ -31,9 +31,9 @@ knitr::opts_chunk$set(echo = TRUE,
 
 Script : 00_importation_base_aspe
 
-L'objectif de ce script est de se connecter à l'IDG (= Infrastructure de Données Géographiques) de l'OFB afin de pouvoir télécharger une sauvegarde la base Aspe entièrement. Le BRGM réalise une nouvelle sauvegarde de la base Aspe tous les jours. Après avoir téléchargé la base aspe, on l'enregistrera dans un fichier Rdata pour faciliter son utilisation par la suite. A noter que cet accès via l’IDG est restreint aux agents de l’OFB, ayant préalablement été inscrits comme utilisateurs ; se fait à partir du réseau interne de l’OFB (ou via le VPN à l’externe) et nécessite de disposer des paramètres de connexion à la base IDG (adresse, login,…).
+L'objectif de ce script est de se connecter à l'IDG (= Infrastructure de Données Géographiques) de l'OFB afin de pouvoir télécharger une sauvegarde de l'entièreté de la base Aspe. Le BRGM réalise une nouvelle sauvegarde de la base Aspe tous les jours. Après avoir téléchargé la base aspe, on l'enregistrera dans un fichier Rdata pour faciliter son utilisation par la suite. A noter que cet accès via l’IDG est restreint aux agents de l’OFB, ayant préalablement été inscrits comme utilisateurs ; se fait à partir du réseau interne de l’OFB (ou via le VPN à l’externe) et nécessite de disposer des paramètres de connexion à la base IDG (adresse, login,…).
 
-L'entièreté des informations d'importation de la base Aspe se trouve dans la fiche intitulé "01b_importation_tables_idg" présent sur la page github.io du package R aspe réalisé par Benoit Richard et Pascal Irz et Cédric Mondy. <https://pascalirz.github.io/aspe/articles/aspe_01b_importation_tables_idg.html#importation-de-la-base-depuis-lidg>
+L'entièreté des informations d'importation de la base Aspe se trouve dans la fiche intitulé "01b_importation_tables_idg" présent sur la page github.io du package R aspe réalisé par Benoit Richard, Pascal Irz et Cédric Mondy. <https://pascalirz.github.io/aspe/articles/aspe_01b_importation_tables_idg.html#importation-de-la-base-depuis-lidg>
 
 ```{r telechargement du package aspe}
 # install.packages("devtools")

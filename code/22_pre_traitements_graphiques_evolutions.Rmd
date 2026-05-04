@@ -99,6 +99,9 @@ total_valeur_esp_abs <- ope_effectif_glm %>%
 
 
 ```{r preparation du df pour graphique evolution effectifs par annee, fig.height = 30, fig.width = 15}
+# Pour creer la colonne periode : on renseigne le début de période souhaiter : ici 2007
+annee_debut_periode <- 2007
+
 # preparer la table pour jointure
 ope_selection <- ope_selection %>%
   dplyr::select(ope_id, pop_id, sta_id)
@@ -115,7 +118,12 @@ esp_ope_selection_graph <- esp_ope_selection %>%
     pop_id = as.factor(pop_id),
     sta_id = as.factor(sta_id),
     indicateur = "effectif_total"
-  ) %>%
+  ) %>% # creation d'une colonne pour la période (ex : 2007-2008)
+  mutate(periode = {
+    debut <- floor((annee - annee_debut_periode) / 2) * 2 + annee_debut_periode
+    paste0(debut, "-", debut + 1)
+  }, 
+  periode = as.numeric(periode))%>%
   select(
     ope_id,
     valeur,
@@ -125,16 +133,15 @@ esp_ope_selection_graph <- esp_ope_selection %>%
     pro_libelle,
     pop_id,
     sta_id,
-    indicateur
-  )
-
+    indicateur, 
+    periode
+  ) 
 # Creation du df par especes avec effectif total
 total_valeur_esp <- esp_ope_selection_graph %>%
-  group_by(annee, esp_code_alternatif, indicateur) %>%
+  group_by(periode, esp_code_alternatif, indicateur) %>%
   summarise(effectif_total = sum(valeur), .groups = "drop") %>%
-  select(esp_code_alternatif, annee, effectif_total, indicateur)
+  select(esp_code_alternatif, periode, effectif_total, indicateur)
 ```
-
 # Graphique evolution des effectifs totaux 
 
 ## Df traité avec les classes d'ages et ajout des absences
@@ -272,6 +279,103 @@ effectif_total_esp <- ggplot(total_valeur_esp, aes(x = annee, y = effectif_total
   geom_vline(
     data = . %>% filter(esp_code_alternatif %in% c("ABL","BAF","BLN","BRB", "BRE","BRO","CCO","CHA","CHE", "EPI", "EPT", "GAR", "GOU","HOT","LOF","LOR", "LOT", "OBR", "PER", "ROT", "SAT", "SPI", "TAN", "TOX", "TRF","VAI","VAN","VAR") &
                           annee == 2015),
+    aes(xintercept = 2015),
+    linetype = "dotted",
+    color = "red",
+    size = 1
+  )
+
+effectif_total_esp
+```
+
+## Df avec periode bianuelle
+
+```{r preparation du df pour graphique evolution effectifs par annee, fig.height = 30, fig.width = 15}
+# Pour creer la colonne periode : on renseigne le début de période souhaiter : ici 2007
+annee_debut_periode <- 2007
+
+# preparer la table pour jointure
+ope_selection <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id)
+
+esp_ope_selection_graph <- esp_ope_selection %>%
+  mef_ajouter_type_protocole() %>%
+  left_join(ope_selection, by = "ope_id") %>%
+  rename(valeur = lop_effectif, annee = annee.x) %>%
+  mutate(
+    valeur = as.numeric(valeur) ,
+    annee = as.numeric(annee),
+    ope_surface_calculee = as.numeric(ope_surface_calculee) ,
+    pro_libelle = as.factor(pro_libelle),
+    pop_id = as.factor(pop_id),
+    sta_id = as.factor(sta_id),
+    indicateur = "effectif_total"
+  ) %>% # creation d'une colonne pour la période (ex : 2007-2008)
+  mutate(periode = {
+    debut <- floor((annee - annee_debut_periode) / 2) * 2 + annee_debut_periode
+    paste0(debut)
+  }, 
+  periode = as.numeric(periode))%>%
+  select(
+    ope_id,
+    valeur,
+    esp_code_alternatif,
+    annee,
+    ope_surface_calculee,
+    pro_libelle,
+    pop_id,
+    sta_id,
+    indicateur, 
+    periode
+  ) 
+# Creation du df par especes avec effectif total
+total_valeur_esp <- esp_ope_selection_graph %>%
+  group_by(periode, esp_code_alternatif, indicateur) %>%
+  summarise(effectif_total = sum(valeur), .groups = "drop") %>%
+  select(esp_code_alternatif, periode, effectif_total, indicateur)
+```
+
+```{r}
+#calcul des densitées
+
+
+
+
+
+
+```
+
+
+
+
+
+```{r graphique evolution effectifs par annee lm, fig.height = 30, fig.width = 15}
+# Creation du graph
+effectif_total_esp <- ggplot(total_valeur_esp, aes(x = periode, y = effectif_total)) +
+  facet_wrap2(
+    esp_code_alternatif ~ indicateur,
+    ncol = 3,
+    scales = "free_y",
+    axes = "all",
+    trim_blank = T
+  ) +
+  geom_point(shape = 21, size = 2) +
+  geom_line(linetype = 3, linewidth = 0.5) +
+  labs(x = "Années", y = "Effectif total") +
+  # geom_smooth(method = "loess",
+  #             se = F,
+  #             color = "darkred") +  # Add loess trend lines
+  geom_smooth(method = "lm", se = F, color = "darkred") +
+  theme(
+    strip.background = element_rect(color = "grey85", fill = "grey85"),
+    legend.position = "bottom",
+    panel.background = element_rect(fill = "grey95"),
+    panel.grid.major = element_line(color = "#faffff", size = 0.1),
+    panel.grid.minor = element_line(color = "#faffff")
+  )+
+  geom_vline(
+    data = . %>% filter(esp_code_alternatif %in% c("ABL","BAF","BLN","BRB", "BRE","BRO","CCO","CHA","CHE", "EPI", "EPT", "GAR", "GOU","HOT","LOF","LOR", "LOT", "OBR", "PER", "ROT", "SAT", "SPI", "TAN", "TOX", "TRF","VAI","VAN","VAR") &
+                          periode == 2015),
     aes(xintercept = 2015),
     linetype = "dotted",
     color = "red",

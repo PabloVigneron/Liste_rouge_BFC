@@ -40,6 +40,10 @@ library(gratia)
 library(patchwork)
 library(lme4)
 library(RVAideMemoire)
+library(glmmTMB)
+library(car) # fonction Anova()
+library(ggh4x)
+library(gstat)#semi_variogramme
 ```
 
 ```{r Chargement des données}
@@ -114,137 +118,328 @@ ope_selection %>% # Représentation graphique des stations sélectionnées et de
 
 # Exemple d'analyse avec une espèce de poisson
 
-```{r}
-esp_ope_selection_cha <- esp_ope_selection %>%
-  filter(esp_code_alternatif == "CHA") %>%
+## Resprésenation graphique - effectif total en fonction des années
+
+```{r preparation du df pour graphique evolution effectifs par annee, fig.height = 30, fig.width = 15}
+# Pour creer la colonne periode : on renseigne le début de période souhaiter : ici 2007
+annee_debut_periode <- 2007
+
+# preparer la table pour jointure
+ope_selection <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id)
+
+esp_ope_selection_graph <- esp_ope_selection %>%
   mef_ajouter_type_protocole() %>%
-  left_join(ope_selection_test, by = "ope_id") %>%
-  rename(valeur = lop_effectif,
-         annee = annee.x) %>%
+  left_join(ope_selection, by = "ope_id") %>%
+  rename(valeur = lop_effectif, annee = annee.x) %>%
   mutate(
     valeur = as.numeric(valeur) ,
     annee = as.numeric(annee),
     ope_surface_calculee = as.numeric(ope_surface_calculee) ,
     pro_libelle = as.factor(pro_libelle),
     pop_id = as.factor(pop_id),
-    sta_id = as.factor(sta_id)
-  )
-
+    sta_id = as.factor(sta_id),
+    indicateur = "effectif_total"
+  ) %>% # creation d'une colonne pour la période (ex : 2007-2008)
+  mutate(periode = {
+    debut <- floor((annee - annee_debut_periode) / 2) * 2 + annee_debut_periode
+    paste0(debut)
+  }, 
+  periode = as.numeric(periode))%>%
+  select(
+    ope_id,
+    valeur,
+    esp_code_alternatif,
+    annee,
+    ope_surface_calculee,
+    pro_libelle,
+    pop_id,
+    sta_id,
+    indicateur, 
+    periode
+  ) 
+# Creation du df par especes avec effectif total
+total_valeur_esp <- esp_ope_selection_graph %>%
+  group_by(periode,annee, esp_code_alternatif, indicateur) %>%
+  summarise(effectif_total = sum(valeur), .groups = "drop") %>%
+  select(esp_code_alternatif,annee, periode, effectif_total, indicateur)
 ```
 
+Selection de l'espèce à traiter : ici le **Chabot "CHA"**
+
+```{r}
+esp_ope_selection_cha <- esp_ope_selection_graph %>%
+  filter(esp_code_alternatif == "CHA") 
+```
+
+```{r}
+# ggplot(total_valeur_cha, mapping = aes(x = annee, y = effectif_total)) +
+#   # facet_grid2(
+#   #   espece ~ indicateur,
+#   #   scales = "free",
+#   #   independent = "y",
+#   #   labeller = labeller(indicateur = "effectif total")) +
+#       geom_point(shape = 1, size = 2) +
+#       geom_line(linetype = 3, size = 0.9) +
+#       labs(x = "Années", y = "Effectif total") +
+#       geom_smooth(method = "lm", color = "darkred") +
+#       theme_grey(base_size = 12) 
+
+```
 ## Construction du modele GAMM
 
 ```{r}
-# mod <- gamm(
-#   valeur ~ s(annee, k = 15) + s(ope_surface_calculee, k = 15)  + pro_libelle,
-#   random = list(sta_id =  ~ 1),
-#   data = esp_ope_selection_cha,
-#   family = poisson,
-#   method = "REML"
-# )
+mod_gamm_1.0 <- gamm(
+  valeur ~ s(annee, k = 15) + s(ope_surface_calculee, k = 15)  + pro_libelle,
+  random = list(sta_id =  ~ 1),
+  data = esp_ope_selection_cha,
+  family = poisson(link = "log"),
+  method = "REML"
+)
+mod_gamm_1.1 <- gamm(
+  valeur ~ s(annee, k = 15) + s(ope_surface_calculee, k = 15)  + pro_libelle,
+  random = list(sta_id =  ~ 1),
+  data = esp_ope_selection_cha,
+  family = poisson(link = "identity"),
+  method = "REML"
+)
+mod_gamm_1.2 <- gamm(
+  valeur ~ s(annee, k = 15) + s(ope_surface_calculee, k = 15)  + pro_libelle,
+  random = list(sta_id =  ~ 1),
+  data = esp_ope_selection_cha,
+  family = poisson(link = "sqrt"),
+  method = "REML"
+)
 ```
 
-
-## Autocorelation temporelle - plot
+### Autocorelation temporelle - plot
 
 
 ```{r}
-acf(residuals(mod$lme, type = "normalized"), lag.max = 20)# Autocorrélation temporelle — tient compte des effets aléatoires
+acf(residuals(mod_gamm_1.0$lme, type = "normalized"), lag.max = 20)# Autocorrélation temporelle — tient compte des effets aléatoires
+acf(residuals(mod_gamm_1.1$lme, type = "normalized"), lag.max = 20)# Autocorrélation temporelle — tient compte des effets aléatoires
+acf(residuals(mod_gamm_1.2$lme, type = "normalized"), lag.max = 20)# Autocorrélation temporelle — tient compte des effets aléatoires
 ```
 
 
-## Autocorelation spatial - semi-variogramme
+### Autocorelation spatial - semi-variogramme
 
-```{r}
-plot(variogram(valeur ~ annee, localisations = ~ X + Y, data, cutoff = 50))
+```{r, semi_variogramme pour tester l'autocorrelation spatiale}
+vgm_cha <- variogram(
+  valeur ~ annee,
+  locations = ~ x + y,
+  data = esp_ope_selection_cha,
+  cutoff = 50
+)
+plot(vgm_cha)
 ```
 
 
-## Indépendance du modèles au data
+
+### Indépendance du modèles aux data
 
 ```{r plots résidus}
-gam.check(mod$gam)
+gam.check(mod_gamm_1.0$gam)
+```
 
+```{r}
+gam.check(mod_gamm_1.1$gam)
+```
+
+```{r}
+gam.check(mod_gamm_1.2$gam)
 ```
 
 -> verifier le k'/edf : edf doit être << k'
 
-## Verifier la concurvity
+### Verifier la concurvity
 
 ```{r}
-concurvity(mod$gam)
+concurvity(mod_gamm_1.0$gam)
+concurvity(mod_gamm_1.2$gam)
+concurvity(mod_gamm_1.2$gam)
 ```
 
 
-## Représentation graphique des smooth
+### Représentation graphique des smooth
 
 ```{r representation graphique standard}
-draw(mod)
-
+draw(mod_gamm_1.0)
+draw(mod_gamm_1.1)
+draw(mod_gamm_1.2)
 ```
 
 ```{r}
-sm <- smooth_estimates(mod) |>
-  add_confint()
-sm
+# sm <- smooth_estimates(mod) |>
+#   add_confint()
+# sm
+# # add partial residuals to data
+# esp_ope_selection_cha <- ope_effectif_glm |>
+#   add_partial_residuals(mod$gam)
+# names(esp_ope_selection_cha)
+# 
+# # Representation graphique custom ggplot2
+# p_sx2 <- sm  %>%
+#   filter(.smooth == "s(annee)")  %>%
+#   ggplot() +
+#   geom_rug(
+#     aes(x = annee),
+#     data = ,
+#     sides = "b",
+#     length = grid::unit(0.02, "npc")
+#   ) +
+#   geom_ribbon(aes(ymin = .lower_ci, ymax = .upper_ci, x = annee), alpha = 0.2) +
+#   geom_point(
+#     aes(x = annee, y = `s(annee)`),
+#     data = esp_ope_selection_cha,
+#     cex = 1.5,
+#     colour = "steelblue3"
+#   ) +
+#   geom_line(aes(x = annee, y = .estimate), lwd = 1.2) +
+#   labs(y = "Partial effect", title = "s(annee)")
+# 
+# p_sx0 <- sm  %>%
+#   filter(.smooth == "s(ope_surface_calculee)")  %>%
+#   ggplot() +
+#   geom_rug(
+#     aes(x = ope_surface_calculee),
+#     data = esp_ope_selection_cha,
+#     sides = "b",
+#     length = grid::unit(0.02, "npc")
+#   ) +
+#   geom_ribbon(aes(ymin = .lower_ci, ymax = .upper_ci, x = ope_surface_calculee), alpha = 0.2) +
+#   geom_point(
+#     aes(x = ope_surface_calculee, y = `s(ope_surface_calculee)`),
+#     data = esp_ope_selection_cha,
+#     cex = 1.5,
+#     colour = "steelblue3"
+#   ) +
+#   geom_line(aes(x = ope_surface_calculee, y = .estimate), lwd = 1.2) +
+#   labs(y = "Partial effect", title = "s(x0)")
+# 
+# p_sx0 + p_sx2 + plot_layout(ncol = 2)
+
+```
+
+## Construction du modele GLMM
+
+```{r, construction des modèles GLMM avec différentes fonctions de liens}
+mod_glmm_1.0 <- glmer(
+  valeur ~ annee + ope_surface_calculee + pro_libelle  + (1 |
+                                                            sta_id),
+  data = esp_ope_selection_cha,
+  family = poisson(link = "log")
+)
+mod_glmm_1.1 <- glmer(
+  valeur ~ annee + ope_surface_calculee + pro_libelle  + (1 |
+                                                            sta_id),
+  data = esp_ope_selection_cha,
+  family = poisson(link = "identity")
+)
+mod_glmm_1.2 <- glmer(
+  valeur ~ annee + ope_surface_calculee + pro_libelle  + (1 |
+                                                            sta_id),
+  data = esp_ope_selection_cha,
+  family = poisson(link = "sqrt")
+)
+```
+
+### Indépendance du modèle aux données
+
+```{r, plotresid des modèles glmm}
+plotresid(mod_glmm_1.0)
+# plotresid(mod_glmm_1.1)
+plotresid(mod_glmm_1.2)
+```
+
+### Homoscédaticité des résidus
+
+```{r, Homoscédaticité des résidus}
+overdisp.glmer(mod_glmm_1.0)
+# overdisp.glmer(mod_glmm_1.1)
+overdisp.glmer(mod_glmm_1.2)
+```
+
+### Test post-hoc - fonction anova
+
+Si les conditions d'applications du modèle sont bien respectées :
+
+```{r}
+anova(mod_glmm_1.0)
+# anova(mod_glmm_1.1)
+anova(mod_glmm_1.2)
 ```
 
 ```{r}
-# add partial residuals to data
-esp_ope_selection_cha <- ope_effectif_glm |>
-  add_partial_residuals(mod$gam)
-names(esp_ope_selection_cha)
+summary(mod_glmm_1.0)
+# summary(mod_glmm_1.1)
+summary(mod_glmm_1.2)
 ```
+Si problème de sur ou sous-dispersion : esssayer une Quasi binomiale négative. 
 
-```{r representation graphique custom ggplot2}
-p_sx2 <- sm  %>%
-  filter(.smooth == "s(annee)")  %>%
-  ggplot() +
-  geom_rug(
-    aes(x = annee),
-    data = ,
-    sides = "b",
-    length = grid::unit(0.02, "npc")
-  ) +
-  geom_ribbon(aes(ymin = .lower_ci, ymax = .upper_ci, x = annee), alpha = 0.2) +
-  geom_point(
-    aes(x = annee, y = `s(annee)`),
-    data = esp_ope_selection_cha,
-    cex = 1.5,
-    colour = "steelblue3"
-  ) +
-  geom_line(aes(x = annee, y = .estimate), lwd = 1.2) +
-  labs(y = "Partial effect", title = "s(annee)")
+## Construction du modèle GLMM avec une Quasi binomiale négative 
 
-p_sx0 <- sm  %>%
-  filter(.smooth == "s(ope_surface_calculee)")  %>%
-  ggplot() +
-  geom_rug(
-    aes(x = ope_surface_calculee),
-    data = esp_ope_selection_cha,
-    sides = "b",
-    length = grid::unit(0.02, "npc")
-  ) +
-  geom_ribbon(aes(ymin = .lower_ci, ymax = .upper_ci, x = ope_surface_calculee), alpha = 0.2) +
-  geom_point(
-    aes(x = ope_surface_calculee, y = `s(ope_surface_calculee)`),
-    data = esp_ope_selection_cha,
-    cex = 1.5,
-    colour = "steelblue3"
-  ) +
-  geom_line(aes(x = ope_surface_calculee, y = .estimate), lwd = 1.2) +
-  labs(y = "Partial effect", title = "s(x0)")
-
-p_sx0 + p_sx2 + plot_layout(ncol = 2)
+```{r}
+mod_glmm_qbn <- glmer.nb(valeur ~ annee + ope_surface_calculee + pro_libelle+ (1|sta_id),  data = esp_ope_selection_cha,  family = poisson(link = "log")
+)
 
 ```
 
+## Construction des modeles GLMM Zero-inlfated
 
+```{r}
+mod_zi_1.0 <- glmmTMB(
+  valeur ~ annee + ope_surface_calculee + pro_libelle + (1 |
+                                                           sta_id) ,
+  data = esp_ope_selection_cha,
+  family = poisson(link = "log"),
+  ziformula = ~ 1
+)
+mod_zi_1.1 <- glmmTMB(
+  valeur ~ annee + ope_surface_calculee + pro_libelle + (1 | sta_id) ,
+  family = nbinom2(link = "log"),
+  data = esp_ope_selection_cha,
+  ziformula = ~ 1
+)
+mod_zi_1.2 <- glmmTMB(
+  valeur ~ annee + ope_surface_calculee + pro_libelle + (1 | sta_id) ,
+  family = truncated_poisson(link = "log"),
+  data = esp_ope_selection_cha,
+  ziformula = ~ 1
+)
+mod_zi_1.3 <- glmmTMB(
+  valeur ~ annee + ope_surface_calculee + pro_libelle + (1 | sta_id) ,
+  family = truncated_nbinom2(link = "log"),
+  data = esp_ope_selection_cha,
+  ziformula = ~ 1
+)
+```
 
-## Getting the right fit 
+On selectionne à l'aide du critère AIC le meilleur modèle c'est à dire le modèle avec le plus petit AIC. 
 
-Fit = Likelihood - lambda x Wiggliness
+```{r, selection du meilleur modeles}
+AIC(mod_zi_1.0, mod_zi_1.1, mod_zi_1.2, mod_zi_1.3)
+```
 
-Le lambda permet de balancer entre l'over et l'underfitting du modèle au données.
+```{r, plotresid des modèles glmm zero inflated}
+plotresid(mod_zi_1.0)
+plotresid(mod_zi_1.1)
+plotresid(mod_zi_1.2)
+plotresid(mod_zi_1.3)
+```
 
-Utiliser la  "Restricted Maximum Likelihood" (REML) methode pour comme smoothing parameter (methode la plus stable hautement recommandé).
+```{r}
+summary(mod_zi_1.0)
+summary(mod_zi_1.1)
+summary(mod_zi_1.2)
+summary(mod_zi_1.3)
+```
+
+Si les conditions d'applications du modèle sont bien respectées :
+```{r}
+Anova(mod_zi_1.0)
+Anova(mod_zi_1.1)
+Anova(mod_zi_1.2)
+Anova(mod_zi_1.3)
+```
+

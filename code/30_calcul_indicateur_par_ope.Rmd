@@ -273,16 +273,16 @@ Le calcul de pourcentage de juvéniles par opération est effectué. Les résult
 ## code noam suite
 
 ```{r Calcul pourcentage juvéniles}
-# ope_pc_juv <- ope_pc_juv %>% 
-#   ungroup() %>% 
+# ope_pc_juv <- ope_pc_juv %>%
+#   ungroup() %>%
 #   complete(ope_id,
 #            esp_code_alternatif,
 #            stade,
 #            indicateur,
-#            fill = list(valeur = 0)) %>% 
+#            fill = list(valeur = 0)) %>%
 #     group_by(ope_id,
-#              esp_code_alternatif) %>% 
-#   dplyr::mutate(valeur = (valeur [stade == "juv"] / valeur [stade == "ind"])*100) %>% 
+#              esp_code_alternatif) %>%
+#   dplyr::mutate(valeur = (valeur [stade == "juv"] / valeur [stade == "ind"])*100) %>%
 #   filter(stade == "ind",
 #          !is.nan(valeur))
 ```
