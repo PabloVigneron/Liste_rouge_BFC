@@ -465,6 +465,7 @@ plot(variogram(
   cutoff = 50
 ))
 ```
+
 ```{r}
 ggplot(esp_ope_selection_cha, aes(x, y, color = valeur)) + geom_point()
 ```

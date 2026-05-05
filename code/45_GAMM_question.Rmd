@@ -44,6 +44,11 @@ library(glmmTMB)
 library(car) # fonction Anova()
 library(ggh4x)
 library(gstat)#semi_variogramme
+library(mapview)
+library(COGiter)
+library(sf)
+library(ggplotify)
+library(ggpubr)
 ```
 
 ```{r Chargement des données}
@@ -51,6 +56,7 @@ load(file = "../processed_data/selection_especes.rda")
 load(file = "../processed_data/selection_pop_ope.rda")
 load(file = "../processed_data/donnees_densite_eff_abs.rda")
 load(file = "../processed_data/selection_pop_ope.rda")
+load(file = "../processed_data/selection_pop_ope_carte.rda")
 ```
 
 ```{r Chargement des tables aspe}
@@ -116,6 +122,29 @@ ope_selection %>% # Représentation graphique des stations sélectionnées et de
   scale_y_continuous(breaks = seq(min(ope_selection$annee), max(ope_selection$annee), by = 3))
 ```
 
+## Représentation de l'effort d'echantillonnage par stations 
+
+```{r Visualisation effort pêche}
+mapview(
+  list(buffer, mes_depts),
+  # Visualisation de l'effort de pêche
+  layer.name = c("Buffer_1_km", "Bourgogne-Franche-Comté"),
+  col.regions = list("darkseagreen4", "darkseagreen1")
+) +
+  mapview(
+    sta_id_ope_selection,
+    layer.name = "Nombre operation par station",
+    # size_var = "nb_ope_par_sta",
+    # cex = "sta_id",
+    cex = "nb_ope_par_sta",
+    lwd = 0.2,
+    zcol = "nb_ope_par_sta",
+   # col.regions = "#D693E0",
+    alpha = 0.8,
+    legend = TRUE,
+    labels = list(text = sta_id_ope_selection$nb_ope_par_sta, cex = 1.5)
+  )
+```
 # Exemple d'analyse avec une espèce de poisson
 
 ## Resprésenation graphique - effectif total en fonction des années
@@ -128,10 +157,17 @@ annee_debut_periode <- 2007
 ope_selection <- ope_selection %>%
   dplyr::select(ope_id, pop_id, sta_id)
 
+# Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
+coord_sta_id <- point_prelevement %>%
+  filter(pop_id %in% pop_serie_tempo) %>%
+  rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
+  select(pop_id, x, y)
+
 esp_ope_selection_graph <- esp_ope_selection %>%
   mef_ajouter_type_protocole() %>%
   left_join(ope_selection, by = "ope_id") %>%
   rename(valeur = lop_effectif, annee = annee.x) %>%
+  left_join(coord_sta_id, by = "pop_id") %>%
   mutate(
     valeur = as.numeric(valeur) ,
     annee = as.numeric(annee),
@@ -156,36 +192,114 @@ esp_ope_selection_graph <- esp_ope_selection %>%
     pop_id,
     sta_id,
     indicateur, 
-    periode
+    periode,
+    x,
+    y
   ) 
-# Creation du df par especes avec effectif total
+# Creation du df par especes avec effectif total - periode
 total_valeur_esp <- esp_ope_selection_graph %>%
-  group_by(periode,annee, esp_code_alternatif, indicateur) %>%
+  group_by(periode, esp_code_alternatif, indicateur) %>%
   summarise(effectif_total = sum(valeur), .groups = "drop") %>%
-  select(esp_code_alternatif,annee, periode, effectif_total, indicateur)
+  select(esp_code_alternatif, periode, effectif_total, indicateur)
+
+# Creation du df par especes avec effectif total - annee
+total_valeur_esp_an <- esp_ope_selection_graph %>%
+  group_by(annee, esp_code_alternatif, indicateur) %>%
+  summarise(effectif_total = sum(valeur), .groups = "drop") %>%
+  select(esp_code_alternatif, annee, effectif_total, indicateur)
 ```
 
 Selection de l'espèce à traiter : ici le **Chabot "CHA"**
 
 ```{r}
+# Selection de lespèce cible pour le graphique 
+total_valeur_esp_cha <- total_valeur_esp %>%
+  filter(esp_code_alternatif == "TRF") 
+
+# Selection de lespèce cible pour le graphique 
+total_valeur_esp_cha_an <- total_valeur_esp_an %>%
+  filter(esp_code_alternatif == "TRF") 
+
+# Selecetion de l'espèce pour les analyses
 esp_ope_selection_cha <- esp_ope_selection_graph %>%
-  filter(esp_code_alternatif == "CHA") 
+  filter(esp_code_alternatif == "TRF") 
 ```
+
 
 ```{r}
-# ggplot(total_valeur_cha, mapping = aes(x = annee, y = effectif_total)) +
-#   # facet_grid2(
-#   #   espece ~ indicateur,
-#   #   scales = "free",
-#   #   independent = "y",
-#   #   labeller = labeller(indicateur = "effectif total")) +
-#       geom_point(shape = 1, size = 2) +
-#       geom_line(linetype = 3, size = 0.9) +
-#       labs(x = "Années", y = "Effectif total") +
-#       geom_smooth(method = "lm", color = "darkred") +
-#       theme_grey(base_size = 12) 
-
+# table(esp_ope_selection_graph$esp_code_alternatif)
 ```
+
+
+```{r plot evolution effectif annee periode, fig.height = 11, fig.width = 20}
+plot_trf_annee <- ggplot(total_valeur_esp_cha_an, aes(x = annee, y = effectif_total)) +
+  facet_wrap2(
+    esp_code_alternatif ~ indicateur,
+    ncol = 3,
+    scales = "free_y",
+    axes = "all",
+    trim_blank = T
+  ) +
+  geom_point(shape = 21, size = 2) +
+  geom_line(linetype = 3, linewidth = 0.5) +
+  labs(x = "Années", y = "Effectif total") +
+  geom_smooth(method = "lm", color = "darkred") +
+  # geom_smooth(method = "loess",
+  #             se = F,
+  #             color = "darkred") +  # Add loess trend lines
+  theme(
+    strip.background = element_rect(color = "grey85", fill = "grey85"),
+    legend.position = "bottom",
+    panel.background = element_rect(fill = "grey95"),
+    panel.grid.major = element_line(color = "#faffff", size = 0.1),
+    panel.grid.minor = element_line(color = "#faffff")
+  )
+
+plot_trf_periode <- ggplot(total_valeur_esp_cha, aes(x = periode, y = effectif_total)) +
+  facet_wrap2(
+    esp_code_alternatif ~ indicateur,
+    ncol = 3,
+    scales = "free_y",
+    axes = "all",
+    trim_blank = T
+  ) +
+  geom_point(shape = 21, size = 2) +
+  geom_line(linetype = 3, linewidth = 0.5) +
+  labs(x = "Période", y = "Effectif total") +
+  geom_smooth(method = "lm", color = "darkred") +
+  # geom_smooth(method = "loess",
+  #             se = F,
+  #             color = "darkred") +  # Add loess trend lines
+  theme(
+    strip.background = element_rect(color = "grey85", fill = "grey85"),
+    legend.position = "bottom",
+    panel.background = element_rect(fill = "grey95"),
+    panel.grid.major = element_line(color = "#faffff", size = 0.1),
+    panel.grid.minor = element_line(color = "#faffff")
+  )
+
+plot_trf <- ggarrange(
+  plot_trf_annee,
+  plot_trf_periode,
+  ncol = 2,
+  nrow = 1,
+  labels = c(
+    "Effectif en fonction de l'annee",
+    "Effectif en fonction de la periode"
+  ),
+  font.label = list(
+    size = 14,
+    color = "darkred",
+    face = "bold",
+    family = NULL
+  ),
+  hjust = -0.5,
+  vjust = 1.9,
+  align = c("none", "h", "v", "hv")
+)
+plot_trf
+```
+
 ## Construction du modele GAMM
 
 ```{r}
@@ -211,43 +325,76 @@ mod_gamm_1.2 <- gamm(
   method = "REML"
 )
 ```
-
 ### Autocorelation temporelle - plot
 
+```{r autocorrelation spatiale plot, fig.height = 10, fig.width = 24}
+acf_mod_gamm_1.0 <- as.ggplot(~ acf(residuals(mod_gamm_1.0$lme, type = "normalized"), lag.max = 20))
+acf_mod_gamm_1.1 <- as.ggplot(~ acf(residuals(mod_gamm_1.1$lme, type = "normalized"), lag.max = 20))
+acf_mod_gamm_1.2 <- as.ggplot(~ acf(residuals(mod_gamm_1.2$lme, type = "normalized"), lag.max = 20))
 
-```{r}
-acf(residuals(mod_gamm_1.0$lme, type = "normalized"), lag.max = 20)# Autocorrélation temporelle — tient compte des effets aléatoires
-acf(residuals(mod_gamm_1.1$lme, type = "normalized"), lag.max = 20)# Autocorrélation temporelle — tient compte des effets aléatoires
-acf(residuals(mod_gamm_1.2$lme, type = "normalized"), lag.max = 20)# Autocorrélation temporelle — tient compte des effets aléatoires
+ggarrange(
+  acf_mod_gamm_1.0,
+  acf_mod_gamm_1.1,
+  acf_mod_gamm_1.2,
+  ncol = 3,
+  nrow = 1,
+  labels = c("acf_mod_gamm_1.0", "acf_mod_gamm_1.1", "acf_mod_gamm_1.2"),
+  font.label = list(
+    size = 14,
+    color = "darkred",
+    face = "bold",
+    family = NULL
+  ),
+  hjust = -0.1,
+  vjust = 1.6,
+  align = c("none", "h", "v", "hv")
+)
 ```
-
 
 ### Autocorelation spatial - semi-variogramme
 
-```{r, semi_variogramme pour tester l'autocorrelation spatiale}
-vgm_cha <- variogram(
-  valeur ~ annee,
-  locations = ~ x + y,
-  data = esp_ope_selection_cha,
-  cutoff = 50
-)
-plot(vgm_cha)
+```{r, semivariogramme pour tester autocorrelation spatiale}
+# vgm_cha <- variogram(
+#   valeur ~ annee,
+#   locations = ~ x + y,
+#   data = esp_ope_selection_cha,
+#   cutoff = 50
+# )
+# plot(vgm_cha)
 ```
 
+```{r}
+library(gstat)
+library(sp)
+# gstat::variogram needs to know which columns have the 
+# location information. Because we're using a formula when
+# calling it, below, we first set the "coordinates" of the
+# meuse object; that is, we define which columns contain
+# this location information
+coordinates(esp_ope_selection_cha) = ~ x + y
 
+# Calculate the sample variogram
+v <- variogram(log(valeur) ~ 1, data = esp_ope_selection_cha)
+print(v)
+```
+
+```{r}
+plot(v)
+```
 
 ### Indépendance du modèles aux data
 
-```{r plots résidus}
-gam.check(mod_gamm_1.0$gam)
+```{r plots résidus,fig.height = 10, fig.width = 12}
+appraise(mod_gamm_1.0$gam)
 ```
 
-```{r}
-gam.check(mod_gamm_1.1$gam)
+```{r, fig.height = 10, fig.width = 12}
+appraise(mod_gamm_1.1$gam)
 ```
 
-```{r}
-gam.check(mod_gamm_1.2$gam)
+```{r, fig.height = 10, fig.width = 12}
+appraise(mod_gamm_1.2$gam)
+
 ```
 
 -> verifier le k'/edf : edf doit être << k'
@@ -263,62 +410,16 @@ concurvity(mod_gamm_1.2$gam)
 
 ### Représentation graphique des smooth
 
-```{r representation graphique standard}
-draw(mod_gamm_1.0)
-draw(mod_gamm_1.1)
-draw(mod_gamm_1.2)
+```{r representation graphique standard, fig.height = 10, fig.width = 20}
+draw(mod_gamm_1.0, residuals = T)
+draw(mod_gamm_1.1, residuals = T)
+draw(mod_gamm_1.2, residuals = T)
 ```
 
-```{r}
-# sm <- smooth_estimates(mod) |>
-#   add_confint()
-# sm
-# # add partial residuals to data
-# esp_ope_selection_cha <- ope_effectif_glm |>
-#   add_partial_residuals(mod$gam)
-# names(esp_ope_selection_cha)
-# 
-# # Representation graphique custom ggplot2
-# p_sx2 <- sm  %>%
-#   filter(.smooth == "s(annee)")  %>%
-#   ggplot() +
-#   geom_rug(
-#     aes(x = annee),
-#     data = ,
-#     sides = "b",
-#     length = grid::unit(0.02, "npc")
-#   ) +
-#   geom_ribbon(aes(ymin = .lower_ci, ymax = .upper_ci, x = annee), alpha = 0.2) +
-#   geom_point(
-#     aes(x = annee, y = `s(annee)`),
-#     data = esp_ope_selection_cha,
-#     cex = 1.5,
-#     colour = "steelblue3"
-#   ) +
-#   geom_line(aes(x = annee, y = .estimate), lwd = 1.2) +
-#   labs(y = "Partial effect", title = "s(annee)")
-# 
-# p_sx0 <- sm  %>%
-#   filter(.smooth == "s(ope_surface_calculee)")  %>%
-#   ggplot() +
-#   geom_rug(
-#     aes(x = ope_surface_calculee),
-#     data = esp_ope_selection_cha,
-#     sides = "b",
-#     length = grid::unit(0.02, "npc")
-#   ) +
-#   geom_ribbon(aes(ymin = .lower_ci, ymax = .upper_ci, x = ope_surface_calculee), alpha = 0.2) +
-#   geom_point(
-#     aes(x = ope_surface_calculee, y = `s(ope_surface_calculee)`),
-#     data = esp_ope_selection_cha,
-#     cex = 1.5,
-#     colour = "steelblue3"
-#   ) +
-#   geom_line(aes(x = ope_surface_calculee, y = .estimate), lwd = 1.2) +
-#   labs(y = "Partial effect", title = "s(x0)")
-# 
-# p_sx0 + p_sx2 + plot_layout(ncol = 2)
-
+```{r representation graphique standard sans residuals, fig.height = 10, fig.width = 20}
+draw(mod_gamm_1.0, residuals = F)
+draw(mod_gamm_1.1, residuals = F)
+draw(mod_gamm_1.2, residuals = F)
 ```
 
 ## Construction du modele GLMM
@@ -346,17 +447,35 @@ mod_glmm_1.2 <- glmer(
 
 ### Indépendance du modèle aux données
 
-```{r, plotresid des modèles glmm}
-plotresid(mod_glmm_1.0)
-# plotresid(mod_glmm_1.1)
-plotresid(mod_glmm_1.2)
+```{r plotresid des modèles glmm, fig.height = 10, fig.width = 12}
+res_mod_glmm_1.0 <- as.ggplot(~ plotresid(mod_glmm_1.0))
+res_mod_glmm_1.1 <- as.ggplot(~ plotresid(mod_glmm_1.1))
+res_mod_glmm_1.2 <- as.ggplot(~ plotresid(mod_glmm_1.2))
+
+ggarrange(
+  res_mod_glmm_1.0,
+  res_mod_glmm_1.1,
+  res_mod_glmm_1.2,
+  ncol = 2,
+  nrow = 2,
+  labels = c("mod_glmm_1.0_log", "mod_glmm_1.1_idd", "mod_glmm_1.2_sqrt"),
+  font.label = list(
+    size = 13,
+    color = "darkred",
+    face = "bold",
+    family = NULL
+  ),
+  hjust = -0.1,
+  vjust = 1.6,
+  align = c("none", "h", "v", "hv")
+)
 ```
 
-### Homoscédaticité des résidus
+### Homoscédasticité des résidus
 
-```{r, Homoscédaticité des résidus}
+```{r, Homoscédasticité des résidus}
 overdisp.glmer(mod_glmm_1.0)
-# overdisp.glmer(mod_glmm_1.1)
+overdisp.glmer(mod_glmm_1.1)
 overdisp.glmer(mod_glmm_1.2)
 ```
 
@@ -365,29 +484,29 @@ overdisp.glmer(mod_glmm_1.2)
 Si les conditions d'applications du modèle sont bien respectées :
 
 ```{r}
-anova(mod_glmm_1.0)
+# anova(mod_glmm_1.0)
 # anova(mod_glmm_1.1)
-anova(mod_glmm_1.2)
+# anova(mod_glmm_1.2)
 ```
 
 ```{r}
-summary(mod_glmm_1.0)
+# summary(mod_glmm_1.0)
 # summary(mod_glmm_1.1)
-summary(mod_glmm_1.2)
+# summary(mod_glmm_1.2)
 ```
 Si problème de sur ou sous-dispersion : esssayer une Quasi binomiale négative. 
 
 ## Construction du modèle GLMM avec une Quasi binomiale négative 
 
 ```{r}
-mod_glmm_qbn <- glmer.nb(valeur ~ annee + ope_surface_calculee + pro_libelle+ (1|sta_id),  data = esp_ope_selection_cha,  family = poisson(link = "log")
-)
+# mod_glmm_qbn <- glmer.nb(valeur ~ annee + ope_surface_calculee + pro_libelle+ (1|sta_id),  data = esp_ope_selection_cha,  family = poisson(link = "log")
+# )
 
 ```
 
 ## Construction des modeles GLMM Zero-inlfated
 
-```{r}
+```{r, construction des modeles glmmzi}
 mod_zi_1.0 <- glmmTMB(
   valeur ~ annee + ope_surface_calculee + pro_libelle + (1 |
                                                            sta_id) ,
@@ -420,12 +539,31 @@ On selectionne à l'aide du critère AIC le meilleur modèle c'est à dire le mo
 ```{r, selection du meilleur modeles}
 AIC(mod_zi_1.0, mod_zi_1.1, mod_zi_1.2, mod_zi_1.3)
 ```
+```{r plotresid des modèles glmm zero inflated, fig.height = 10, fig.width = 12}
 
-```{r, plotresid des modèles glmm zero inflated}
-plotresid(mod_zi_1.0)
-plotresid(mod_zi_1.1)
-plotresid(mod_zi_1.2)
-plotresid(mod_zi_1.3)
+res_mod_zi_1.0 <- as.ggplot(~ plotresid(mod_zi_1.0))
+res_mod_zi_1.1 <- as.ggplot(~ plotresid(mod_zi_1.1))
+res_mod_zi_1.2 <- as.ggplot(~ plotresid(mod_zi_1.2))
+res_mod_zi_1.3 <- as.ggplot(~ plotresid(mod_zi_1.3))
+
+ggarrange(
+  res_mod_zi_1.0,
+  res_mod_zi_1.1,
+  res_mod_zi_1.2,
+  res_mod_zi_1.3,
+  ncol = 2,
+  nrow = 2,
+  labels = c("poisson", "nbinom2", "truncated_poisson", "truncated_nbinom2"),
+  font.label = list(
+    size = 13,
+    color = "darkred",
+    face = "bold",
+    family = NULL
+  ),
+  hjust = -0.1,
+  vjust = 1.6,
+  align = c("none", "h", "v", "hv")
+)
 ```
 
 ```{r}
@@ -442,4 +580,6 @@ Anova(mod_zi_1.1)
 Anova(mod_zi_1.2)
 Anova(mod_zi_1.3)
 ```
+# References bibliographiques
 
+Simpson, G. L., (2024). gratia: An R package for exploring generalized additive models. Journal of Open Source Software, 9(104), 6962, <https://doi.org/10.21105/joss.06962>
