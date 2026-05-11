@@ -49,6 +49,7 @@ library(COGiter)
 library(sf)
 library(ggplotify)
 library(ggpubr)
+library(gstat)# For semivariogram
 ```
 
 ```{r Chargement des données}
@@ -74,16 +75,63 @@ Script : 45_GAMM_question
 
 # Objectif 
 
+## Contexte du stage
+
 L’objectif principal de l'étude est d'évaluer les tendances démographiques des espèces de poissons d'eau douce à l'échelle de la région Bourgogne Franche-comté. Des séries chronologiques longues enregistrant plus d’une dizaine d’années ou 3 générations (critère A UICN) de données seront utilisées (sur un total disponible d’une vingtaine d'années). Ce travail s’inscrit dans la perspective de la création de la Liste rouge régionale des poissons d’eau douce de Bourgogne Franche-Comté et compte une trentaine d'espèces à évaluer.
 
 
 L’OFB a mis en place depuis 1990 des réseaux de suivi temporel de l’état des milieux aquatiques à partir des peuplements de poissons. Les échantillonnages sont réalisés tous les ans ou tout les deux ans en fonction des réseaux pluriannuels des stations identiques selon deux protocoles distincts : 
-- pêche par points 
+- pêche par points (partielle)
 - pêche complète
 
+L'ensemble des données sont stocké dans la base de données **aspe** de l'OFB.
 
-Les tendances temporelles seront estimées par une analyse statistiques de Modèles Linéaires Généralisé Mixtes (GLMM) ou de 
-Modèles Additifs Généralisé Mixtes (GAMMs).
+Les tendances temporelles seront estimées par une analyse statistique de Modèles Additifs Généralisé Mixtes (GAMMs), de Modèles Linéaires Généralisé Mixtes (GLMM) 
+ou de Zero-Inflated Poisson GLM (ZIPGLMM) en fonction de l'ajustement des modèles aux données.
+
+
+
+## Choix des variables
+
+Pour répondre à la question initiale, les modèles vont se construire à partir des variables suivantes : 
+
+La variable réponse : **valeur**, effectif des poissons  *variable quantitative discrète bornée*
+
+Les variables explicatives : 
+
+les co-variables : 
+
+- **annee**, *variable quantitative discrète bornée*
+
+- **ope_surface_calculee**, la surface pêchée *variable quantitative continue bornée*
+
+les facteurs :
+
+- **pro_libelle**, les protocoles utilisés (2 modalitées) *variable qualitative nominal*
+
+- **sta_id**, les stations d'échantillonages (163 modalitées) *variable qualitative nominal*
+
+
+## Demarche des analyses statistiques
+
+Comme les données sont appariées, un facteur aléatoire **(1|sta_id)** sera intégré dans tous les modèles.Les modèles seront de la forme suivante : 
+
+modele <- effectif ~ annee + protocole + surface + (1|station)
+ 
+**Le coefficient prédit par les modèles permettra d'estimer la tendance temporelle**.
+
+1. **Modèles Additifs Généralisé Mixtes (GAMMs)**  
+
+Les GAMMs sont utilisés en considérant que les relations entre les variables ne sont pas forcément linéaires. Par exemple, les effectifs fluctuent entre les années par un échantillonnage bi-annelles pour certaines stations et une grande variabilité annuelle des effectifs conditionnés par les conditions lors de la période de reproduction.
+
+2. **Modèles Linéaires Généralisé Mixtes (GLMM)**
+
+Les GLMM sont utilisés pour améliorer l'ajustement du modèle au données.
+
+3. **Modèle de zéro enflées**
+
+Les modèles Zero-inflated sont utilisés pour corrigé **la sur-dispersion des résidus**
+
 
 ## Représentation des series temporelles par stations (163)
 
@@ -165,6 +213,7 @@ coord_sta_id <- point_prelevement %>%
 
 esp_ope_selection_graph <- esp_ope_selection %>%
   mef_ajouter_type_protocole() %>%
+  mef_ajouter_ope_date() %>%
   left_join(ope_selection, by = "ope_id") %>%
   rename(valeur = lop_effectif, annee = annee.x) %>%
   left_join(coord_sta_id, by = "pop_id") %>%
@@ -180,8 +229,8 @@ esp_ope_selection_graph <- esp_ope_selection %>%
   mutate(periode = {
     debut <- floor((annee - annee_debut_periode) / 2) * 2 + annee_debut_periode
     paste0(debut)
-  }, 
-  periode = as.numeric(periode))%>%
+  }, periode = as.numeric(periode)) %>%
+  mutate(julian = lubridate::yday(ope_date)) %>% #  Ajout de la date de pêche codée de 1 à 365
   select(
     ope_id,
     valeur,
@@ -191,10 +240,12 @@ esp_ope_selection_graph <- esp_ope_selection %>%
     pro_libelle,
     pop_id,
     sta_id,
-    indicateur, 
+    indicateur,
     periode,
     x,
-    y
+    y,
+    ope_date, 
+    julian
   ) 
 # Creation du df par especes avec effectif total - periode
 total_valeur_esp <- esp_ope_selection_graph %>%
@@ -209,30 +260,25 @@ total_valeur_esp_an <- esp_ope_selection_graph %>%
   select(esp_code_alternatif, annee, effectif_total, indicateur)
 ```
 
-Selection de l'espèce à traiter : ici le **Chabot "CHA"**
+Selection de l'espèce à traiter : ici la **Truite fario "TRF"**
 
 ```{r}
 # Selection de lespèce cible pour le graphique 
-total_valeur_esp_cha <- total_valeur_esp %>%
+total_valeur_esp_trf <- total_valeur_esp %>%
   filter(esp_code_alternatif == "TRF") 
 
 # Selection de lespèce cible pour le graphique 
-total_valeur_esp_cha_an <- total_valeur_esp_an %>%
+total_valeur_esp_trf_an <- total_valeur_esp_an %>%
   filter(esp_code_alternatif == "TRF") 
 
 # Selecetion de l'espèce pour les analyses
-esp_ope_selection_cha <- esp_ope_selection_graph %>%
+esp_ope_selection_trf <- esp_ope_selection_graph %>%
   filter(esp_code_alternatif == "TRF") 
-```
-
-
-```{r}
-# table(esp_ope_selection_graph$esp_code_alternatif)
 ```
 
 
 ```{r plot evolution effectif annee periode, fig.height = 11, fig.width = 20}
-plot_trf_annee <- ggplot(total_valeur_esp_cha_an, aes(x = annee, y = effectif_total)) +
+plot_trf_annee <- ggplot(total_valeur_esp_trf_an, aes(x = annee, y = effectif_total)) +
   facet_wrap2(
     esp_code_alternatif ~ indicateur,
     ncol = 3,
@@ -255,7 +301,7 @@ plot_trf_annee <- ggplot(total_valeur_esp_cha_an, aes(x = annee, y = effectif_to
     panel.grid.minor = element_line(color = "#faffff")
   )
 
-plot_trf_periode <- ggplot(total_valeur_esp_cha, aes(x = periode, y = effectif_total)) +
+plot_trf_periode <- ggplot(total_valeur_esp_trf, aes(x = periode, y = effectif_total)) +
   facet_wrap2(
     esp_code_alternatif ~ indicateur,
     ncol = 3,
@@ -285,7 +331,7 @@ plot_trf <- ggarrange(
   nrow = 1,
   labels = c(
     "Effectif en fonction de l'annee",
-    "Effectif en fonction de la periode"
+    "Effectif en fonction de la periode (n : n+1)"
   ),
   font.label = list(
     size = 14,
@@ -306,25 +352,36 @@ plot_trf
 mod_gamm_1.0 <- gamm(
   valeur ~ s(annee, k = 15) + s(ope_surface_calculee, k = 15)  + pro_libelle,
   random = list(sta_id =  ~ 1),
-  data = esp_ope_selection_cha,
+  data = esp_ope_selection_trf,
   family = poisson(link = "log"),
   method = "REML"
 )
 mod_gamm_1.1 <- gamm(
   valeur ~ s(annee, k = 15) + s(ope_surface_calculee, k = 15)  + pro_libelle,
   random = list(sta_id =  ~ 1),
-  data = esp_ope_selection_cha,
+  data = esp_ope_selection_trf,
   family = poisson(link = "identity"),
   method = "REML"
 )
 mod_gamm_1.2 <- gamm(
   valeur ~ s(annee, k = 15) + s(ope_surface_calculee, k = 15)  + pro_libelle,
   random = list(sta_id =  ~ 1),
-  data = esp_ope_selection_cha,
+  data = esp_ope_selection_trf,
   family = poisson(link = "sqrt"),
   method = "REML"
 )
+
+mod_gamm_1.3 <- gam(
+  valeur ~ s(annee) + s(ope_surface_calculee)  + pro_libelle+ s(x,y),
+  data = esp_ope_selection_trf,
+  family = poisson(link = "log"),
+  method = "REML"
+)
 ```
+
+
+
+
 ### Autocorelation temporelle - plot
 
 ```{r autocorrelation spatiale plot, fig.height = 10, fig.width = 24}
@@ -353,33 +410,67 @@ ggarrange(
 
 ### Autocorelation spatial - semi-variogramme
 
-```{r, semivariogramme pour tester autocorrelation spatiale}
-# vgm_cha <- variogram(
-#   valeur ~ annee,
-#   locations = ~ x + y,
-#   data = esp_ope_selection_cha,
-#   cutoff = 50
-# )
-# plot(vgm_cha)
+```{r}
+ggplot(esp_ope_selection_trf, aes(x = x, y = y, size = valeur)) +
+    geom_point() +
+    coord_fixed()
 ```
 
 ```{r}
-library(gstat)
-library(sp)
-# gstat::variogram needs to know which columns have the 
-# location information. Because we're using a formula when
-# calling it, below, we first set the "coordinates" of the
-# meuse object; that is, we define which columns contain
-# this location information
-coordinates(esp_ope_selection_cha) = ~ x + y
+ggplot(esp_ope_selection_trf, aes(x = annee, y = valeur)) +
+  geom_point()
+```
 
-# Calculate the sample variogram
-v <- variogram(log(valeur) ~ 1, data = esp_ope_selection_cha)
-print(v)
+
+
+
+
+```{r, semivariogramme pour tester autocorrelation spatiale avec uniquement la variable reponse}
+var <- variogram(valeur ~ annee + ope_surface_calculee, locations = ~ x+y, data = esp_ope_selection_trf)
+var
+plot(var, col= "black")
 ```
 
 ```{r}
-plot(v)
+show.vgms(models = c("Exp",  # Exponential model
+                     "Sph",  # Spherical model
+                     "Gau",  # Gaussian model
+                     "Nug"), # Nugget model
+          nugget = 50)
+```
+
+```{r}
+vfit <- fit.variogram(var, vgm(c("Exp", "Gau", "Sph")))
+vfit
+```
+
+```{r}
+# Did the model-fitting process converge successfully?
+# This is not guaranteed for nonlinear models.
+attributes(vfit)$singular
+```
+
+```{r}
+# For convenience, use show.vgms() to calculate the
+# predicted values for our fitted model
+fitted <-show.vgms(min = min(var$dist), 
+                   max = max(var$dist), 
+                   models ="Sph",
+                   range = vfit$range[2],
+                   sill = vfit$psill[2],
+                   nugget = vfit$psill[1],
+                   plot = FALSE)
+
+# Now we can easily plot this against the observed data
+ggplot(var, aes(dist, gamma)) + 
+  geom_point() + 
+  geom_line(data = fitted, 
+            aes(distance, semivariance),
+            linetype = 2)
+```
+
+```{r}
+# plot(var, vfit, col = "black")
 ```
 
 ### Indépendance du modèles aux data
@@ -394,16 +485,21 @@ appraise(mod_gamm_1.1$gam)
 
 ```{r, fig.height = 10, fig.width = 12}
 appraise(mod_gamm_1.2$gam)
-
 ```
 
--> verifier le k'/edf : edf doit être << k'
+```{r}
+k.check(mod_gamm_1.0$gam)
+k.check(mod_gamm_1.1$gam)
+k.check(mod_gamm_1.2$gam)
+```
+
+-> Verifier le k'/edf : edf doit être << k'. Si edf est proche de k', cela signifie qu'il faut augmenter k. Cependant, comme on travaille sur 20 ans on ne peut pas dépasser k = 19.
 
 ### Verifier la concurvity
 
 ```{r}
 concurvity(mod_gamm_1.0$gam)
-concurvity(mod_gamm_1.2$gam)
+concurvity(mod_gamm_1.1$gam)
 concurvity(mod_gamm_1.2$gam)
 ```
 
@@ -424,28 +520,36 @@ draw(mod_gamm_1.2, residuals = F)
 
 ## Construction du modele GLMM
 
+```{r}
+summary(esp_ope_selection_graph)
+```
+
 ```{r, construction des modèles GLMM avec différentes fonctions de liens}
 mod_glmm_1.0 <- glmer(
-  valeur ~ annee + ope_surface_calculee + pro_libelle  + (1 |
-                                                            sta_id),
-  data = esp_ope_selection_cha,
+  valeur ~ annee + ope_surface_calculee + pro_libelle  + (1 |sta_id),
+  data = esp_ope_selection_trf,
   family = poisson(link = "log")
 )
 mod_glmm_1.1 <- glmer(
-  valeur ~ annee + ope_surface_calculee + pro_libelle  + (1 |
-                                                            sta_id),
-  data = esp_ope_selection_cha,
+  valeur ~ annee + ope_surface_calculee + pro_libelle  + (1 |sta_id),
+  data = esp_ope_selection_trf,
   family = poisson(link = "identity")
 )
 mod_glmm_1.2 <- glmer(
-  valeur ~ annee + ope_surface_calculee + pro_libelle  + (1 |
-                                                            sta_id),
-  data = esp_ope_selection_cha,
+  valeur ~ annee + ope_surface_calculee + pro_libelle  + (1 |sta_id),
+  data = esp_ope_selection_trf,
   family = poisson(link = "sqrt")
+)
+
+mod_glmm_1.3 <- glmer(
+  valeur ~ annee + ope_surface_calculee + pro_libelle + julian + (1 |sta_id),
+  data = esp_ope_selection_trf,
+  family = poisson(link = "log")
 )
 ```
 
 ### Indépendance du modèle aux données
+
 
 ```{r plotresid des modèles glmm, fig.height = 10, fig.width = 12}
 res_mod_glmm_1.0 <- as.ggplot(~ plotresid(mod_glmm_1.0))
@@ -458,7 +562,7 @@ ggarrange(
   res_mod_glmm_1.2,
   ncol = 2,
   nrow = 2,
-  labels = c("mod_glmm_1.0_log", "mod_glmm_1.1_idd", "mod_glmm_1.2_sqrt"),
+  labels = c("log", "identity", "sqrt"),
   font.label = list(
     size = 13,
     color = "darkred",
@@ -484,9 +588,9 @@ overdisp.glmer(mod_glmm_1.2)
 Si les conditions d'applications du modèle sont bien respectées :
 
 ```{r}
-# anova(mod_glmm_1.0)
-# anova(mod_glmm_1.1)
-# anova(mod_glmm_1.2)
+# Anova(mod_glmm_1.0)
+# Anova(mod_glmm_1.1)
+# Anova(mod_glmm_1.2)
 ```
 
 ```{r}
@@ -494,12 +598,13 @@ Si les conditions d'applications du modèle sont bien respectées :
 # summary(mod_glmm_1.1)
 # summary(mod_glmm_1.2)
 ```
+
 Si problème de sur ou sous-dispersion : esssayer une Quasi binomiale négative. 
 
 ## Construction du modèle GLMM avec une Quasi binomiale négative 
 
 ```{r}
-# mod_glmm_qbn <- glmer.nb(valeur ~ annee + ope_surface_calculee + pro_libelle+ (1|sta_id),  data = esp_ope_selection_cha,  family = poisson(link = "log")
+# mod_glmm_qbn <- glmer.nb(valeur ~ annee + ope_surface_calculee + pro_libelle+ (1|sta_id),  data = esp_ope_selection_trf,  family = poisson(link = "log")
 # )
 
 ```
@@ -510,26 +615,26 @@ Si problème de sur ou sous-dispersion : esssayer une Quasi binomiale négative.
 mod_zi_1.0 <- glmmTMB(
   valeur ~ annee + ope_surface_calculee + pro_libelle + (1 |
                                                            sta_id) ,
-  data = esp_ope_selection_cha,
+  data = esp_ope_selection_trf,
   family = poisson(link = "log"),
   ziformula = ~ 1
 )
 mod_zi_1.1 <- glmmTMB(
   valeur ~ annee + ope_surface_calculee + pro_libelle + (1 | sta_id) ,
   family = nbinom2(link = "log"),
-  data = esp_ope_selection_cha,
+  data = esp_ope_selection_trf,
   ziformula = ~ 1
 )
 mod_zi_1.2 <- glmmTMB(
   valeur ~ annee + ope_surface_calculee + pro_libelle + (1 | sta_id) ,
   family = truncated_poisson(link = "log"),
-  data = esp_ope_selection_cha,
+  data = esp_ope_selection_trf,
   ziformula = ~ 1
 )
 mod_zi_1.3 <- glmmTMB(
   valeur ~ annee + ope_surface_calculee + pro_libelle + (1 | sta_id) ,
   family = truncated_nbinom2(link = "log"),
-  data = esp_ope_selection_cha,
+  data = esp_ope_selection_trf,
   ziformula = ~ 1
 )
 ```
@@ -539,6 +644,7 @@ On selectionne à l'aide du critère AIC le meilleur modèle c'est à dire le mo
 ```{r, selection du meilleur modeles}
 AIC(mod_zi_1.0, mod_zi_1.1, mod_zi_1.2, mod_zi_1.3)
 ```
+
 ```{r plotresid des modèles glmm zero inflated, fig.height = 10, fig.width = 12}
 
 res_mod_zi_1.0 <- as.ggplot(~ plotresid(mod_zi_1.0))
@@ -574,12 +680,14 @@ summary(mod_zi_1.3)
 ```
 
 Si les conditions d'applications du modèle sont bien respectées :
+
 ```{r}
 Anova(mod_zi_1.0)
 Anova(mod_zi_1.1)
 Anova(mod_zi_1.2)
 Anova(mod_zi_1.3)
 ```
+
 # References bibliographiques
 
 Simpson, G. L., (2024). gratia: An R package for exploring generalized additive models. Journal of Open Source Software, 9(104), 6962, <https://doi.org/10.21105/joss.06962>
