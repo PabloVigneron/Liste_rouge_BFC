@@ -1,6 +1,6 @@
 ---
 title: "LRR des poissons d'eau douce de BFC"
-subtitle: "45_GAMM_question"
+subtitle: "46_ZIP_GLMM"
 author: "PabloVigneron"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output: 
@@ -71,25 +71,11 @@ load(rdata_tables) # Chargement des données
 pal <- wes_palette("AsteroidCity1")
 ```
 
-Script : 45_GAMM_question
+```{r chragement des fonctions}
+source(file = "../R/adequate_data_for_model.R")
+```
 
-# Objectif 
-
-## Contexte du stage
-
-L’objectif principal de l'étude est d'évaluer les tendances démographiques des espèces de poissons d'eau douce à l'échelle de la région Bourgogne Franche-comté. Des séries chronologiques longues enregistrant plus d’une dizaine d’années ou 3 générations (critère A UICN) de données seront utilisées (sur un total disponible d’une vingtaine d'années). Ce travail s’inscrit dans la perspective de la création de la Liste rouge régionale des poissons d’eau douce de Bourgogne Franche-Comté et compte une trentaine d'espèces à évaluer.
-
-
-L’OFB a mis en place depuis 1990 des réseaux de suivi temporel de l’état des milieux aquatiques à partir des peuplements de poissons. Les échantillonnages sont réalisés tous les ans ou tout les deux ans en fonction des réseaux pluriannuels des stations identiques selon deux protocoles distincts : 
-- pêche par points (partielle)
-- pêche complète
-
-L'ensemble des données sont stocké dans la base de données **aspe** de l'OFB.
-
-Les tendances temporelles seront estimées par une analyse statistique de Modèles Additifs Généralisé Mixtes (GAMMs), de Modèles Linéaires Généralisé Mixtes (GLMM) 
-ou de Zero-Inflated Poisson GLM (ZIPGLMM) en fonction de l'ajustement des modèles aux données.
-
-
+Script : 46_ZIP_GLMM
 
 ## Choix des variables
 
@@ -132,68 +118,6 @@ Les GLMM sont utilisés pour améliorer l'ajustement du modèle au données.
 
 Les modèles Zero-inflated sont utilisés pour corrigé **la sur-dispersion des résidus**
 
-
-## Représentation des series temporelles par stations (163)
-
-```{r Représentation séries temporelles, fig.height = 44, fig.width = 28}
-ope_selection %>% # Représentation graphique des stations sélectionnées et des types de pêche associées
-  ggplot(
-    aes(
-      x = as.character(pop_libelle),
-      y = annee,
-      fill = pro_libelle
-    ),
-    legend.background = element_rect(fill = "#ffffff")
-  ) +
-  scale_fill_manual(values = pal) +
-  geom_tile() +
-  labs(
-    title = "Les points de prélèvements sélectionnés et les types de pêches associées",
-    subtitle = "Région Bourgogne-Franche-Comté",
-    x = "",
-    y = "Années",
-    fill = "Type de pêche"
-  ) +
-  theme_light(base_size = 18) +
-  theme(
-    panel.grid.major = element_line(color = "#ffffff", size = 0.1),
-    panel.grid.minor = element_line(color = "#ffffff"),
-    panel.background = element_rect(fill = "#faf0e6"),
-    legend.position = "bottom",
-    legend.text = element_text(size = 18),
-    # taille labels pro_libelle
-    legend.title = element_text(size = 15),
-    # taille titre légende
-    axis.text.y = element_text(size = 16) # taille noms stations
-  ) +
-  coord_flip() +
-  scale_y_continuous(breaks = seq(min(ope_selection$annee), max(ope_selection$annee), by = 3))
-```
-
-## Représentation de l'effort d'echantillonnage par stations 
-
-```{r Visualisation effort pêche}
-mapview(
-  list(buffer, mes_depts),
-  # Visualisation de l'effort de pêche
-  layer.name = c("Buffer_1_km", "Bourgogne-Franche-Comté"),
-  col.regions = list("darkseagreen4", "darkseagreen1")
-) +
-  mapview(
-    sta_id_ope_selection,
-    layer.name = "Nombre operation par station",
-    # size_var = "nb_ope_par_sta",
-    # cex = "sta_id",
-    cex = "nb_ope_par_sta",
-    lwd = 0.2,
-    zcol = "nb_ope_par_sta",
-   # col.regions = "#D693E0",
-    alpha = 0.8,
-    legend = TRUE,
-    labels = list(text = sta_id_ope_selection$nb_ope_par_sta, cex = 1.5)
-  )
-```
-# Exemple d'analyse avec une espèce de poisson
 
 ## Resprésenation graphique - effectif total en fonction des années
 
@@ -260,25 +184,33 @@ total_valeur_esp_an <- esp_ope_selection_graph %>%
   select(esp_code_alternatif, annee, effectif_total, indicateur)
 ```
 
+```{r, definir si le nombre de data est suffisant pour appliquer les modeles}
+
+# adequate_data_for_model(esp_ope_selection_graph, esp = c("ABL","ANG","BAF","BLN","BRB", "BRE","BRO","CCO","CHA","CHE", "EPI", "EPT", "GAR", "GOU","HOT","LOF","LOR", "LOT","LPM" ,"LPP", "OBR", "PER", "ROT", "SAT", "SPI", "TAN", "TOX", "TRF","VAI","VAN","VAR"))
+
+```
+
+
+
 Selection de l'espèce à traiter : ici la **Truite fario "TRF"**
 
 ```{r}
-# Selection de lespèce cible pour le graphique 
-total_valeur_esp_trf <- total_valeur_esp %>%
-  filter(esp_code_alternatif == "TRF") 
+# Selection de lespèce cible pour le graphique
+total_valeur_esp <- total_valeur_esp %>%
+  filter(esp_code_alternatif == "VAR")
 
-# Selection de lespèce cible pour le graphique 
-total_valeur_esp_trf_an <- total_valeur_esp_an %>%
-  filter(esp_code_alternatif == "TRF") 
+# Selection de lespèce cible pour le graphique
+total_valeur_esp_an <- total_valeur_esp_an %>%
+  filter(esp_code_alternatif == "VAR")
 
 # Selecetion de l'espèce pour les analyses
-esp_ope_selection_trf <- esp_ope_selection_graph %>%
-  filter(esp_code_alternatif == "TRF") 
+esp_ope_selection_x <- esp_ope_selection_graph %>%
+  filter(esp_code_alternatif == "VAR") 
 ```
 
 
 ```{r plot evolution effectif annee periode, fig.height = 11, fig.width = 20}
-plot_trf_annee <- ggplot(total_valeur_esp_trf_an, aes(x = annee, y = effectif_total)) +
+plot_trf_annee <- ggplot(total_valeur_esp_an, aes(x = annee, y = effectif_total)) +
   facet_wrap2(
     esp_code_alternatif ~ indicateur,
     ncol = 3,
@@ -301,7 +233,7 @@ plot_trf_annee <- ggplot(total_valeur_esp_trf_an, aes(x = annee, y = effectif_to
     panel.grid.minor = element_line(color = "#faffff")
   )
 
-plot_trf_periode <- ggplot(total_valeur_esp_trf, aes(x = periode, y = effectif_total)) +
+plot_trf_periode <- ggplot(total_valeur_esp, aes(x = periode, y = effectif_total)) +
   facet_wrap2(
     esp_code_alternatif ~ indicateur,
     ncol = 3,
@@ -352,28 +284,28 @@ plot_trf
 mod_gamm_1.0 <- gamm(
   valeur ~ s(annee, k = 15) + s(ope_surface_calculee, k = 15)  + pro_libelle,
   random = list(sta_id =  ~ 1),
-  data = esp_ope_selection_trf,
+  data = esp_ope_selection_x,
   family = poisson(link = "log"),
   method = "REML"
 )
 mod_gamm_1.1 <- gamm(
   valeur ~ s(annee, k = 15) + s(ope_surface_calculee, k = 15)  + pro_libelle,
   random = list(sta_id =  ~ 1),
-  data = esp_ope_selection_trf,
+  data = esp_ope_selection_x,
   family = poisson(link = "identity"),
   method = "REML"
 )
 mod_gamm_1.2 <- gamm(
   valeur ~ s(annee, k = 15) + s(ope_surface_calculee, k = 15)  + pro_libelle,
   random = list(sta_id =  ~ 1),
-  data = esp_ope_selection_trf,
+  data = esp_ope_selection_x,
   family = poisson(link = "sqrt"),
   method = "REML"
 )
 
 mod_gamm_1.3 <- gam(
   valeur ~ s(annee) + s(ope_surface_calculee)  + pro_libelle+ s(x,y),
-  data = esp_ope_selection_trf,
+  data = esp_ope_selection_x,
   family = poisson(link = "log"),
   method = "REML"
 )
@@ -409,13 +341,13 @@ ggarrange(
 ### Autocorelation spatial - semi-variogramme
 
 ```{r}
-ggplot(esp_ope_selection_trf, aes(x = x, y = y, size = valeur)) +
+ggplot(esp_ope_selection_x, aes(x = x, y = y, size = valeur)) +
     geom_point() +
     coord_fixed()
 ```
 
 ```{r}
-ggplot(esp_ope_selection_trf, aes(x = annee, y = valeur)) +
+ggplot(esp_ope_selection_x, aes(x = annee, y = valeur)) +
   geom_point()
 ```
 
@@ -424,7 +356,7 @@ ggplot(esp_ope_selection_trf, aes(x = annee, y = valeur)) +
 
 
 ```{r, semivariogramme pour tester autocorrelation spatiale avec uniquement la variable reponse}
-var <- variogram(valeur ~ annee + ope_surface_calculee, locations = ~ x+y, data = esp_ope_selection_trf)
+var <- variogram(valeur ~ annee + ope_surface_calculee, locations = ~ x+y, data = esp_ope_selection_x)
 var
 plot(var, col= "black")
 ```
@@ -485,6 +417,7 @@ appraise(mod_gamm_1.1$gam)
 appraise(mod_gamm_1.2$gam)
 ```
 
+
 ```{r}
 k.check(mod_gamm_1.0$gam)
 k.check(mod_gamm_1.1$gam)
@@ -516,6 +449,12 @@ draw(mod_gamm_1.1, residuals = F)
 draw(mod_gamm_1.2, residuals = F)
 ```
 
+```{r}
+summary(mod_gamm_1.0$gam)
+summary(mod_gamm_1.2$gam)
+
+```
+
 ## Construction du modele GLMM
 
 ```{r}
@@ -525,26 +464,23 @@ draw(mod_gamm_1.2, residuals = F)
 ```{r, construction des modèles GLMM avec différentes fonctions de liens}
 mod_glmm_1.0 <- glmer(
   valeur ~ annee + ope_surface_calculee + pro_libelle  + (1 |sta_id),
-  data = esp_ope_selection_trf,
+  data = esp_ope_selection_x,
   family = poisson(link = "log")
 )
 mod_glmm_1.1 <- glmer(
   valeur ~ annee + ope_surface_calculee + pro_libelle  + (1 |sta_id),
-  data = esp_ope_selection_trf,
+  data = esp_ope_selection_x,
   family = poisson(link = "identity")
 )
 mod_glmm_1.2 <- glmer(
   valeur ~ annee + ope_surface_calculee + pro_libelle  + (1 |sta_id),
-  data = esp_ope_selection_trf,
+  data = esp_ope_selection_x,
   family = poisson(link = "sqrt")
 )
 
-mod_glmm_1.3 <- glmer(
-  valeur ~ annee + ope_surface_calculee + pro_libelle + julian + (1 |sta_id),
-  data = esp_ope_selection_trf,
-  family = poisson(link = "log")
-)
+
 ```
+
 
 ### Indépendance du modèle aux données
 
@@ -579,6 +515,7 @@ ggarrange(
 overdisp.glmer(mod_glmm_1.0)
 overdisp.glmer(mod_glmm_1.1)
 overdisp.glmer(mod_glmm_1.2)
+
 ```
 
 ### Test post-hoc - fonction anova
@@ -592,9 +529,9 @@ Si les conditions d'applications du modèle sont bien respectées :
 ```
 
 ```{r}
-# summary(mod_glmm_1.0)
+summary(mod_glmm_1.0)
 # summary(mod_glmm_1.1)
-# summary(mod_glmm_1.2)
+summary(mod_glmm_1.2)
 ```
 
 Si problème de sur ou sous-dispersion : esssayer une Quasi binomiale négative. 
@@ -602,7 +539,11 @@ Si problème de sur ou sous-dispersion : esssayer une Quasi binomiale négative.
 ## Construction du modèle GLMM avec une Quasi binomiale négative 
 
 ```{r}
-# mod_glmm_qbn <- glmer.nb(valeur ~ annee + ope_surface_calculee + pro_libelle+ (1|sta_id),  data = esp_ope_selection_trf,  family = poisson(link = "log")
+# mod_glmm_qbn <- glmer.nb(
+#   valeur ~ annee + ope_surface_calculee + pro_libelle + (1 |
+#                                                            sta_id),
+#   data = esp_ope_selection_x,
+#   family = poisson(link = "log")
 # )
 
 ```
@@ -613,33 +554,33 @@ Si problème de sur ou sous-dispersion : esssayer une Quasi binomiale négative.
 mod_zi_1.0 <- glmmTMB(
   valeur ~ annee + ope_surface_calculee + pro_libelle + (1 |
                                                            sta_id) ,
-  data = esp_ope_selection_trf,
+  data = esp_ope_selection_x,
   family = poisson(link = "log"),
   ziformula = ~ 1
 )
 mod_zi_1.1 <- glmmTMB(
   valeur ~ annee + ope_surface_calculee + pro_libelle + (1 | sta_id) ,
   family = nbinom2(link = "log"),
-  data = esp_ope_selection_trf,
+  data = esp_ope_selection_x,
   ziformula = ~ 1
 )
 mod_zi_1.2 <- glmmTMB(
   valeur ~ annee + ope_surface_calculee + pro_libelle + (1 | sta_id) ,
   family = truncated_poisson(link = "log"),
-  data = esp_ope_selection_trf,
+  data = esp_ope_selection_x,
   ziformula = ~ 1
 )
 mod_zi_1.3 <- glmmTMB(
   valeur ~ annee + ope_surface_calculee + pro_libelle + (1 | sta_id) ,
   family = truncated_nbinom2(link = "log"),
-  data = esp_ope_selection_trf,
+  data = esp_ope_selection_x,
   ziformula = ~ 1
 )
 
 mod_zi_1.4 <- glmmTMB(
   valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
   family = truncated_nbinom2(link = "log"),
-  data = esp_ope_selection_trf,
+  data = esp_ope_selection_x,
   ziformula = ~ 1
 )
 ```
@@ -647,8 +588,15 @@ mod_zi_1.4 <- glmmTMB(
 On selectionne à l'aide du critère AIC le meilleur modèle c'est à dire le modèle avec le plus petit AIC. 
 
 ```{r, selection du meilleur modeles}
-AIC(mod_zi_1.0, mod_zi_1.1, mod_zi_1.2, mod_zi_1.3, mod_zi_1.4)
+AIC(
+  mod_zi_1.0,
+  mod_zi_1.1,
+  mod_zi_1.2,
+  mod_zi_1.3,
+  mod_zi_1.4
+  )
 ```
+
 
 ```{r plotresid des modèles glmm zero inflated, fig.height = 10, fig.width = 20}
 
