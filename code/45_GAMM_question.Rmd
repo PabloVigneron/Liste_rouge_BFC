@@ -265,15 +265,15 @@ Selection de l'espèce à traiter : ici la **Truite fario "TRF"**
 ```{r}
 # Selection de lespèce cible pour le graphique 
 total_valeur_esp_trf <- total_valeur_esp %>%
-  filter(esp_code_alternatif == "TRF") 
+  filter(esp_code_alternatif == "BRO") 
 
 # Selection de lespèce cible pour le graphique 
 total_valeur_esp_trf_an <- total_valeur_esp_an %>%
-  filter(esp_code_alternatif == "TRF") 
+  filter(esp_code_alternatif == "BRO") 
 
 # Selecetion de l'espèce pour les analyses
 esp_ope_selection_trf <- esp_ope_selection_graph %>%
-  filter(esp_code_alternatif == "TRF") 
+  filter(esp_code_alternatif == "BRO") 
 ```
 
 
@@ -602,9 +602,16 @@ Si problème de sur ou sous-dispersion : esssayer une Quasi binomiale négative.
 ## Construction du modèle GLMM avec une Quasi binomiale négative 
 
 ```{r}
-# mod_glmm_qbn <- glmer.nb(valeur ~ annee + ope_surface_calculee + pro_libelle+ (1|sta_id),  data = esp_ope_selection_trf,  family = poisson(link = "log")
-# )
+mod_glmm_qbn <- glmer.nb(valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle+ (1|sta_id),  data = esp_ope_selection_trf,  family = poisson(link = "log")
+)
 
+```
+
+```{r}
+plotresid(mod_glmm_qbn)
+```
+```{r}
+summary(mod_glmm_qbn)
 ```
 
 ## Construction des modeles GLMM Zero-inlfated

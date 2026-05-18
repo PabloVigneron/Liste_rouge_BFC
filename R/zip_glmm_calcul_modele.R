@@ -32,57 +32,81 @@ zip_glmm_calcul_modele <- function(data, mon_espece) {
       !is.na(coef["annee", "Pr(>|z|)"])
   }
   
-  # Modèle 1 : truncated_nbinom2
-  model  <- try(glmmTMB(
+  # Modèle 1 : BINOMIALE NEGATIVE (lme4)
+  model  <- try(glmer.nb(
     valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 |
                                                                           sta_id),
-    family = truncated_nbinom2(link = "log"),
-    data  = filtered_data,
-    ziformula = ~ 1
+    data = filtered_data,
+    family = poisson(link = "log")
   ),
   silent = TRUE)
-  
-  family <- "truncated_nbinom2"
+  family <- "negative_binom"
   coef   <- if (!inherits(model, "try-error"))
-    summary(model)$coefficients$cond
+    summary(model)$coefficients
   else
     NULL
   
-  # Fallback modèle 2 : nbinom2 si try-error ou coef invalides
+  
+  
+  # Fallback modèle 2 : truncated_nbinom2 (si try-error ou coef invalides) (glmmTMB)
+  
   if (inherits(model, "try-error") || !coef_valide(coef)) {
-    model <- try(glmmTMB(
+    model  <- try(glmmTMB(
       valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 |
                                                                             sta_id),
-      family = nbinom2(link = "log"),
-      data = filtered_data,
+      family = truncated_nbinom2(link = "log"),
+      data  = filtered_data,
       ziformula = ~ 1
     ),
     silent = TRUE)
     
-    family <- "nbinom2"
-    coef <- if (!inherits(model, "try-error"))
+    family <- "truncated_nbinom2"
+    coef   <- if (!inherits(model, "try-error"))
       summary(model)$coefficients$cond
     else
       NULL
     
-    if (inherits(model, "try-error") ||
-        !coef_valide(coef))
-      return(NULL)
+    # Fallback modèle 3 : nbinom2  (glmmTMB)
+    if (inherits(model, "try-error") || !coef_valide(coef)) {
+      model <- try(glmmTMB(
+        valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 |
+                                                                              sta_id),
+        family = nbinom2(link = "log"),
+        data = filtered_data,
+        ziformula = ~ 1
+      ),
+      silent = TRUE)
+      
+      family <- "nbinom2"
+      coef <- if (!inherits(model, "try-error"))
+        summary(model)$coefficients$cond
+      else
+        NULL
+      
+      if (inherits(model, "try-error") ||
+          !coef_valide(coef))
+        return(NULL)
+    }
+  }
+    # Uniformise le nom de la colonne p-value avant le rename
+    
+    colnames(coef) <- gsub("Pr\\(>\\|t\\|\\)", "Pr(>|z|)", colnames(coef))
+    
+    res <- coef %>%
+      as.data.frame() %>%
+      rename(p_value = 'Pr(>|z|)') %>%
+      mutate(
+        sig = case_when(
+          p_value < 0.001 ~ "***",
+          p_value < 0.01  ~ "**",
+          p_value < 0.05  ~ "*",
+          TRUE            ~ "NS"
+        ),
+        esp_code_alternatif = mon_espece,
+        family = family
+      )
+    
+    return(res)
   }
   
-  res <- coef %>%
-    as.data.frame() %>%
-    rename(p_value = 'Pr(>|z|)') %>%
-    mutate(
-      sig = case_when(
-        p_value < 0.001 ~ "***",
-        p_value < 0.01  ~ "**",
-        p_value < 0.05  ~ "*",
-        TRUE            ~ "NS"
-      ),
-      esp_code_alternatif = mon_espece,
-      family = family
-    )
-  
-  return(res)
-}
+

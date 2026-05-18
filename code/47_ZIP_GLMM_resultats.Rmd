@@ -97,6 +97,9 @@ liste_periodes_etude <- list(c(2007, 2025),
 Nous construisons un jeu de données complet :
 
 ```{r preparation du df pour zip glmm, fig.height = 30, fig.width = 15}
+# Pour creer la colonne periode : on renseigne le début de période souhaiter : ici 2007
+annee_debut_periode <- 2007
+
 # preparer la table pour jointure
 ope_selection <- ope_selection %>%
   dplyr::select(ope_id, pop_id, sta_id)
@@ -116,12 +119,17 @@ ope_effectif_glm <- esp_ope_selection %>%
   mutate(
     valeur = as.numeric(valeur) ,
     annee = as.numeric(annee),
+    # annee_an = annee,
     ope_surface_calculee = as.numeric(ope_surface_calculee) ,
     pro_libelle = as.factor(pro_libelle),
     pop_id = as.factor(pop_id),
     sta_id = as.factor(sta_id),
-    indicateur = "effectif_total"
-  ) %>%
+    indicateur = "effectif_total") %>% 
+  # ) %>% # creation d'une colonne pour la période (ex : 2007-2008)
+  # mutate(annee = {
+  #   debut <- floor((annee - annee_debut_periode) / 2) * 2 + annee_debut_periode
+  #   paste0(debut)
+  # }, annee = as.numeric(annee)) %>% 
   mutate(julian = lubridate::yday(ope_date)) %>% #  Ajout de la date de pêche codée de 1 à 365
   select(
     ope_id,
@@ -181,7 +189,7 @@ Construction d'un tableau récapitulatif des résultats du modèle GLMM :
 ```{r}
 df_zip_glmm_resultats <- zip_glmm_resultats_format %>%
   select(esp_code_alternatif, periode, trend, sig, Estimate, family) %>%
-  mutate(Estimate = round(Estimate, digits = 3)) %>%
+  mutate(Estimate = round(Estimate, digits = 2)) %>%
   rename(
     "Code Espèce" = esp_code_alternatif,
     "Periode" = periode,
@@ -207,13 +215,17 @@ tab_zip_glmm_resultats <- df_zip_glmm_resultats %>%
   flextable::flextable() %>%
   flextable::autofit() %>%
   flextable::colformat_int(j = c(1, 3), big.mark = " ") %>%
-  flextable::theme_apa() %>%
-  flextable::bg(i = i_vert, bg = "#c6efce") %>%   # vert clair
-  flextable::bg(i = i_rouge, bg = "#ffc7ce") %>%   # rouge clair
+  flextable::theme_vanilla() %>%
+  flextable::font(fontname = "calibri") %>%
+  flextable::fontsize(size = 13) %>%
+  flextable::bg(i = i_vert, bg = "darkolivegreen3") %>%   # vert clair
+  flextable::bg(i = i_rouge, bg = "coral3") %>%   # rouge clair
+  flextable::align(align = "center") %>%
   flextable::set_caption("Synthèse des tendances des populations de poissons d'eau douce de BFC")
 
 tab_zip_glmm_resultats
 ```
+
 
 # Sauvegarde
 
