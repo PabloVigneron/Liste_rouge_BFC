@@ -34,13 +34,13 @@ zip_glmm_calcul_modele <- function(data, mon_espece) {
   
   # Modèle 1 : BINOMIALE NEGATIVE (lme4)
   model  <- try(glmer.nb(
-    valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 |
+    valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle +(1 |
                                                                           sta_id),
     data = filtered_data,
     family = poisson(link = "log")
   ),
   silent = TRUE)
-  family <- "negative_binom"
+  family <- "Negative_Binomial"
   coef   <- if (!inherits(model, "try-error"))
     summary(model)$coefficients
   else
@@ -48,7 +48,7 @@ zip_glmm_calcul_modele <- function(data, mon_espece) {
   
   
   
-  # Fallback modèle 2 : truncated_nbinom2 (si try-error ou coef invalides) (glmmTMB)
+  # Fallback modèle 2 : Hurdle Negative Binomial - truncated_nbinom2 (si try-error ou coef invalides) (glmmTMB)
   
   if (inherits(model, "try-error") || !coef_valide(coef)) {
     model  <- try(glmmTMB(
@@ -60,13 +60,13 @@ zip_glmm_calcul_modele <- function(data, mon_espece) {
     ),
     silent = TRUE)
     
-    family <- "truncated_nbinom2"
+    family <- "Hurdle_Negative_Binomial"
     coef   <- if (!inherits(model, "try-error"))
       summary(model)$coefficients$cond
     else
       NULL
     
-    # Fallback modèle 3 : nbinom2  (glmmTMB)
+    # Fallback modèle 3 : Zero Inflated Negative Binomial - nbinom2  (glmmTMB)
     if (inherits(model, "try-error") || !coef_valide(coef)) {
       model <- try(glmmTMB(
         valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 |
@@ -77,7 +77,7 @@ zip_glmm_calcul_modele <- function(data, mon_espece) {
       ),
       silent = TRUE)
       
-      family <- "nbinom2"
+      family <- "Zero_Inflated_Negative_Binomial"
       coef <- if (!inherits(model, "try-error"))
         summary(model)$coefficients$cond
       else
@@ -109,4 +109,3 @@ zip_glmm_calcul_modele <- function(data, mon_espece) {
     return(res)
   }
   
-

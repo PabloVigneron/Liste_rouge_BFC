@@ -113,6 +113,7 @@ coord_sta_id <- point_prelevement %>%
 ope_effectif_glm <- esp_ope_selection %>%
   mef_ajouter_type_protocole() %>%
   mef_ajouter_ope_date() %>%
+  # mef_ajouter_objectif() %>%  # Ajout  des objectifs de pêches
   left_join(ope_selection, by = "ope_id") %>%
   rename(valeur = lop_effectif, annee = annee.x) %>%
   left_join(coord_sta_id, by = "pop_id") %>%
@@ -124,6 +125,7 @@ ope_effectif_glm <- esp_ope_selection %>%
     pro_libelle = as.factor(pro_libelle),
     pop_id = as.factor(pop_id),
     sta_id = as.factor(sta_id),
+    # obj_libelle = as.factor(obj_libelle),
     indicateur = "effectif_total") %>% 
   # ) %>% # creation d'une colonne pour la période (ex : 2007-2008)
   # mutate(annee = {
@@ -144,7 +146,8 @@ ope_effectif_glm <- esp_ope_selection %>%
     x,
     y,
     ope_date, 
-    julian
+    julian, 
+    # obj_libelle
   ) %>% 
   rename(espece = esp_code_alternatif)
 ```

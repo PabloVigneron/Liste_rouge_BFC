@@ -196,7 +196,7 @@ passerelle <- passerelle %>%
 
   Il existe plusieurs réseaux de pêche en France. Chacune des stations (*sta_id*) et des points de prélèvements (*pop_id*) peuvent correspondre à un ou plusieurs types de réseaux de pêche. Ces différents réseaux sont identifiables par leur *obj_libelle* renseignés dans la base *aspe*. Nous ajoutons cette information dans notre jeu de données à l'aide la passerelle (*mef_ajouter_objectif()*), et nous sélectionnons seulement les réseaux souhaités pour l'étude : ici le RCS, le RHP et le RRP.
 
-### Test NA values 
+### Selection reseaux de pêches
 
 ```{r Sélection réseaux de pêches} 
 passerelle <- passerelle %>%

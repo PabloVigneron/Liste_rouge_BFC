@@ -198,6 +198,9 @@ mapview(
 ## Resprésenation graphique - effectif total en fonction des années
 
 ```{r preparation du df pour graphique evolution effectifs par annee, fig.height = 30, fig.width = 15}
+mes_reseaux <- c("RCS – Réseau de Contrôle de Surveillance", # Réseaux de pêches
+                 "RRP – Réseau de Référence Pérenne",
+                 "RHP – Réseau Hydrobiologique Piscicole")
 # Pour creer la colonne periode : on renseigne le début de période souhaiter : ici 2007
 annee_debut_periode <- 2007
 
@@ -213,7 +216,8 @@ coord_sta_id <- point_prelevement %>%
 
 esp_ope_selection_graph <- esp_ope_selection %>%
   mef_ajouter_type_protocole() %>%
-  mef_ajouter_ope_date() %>%
+  mef_ajouter_ope_date() %>% 
+  mef_ajouter_objectif() %>%
   left_join(ope_selection, by = "ope_id") %>%
   rename(valeur = lop_effectif, annee = annee.x) %>%
   left_join(coord_sta_id, by = "pop_id") %>%
@@ -224,12 +228,13 @@ esp_ope_selection_graph <- esp_ope_selection %>%
     pro_libelle = as.factor(pro_libelle),
     pop_id = as.factor(pop_id),
     sta_id = as.factor(sta_id),
-    indicateur = "effectif_total"
-  ) %>% # creation d'une colonne pour la période (ex : 2007-2008)
-  mutate(periode = {
-    debut <- floor((annee - annee_debut_periode) / 2) * 2 + annee_debut_periode
-    paste0(debut)
-  }, periode = as.numeric(periode)) %>%
+    obj_libelle = as.factor(obj_libelle),
+    indicateur = "effectif_total") %>% 
+  # ) %>% # creation d'une colonne pour la période (ex : 2007-2008)
+  # mutate(periode = {
+  #   debut <- floor((annee - annee_debut_periode) / 2) * 2 + annee_debut_periode
+  #   paste0(debut)
+  # }, periode = as.numeric(periode)) %>%
   mutate(julian = lubridate::yday(ope_date)) %>% #  Ajout de la date de pêche codée de 1 à 365
   select(
     ope_id,
@@ -241,12 +246,13 @@ esp_ope_selection_graph <- esp_ope_selection %>%
     pop_id,
     sta_id,
     indicateur,
-    periode,
+    # periode,
     x,
     y,
     ope_date, 
-    julian
-  ) 
+    julian, 
+    obj_libelle
+  ) %>% filter(obj_libelle %in% mes_reseaux)
 # Creation du df par especes avec effectif total - periode
 total_valeur_esp <- esp_ope_selection_graph %>%
   group_by(periode, esp_code_alternatif, indicateur) %>%
@@ -259,21 +265,36 @@ total_valeur_esp_an <- esp_ope_selection_graph %>%
   summarise(effectif_total = sum(valeur), .groups = "drop") %>%
   select(esp_code_alternatif, annee, effectif_total, indicateur)
 ```
+```{r}
+table(esp_ope_selection_graph$obj_libelle)
+```
+
+
+```{r}
+table(esp_ope_selection$esp_code_alternatif)
+
+```
+
+
+```{r}
+table(esp_ope_selection_graph$esp_code_alternatif)
+
+```
 
 Selection de l'espèce à traiter : ici la **Truite fario "TRF"**
 
 ```{r}
 # Selection de lespèce cible pour le graphique 
 total_valeur_esp_trf <- total_valeur_esp %>%
-  filter(esp_code_alternatif == "BRO") 
+  filter(esp_code_alternatif == "BRE") 
 
 # Selection de lespèce cible pour le graphique 
 total_valeur_esp_trf_an <- total_valeur_esp_an %>%
-  filter(esp_code_alternatif == "BRO") 
+  filter(esp_code_alternatif == "BRE") 
 
 # Selecetion de l'espèce pour les analyses
 esp_ope_selection_trf <- esp_ope_selection_graph %>%
-  filter(esp_code_alternatif == "BRO") 
+  filter(esp_code_alternatif == "BRE") 
 ```
 
 
@@ -544,6 +565,7 @@ mod_glmm_1.3 <- glmer(
   data = esp_ope_selection_trf,
   family = poisson(link = "log")
 )
+
 ```
 
 ### Indépendance du modèle aux données
@@ -618,43 +640,37 @@ summary(mod_glmm_qbn)
 
 ```{r, construction des modeles glmmzi}
 mod_zi_1.0 <- glmmTMB(
-  valeur ~ annee + ope_surface_calculee + pro_libelle + (1 |
+  valeur ~ annee + offset(log(ope_surface_calculee)) + obj_libelle +pro_libelle + (1 |
                                                            sta_id) ,
   data = esp_ope_selection_trf,
   family = poisson(link = "log"),
   ziformula = ~ 1
 )
 mod_zi_1.1 <- glmmTMB(
-  valeur ~ annee + ope_surface_calculee + pro_libelle + (1 | sta_id) ,
+  valeur ~ annee + offset(log(ope_surface_calculee)) +  obj_libelle+pro_libelle + (1 | sta_id) ,
   family = nbinom2(link = "log"),
   data = esp_ope_selection_trf,
   ziformula = ~ 1
 )
 mod_zi_1.2 <- glmmTMB(
-  valeur ~ annee + ope_surface_calculee + pro_libelle + (1 | sta_id) ,
+  valeur ~ annee + offset(log(ope_surface_calculee)) +  obj_libelle+pro_libelle + (1 | sta_id) ,
   family = truncated_poisson(link = "log"),
   data = esp_ope_selection_trf,
   ziformula = ~ 1
 )
 mod_zi_1.3 <- glmmTMB(
-  valeur ~ annee + ope_surface_calculee + pro_libelle + (1 | sta_id) ,
+  valeur ~ annee + offset(log(ope_surface_calculee)) +  obj_libelle+pro_libelle + (1 | sta_id) ,
   family = truncated_nbinom2(link = "log"),
   data = esp_ope_selection_trf,
   ziformula = ~ 1
 )
 
-mod_zi_1.4 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
-  family = truncated_nbinom2(link = "log"),
-  data = esp_ope_selection_trf,
-  ziformula = ~ 1
-)
 ```
 
 On selectionne à l'aide du critère AIC le meilleur modèle c'est à dire le modèle avec le plus petit AIC. 
 
 ```{r, selection du meilleur modeles}
-AIC(mod_zi_1.0, mod_zi_1.1, mod_zi_1.2, mod_zi_1.3, mod_zi_1.4)
+AIC(mod_zi_1.0, mod_zi_1.1, mod_zi_1.2, mod_zi_1.3)
 ```
 
 ```{r plotresid des modèles glmm zero inflated, fig.height = 10, fig.width = 20}
@@ -663,17 +679,15 @@ res_mod_zi_1.0 <- as.ggplot(~ plotresid(mod_zi_1.0))
 res_mod_zi_1.1 <- as.ggplot(~ plotresid(mod_zi_1.1))
 res_mod_zi_1.2 <- as.ggplot(~ plotresid(mod_zi_1.2))
 res_mod_zi_1.3 <- as.ggplot(~ plotresid(mod_zi_1.3))
-res_mod_zi_1.4 <- as.ggplot(~ plotresid(mod_zi_1.4))
 
 ggarrange(
   res_mod_zi_1.0,
   res_mod_zi_1.1,
   res_mod_zi_1.2,
   res_mod_zi_1.3,
-  res_mod_zi_1.4,
-  ncol = 3,
+  ncol = 2,
   nrow = 2,
-  labels = c("poisson", "nbinom2", "truncated_poisson", "truncated_nbinom2","truncated_nbinom2_offset" ),
+  labels = c("poisson", "nbinom2", "truncated_poisson", "truncated_nbinom2"),
   font.label = list(
     size = 13,
     color = "darkred",
@@ -691,7 +705,6 @@ summary(mod_zi_1.0)
 summary(mod_zi_1.1)
 summary(mod_zi_1.2)
 summary(mod_zi_1.3)
-summary(mod_zi_1.4)
 ```
 
 Si les conditions d'applications du modèle sont bien respectées :
@@ -701,7 +714,6 @@ Anova(mod_zi_1.0)
 Anova(mod_zi_1.1)
 Anova(mod_zi_1.2)
 Anova(mod_zi_1.3)
-Anova(mod_zi_1.4)
 ```
 
 # References bibliographiques

@@ -709,6 +709,7 @@ Sauvegarde pour le script suivant : script 20_pre_traitements_donnees_ope_espece
 
 ```{r Sauvegarde}
 save(
+  passerelle,
   especes_lrr_2014,
   mes_especes,
   esp_ope_selection,
