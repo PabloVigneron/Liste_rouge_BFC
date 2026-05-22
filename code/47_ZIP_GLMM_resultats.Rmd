@@ -54,6 +54,7 @@ library(glmmTMB)
 load(file = "../processed_data/selection_especes.rda")
 load(file = "../processed_data/selection_pop_ope.rda")
 load(file = "../processed_data/donnees_densite_eff_abs.rda")
+load(file = "../processed_data/assemblage_tab_par_ope.rda")
 ```
 
 ```{r Chargement des fonctions}
@@ -152,7 +153,7 @@ ope_effectif_glm <- esp_ope_selection %>%
   rename(espece = esp_code_alternatif)
 ```
 
-## Application du modèle GLMM 
+## Application du modèle GLMM avec les effectifs
 
   Afin d'exécuter l'analyse, deux fonctions ont été créer : *zip_glmm_calcul_modele* (en charge de calculer les valeurs des modèles ZIPGLMM) et *zip_glmm_application_modele* (le but étant d'excécuter la fonction *zip_glm_calcul_modele* pour l'ensemble des combinaisons *periodes-especes-stade-indicateur*). Les analyses prennent en considération les données à l'échelle de l'opération. 
 
@@ -229,11 +230,61 @@ tab_zip_glmm_resultats <- df_zip_glmm_resultats %>%
 tab_zip_glmm_resultats
 ```
 
+## Construction des jeu de data occurences 
+
+
+```{r Construction jeu de données occurences}
+# Ajout du protocole, de la surface d'opération et de la date
+# ope_effectif_glm <- ope_effectif_absences %>%
+#   mef_ajouter_type_protocole() %>%
+#   mef_ajouter_surf_calc() %>%
+#   mef_ajouter_ope_date() %>%
+#   select(ope_id,
+#          stade,
+#          ope_surface_calculee,
+#          esp_code_alternatif,
+#          indicateur,
+#          valeur,
+#          ope_date,
+#          pro_libelle,
+#          annee)
+# 
+# ope_effectif_glm <- ope_effectif_glm %>% #Ajout des pop_id dans le dataframe
+#   left_join(y=operation %>%
+#               select(ope_id,
+#                      pop_id= ope_pop_id)) %>%
+#   mutate(pop_id = as.factor(pop_id))
+# 
+# ope_effectif_glm <- ope_effectif_glm %>% # Ajout de la date de pêche codée de 1 à 365
+#   mutate(julian = lubridate::yday(ope_date)) %>%
+#   ungroup() %>%
+#   rename(espece = esp_code_alternatif) %>% 
+#   mutate(stade = as.factor(stade))
+```
+
+### Biomasses
+
+Les biomasses de chacune des espèces sur chaque opération de pêches (*ope_id*) sont calculées à partir du jeu de données *mei_ope_selection*. Dans un premier temps, l'ensemble des stades sont gardés. 
+
+```{r Création tableau biomasse totale par ope}
+ope_biomasse <- mei_ope_selection %>% # Calcul de la biomasse par opération sans distinction de stade
+  group_by(ope_id,
+           esp_code_alternatif,
+           stade) %>%
+  summarise(valeur=sum(poids_tp, na.rm = TRUE)) %>% 
+  mutate(indicateur= "biomasse") %>% 
+  dplyr::select(ope_id,
+         esp_code_alternatif,
+         indicateur,
+         valeur,
+         stade)
+```
+
 
 # Sauvegarde
 
 ```{r Sauvegarde}
-# save(glmm_resultats_format,
+# save(zip_glmm_resultats_format,
 #      reg_indicateur_lrr_tendances_lm,
 #      reg_indicateur_lrr_tendances_mk_st,
 #      tab_glmm_resultats,

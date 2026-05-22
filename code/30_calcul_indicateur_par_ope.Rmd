@@ -191,37 +191,6 @@ ope_densite_surf <- calcul_densite_surface(mei_ope_selection,
 ```
 
 
-### Densités volumiques
-
-  Les densités volumiques de chacune des espèces sur chaque opération de pêche (*ope_id*) sont calculées à partir du jeu de données *mei_ope_selection*. Dans un premier temps, l'ensemble des stades sont gardés. Il est nécessaire d'ajouter les données de profondeur liées à l'opération de pêche afin de calculer les densités volumiques : les valeurs du dataframe *ope_selection_param_env* issu du script 04_pre_traitement_env sont ajoutées. Nous y sélectionnons le paramètre de la profondeur et l'incluons dans notre jeu de données *ope_param_profondeur*.  
-
-```{r Création df profondeur}
-ope_param_profondeur <- ope_selection_param_env %>% # Création d'un df contenant les valeurs de profondeur
-  filter(parametre == "profondeur") %>% 
-  select(ope_id,
-         valeur) %>% 
-  rename(profondeur=valeur) %>% 
-  distinct()
-```
-
-Nous réalisons par la suite le calcul des densités volumiques par opération pour chaque espèce ainsi que pour tous les stades (*ad*, *juv* et *ind*). Pour cela, nous utilisons également les valeurs de densités surfaciques précédemment calculées. 
-
-```{r Calcul densités volumiques}
-densite_surf <- ope_densite_surf %>% # Utilisation des données de densités surfaciques précédemment calculées
-  rename(valeur_ds = valeur)
-
-ope_densite_vol<- left_join(ope_param_profondeur, densite_surf, by = "ope_id") %>% 
-  mutate(valeur = valeur_ds /profondeur) %>%
-  ungroup() %>% 
-  mutate(indicateur = "densite_volumique") %>% 
-  select(ope_id, 
-         esp_code_alternatif, 
-         indicateur,
-         valeur,
-         stade)
-```
-
-
 ### Pourcentage de juvéniles
 
 Le pourcentage de juvéniles de chacune des espèces pour chaque opération de pêche (*ope_id*)est calculé à partir du jeu de données *mei_ope_selection*. Nous utilisons les valeurs d'effectifs précèdemment calculées dans *ope_effectif*. 
@@ -287,72 +256,13 @@ Le calcul de pourcentage de juvéniles par opération est effectué. Les résult
 #          !is.nan(valeur))
 ```
 
-
-
-## Indicateurs sur les mesures individuelles par opération de pêche
-
-  Il s'agit ici de calculer des indicateurs simples spécifiques aux mesures individuelles des poissons. L'ensemble de ces paramètres tournerons autour de la longueur médiane des poissons. Il est donc nécessaire de garder à l'esprit que ces indicateurs reposeront sur des données de tailles estimées par un modèle (cf Script 04_pre_traitement_ope_esp). Il est donc nécessaire de rester critique face aux résultats issus de ces indicateurs. 
-
-
-### Longueur médiane
-
-Nous réalisons ainsi le calcul des longueurs médianes des individus par opération. La fonction *calcul_50_percentile* a été créée afin de calculer cet indicateur par opération / espèce et stade : les résultats de cette fonction sont renvoyés dans le jeu de données *ope_lm*. 
-
-```{r Calcul longueur médiane mei}
-ope_lm <- calcul_50_percentile(mei_ope_selection,
-                               mei_taille,
-                               ope_id,
-                               esp_code_alternatif, 
-                               stade)
-```
-
-
-
-### Ecarts interquartiles des longueurs médianes
-
-Calcul des écarts interquartiles des tailles des individus par opération : Création de la fonction "calcul_ecart_interquartile" :
-
-Le calcul des écarts interquartiles des longueurs médianes des individus par opération est effectué. La fonction *calcul_ecart_inter* a été créée afin de calculer cet indicateur par opération / espèce et stade : les résultats de cette fonction sont renvoyés dans le jeu de données *ope_ecart_inter*. 
-
-```{r Calcul écarts interquartiles longueurs médianes}
-ope_ecart_inter <- calcul_ecart_inter(mei_ope_selection,
-                                      mei_taille,
-                                      ope_id,
-                                      esp_code_alternatif, 
-                                      stade)
-```
-
-
-### Percentiles 25 et 75 des longueurs médianes
-
-Le calcul des percentiles 25 et 75 des longueurs médianes des individus par opération est effectué. Les fonctions *calcul_p25* et *calcul_p75* ont été créées afin de calculer ces indicateurs par opération / espèce et stade : les résultats de cette fonction sont renvoyés dans le jeu de données *ope_p25* et *ope_p75*. 
-
-```{r Calcul p25 longueurs médianes}
-ope_p25 <- calcul_p25(mei_ope_selection, # Calcul des percentiles 25 des longueurs médianes
-                      mei_taille,
-                      ope_id,
-                      esp_code_alternatif, 
-                      stade)
-```
-
-```{r Calcul p75 longueurs médianes}
-ope_p75 <- calcul_p75(mei_ope_selection, # Calcul des percentiles 75 des longueurs médianes
-                      mei_taille,
-                      ope_id,
-                      esp_code_alternatif, 
-                      stade)
-```
-
-
 # Création du tableau final empilé des indicateurs
 
 L'ensemble des indicateurs précèdemment calculés à l'opération sont regroupés dans le dataframe *ope_indicateur*. 
 
 ```{r Création df final "ope_indicateur"}
 # Création du tableau pré-final avec tous les indicateurs calculés
-ope_indicateur <- rbind(ope_lm,
-                        ope_densite_surf,
-                        ope_densite_vol,
+ope_indicateur <- rbind(ope_densite_surf,
                         ope_pc_juv,
                         ope_biomasse,
                         ope_effectif)
@@ -385,7 +295,6 @@ Nous visualisons le dataframe final *ope_indicateur* regroupant donc l'ensemble 
 ope_indicateur%>%
   DT::datatable(rownames = FALSE)
 ```
-
 
 # Sauvegardes
 
