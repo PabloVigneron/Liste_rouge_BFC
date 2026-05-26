@@ -1,6 +1,6 @@
 
 glmm_application_modele <- function(data, 
-                                    liste_periodes) {
+                                        liste_periodes) {
   
   results_list <- map(liste_periodes, function(period) {
     mon_annee_depart <- period[1]
@@ -22,9 +22,9 @@ glmm_application_modele <- function(data,
                     indicateur, 
                     ope_surface_calculee, 
                     pro_libelle) 
-    {
+      {
         glmm_calcul_modele(data = period_data,
-                           mon_espece = espece)
+                               mon_espece = espece)
       }) %>%
       keep(~ !is.null(.)) %>%
       map_dfr(~ mutate(.x, row_name = rownames(.x), periode = period_label))
