@@ -220,7 +220,7 @@ passerelle <- passerelle %>%
 
 ```{r Sélection types de pêche}
 ope_pro_libelle <- passerelle %>%
-  mef_ajouter_type_protocole() %>%
+  mef_ajouter_type_protocole() %>% 
   filter(pro_libelle %in% mes_types_de_peche) %>%  # Paramètres - Sélection des types de pêches      
   select(sta_id:ope_id, pro_libelle) %>%
   distinct()
@@ -583,20 +583,20 @@ sta_id_ope_selection <- sta_id_ope_selection %>%
 Sauvegarde pour le script suivant (sélection des espèces) : script 10_Selection_especes.
 
 ```{r Sauvegarde}
-save(pop_serie_tempo,
-     ope_selection,
-     sta_id_ope_selection,
-     passerelle,
-     file = "../processed_data/selection_pop_ope.rda")
+# save(pop_serie_tempo,
+#      ope_selection,
+#      sta_id_ope_selection,
+#      passerelle,
+#      file = "../processed_data/selection_pop_ope.rda")
 ```
 
 Sauvegarde pour la création de la carte de situation : script 02_production_carte_selection_station.
 
 ```{r Sauvegarde 2}
-save(sta_id_ope_selection,
-     buffer,
-     mes_depts,
-     file = "../processed_data/selection_pop_ope_carte.rda")
+# save(sta_id_ope_selection,
+#      buffer,
+#      mes_depts,
+#      file = "../processed_data/selection_pop_ope_carte.rda")
 ```
 
 ```{r exporter pour cartographie QGIS}

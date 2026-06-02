@@ -198,73 +198,74 @@ mapview(
 ## Resprésenation graphique - effectif total en fonction des années
 
 ```{r preparation du df pour graphique evolution effectifs par annee, fig.height = 30, fig.width = 15}
-mes_reseaux <- c("RCS – Réseau de Contrôle de Surveillance", # Réseaux de pêches
-                 "RRP – Réseau de Référence Pérenne",
-                 "RHP – Réseau Hydrobiologique Piscicole")
-# Pour creer la colonne periode : on renseigne le début de période souhaiter : ici 2007
-annee_debut_periode <- 2007
-
-# preparer la table pour jointure
-ope_selection <- ope_selection %>%
-  dplyr::select(ope_id, pop_id, sta_id)
-
-# Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
-coord_sta_id <- point_prelevement %>%
-  filter(pop_id %in% pop_serie_tempo) %>%
-  rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
-  select(pop_id, x, y)
-
-esp_ope_selection_graph <- esp_ope_selection %>%
-  mef_ajouter_type_protocole() %>%
-  mef_ajouter_ope_date() %>% 
-  mef_ajouter_objectif() %>%
-  left_join(ope_selection, by = "ope_id") %>%
-  rename(valeur = lop_effectif, annee = annee.x) %>%
-  left_join(coord_sta_id, by = "pop_id") %>%
-  mutate(
-    valeur = as.numeric(valeur) ,
-    annee = as.numeric(annee),
-    ope_surface_calculee = as.numeric(ope_surface_calculee) ,
-    pro_libelle = as.factor(pro_libelle),
-    pop_id = as.factor(pop_id),
-    sta_id = as.factor(sta_id),
-    obj_libelle = as.factor(obj_libelle),
-    indicateur = "effectif_total") %>% 
-  # ) %>% # creation d'une colonne pour la période (ex : 2007-2008)
-  # mutate(periode = {
-  #   debut <- floor((annee - annee_debut_periode) / 2) * 2 + annee_debut_periode
-  #   paste0(debut)
-  # }, periode = as.numeric(periode)) %>%
-  mutate(julian = lubridate::yday(ope_date)) %>% #  Ajout de la date de pêche codée de 1 à 365
-  select(
-    ope_id,
-    valeur,
-    esp_code_alternatif,
-    annee,
-    ope_surface_calculee,
-    pro_libelle,
-    pop_id,
-    sta_id,
-    indicateur,
-    # periode,
-    x,
-    y,
-    ope_date, 
-    julian, 
-    obj_libelle
-  ) %>% filter(obj_libelle %in% mes_reseaux)
-# Creation du df par especes avec effectif total - periode
-total_valeur_esp <- esp_ope_selection_graph %>%
-  group_by(periode, esp_code_alternatif, indicateur) %>%
-  summarise(effectif_total = sum(valeur), .groups = "drop") %>%
-  select(esp_code_alternatif, periode, effectif_total, indicateur)
-
-# Creation du df par especes avec effectif total - annee
-total_valeur_esp_an <- esp_ope_selection_graph %>%
-  group_by(annee, esp_code_alternatif, indicateur) %>%
-  summarise(effectif_total = sum(valeur), .groups = "drop") %>%
-  select(esp_code_alternatif, annee, effectif_total, indicateur)
+# mes_reseaux <- c("RCS – Réseau de Contrôle de Surveillance", # Réseaux de pêches
+#                  "RRP – Réseau de Référence Pérenne",
+#                  "RHP – Réseau Hydrobiologique Piscicole")
+# # Pour creer la colonne periode : on renseigne le début de période souhaiter : ici 2007
+# annee_debut_periode <- 2007
+# 
+# # preparer la table pour jointure
+# ope_selection <- ope_selection %>%
+#   dplyr::select(ope_id, pop_id, sta_id)
+# 
+# # Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
+# coord_sta_id <- point_prelevement %>%
+#   filter(pop_id %in% pop_serie_tempo) %>%
+#   rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
+#   select(pop_id, x, y)
+# 
+# esp_ope_selection_graph <- esp_ope_selection %>%
+#   mef_ajouter_type_protocole() %>%
+#   mef_ajouter_ope_date() %>% 
+#   mef_ajouter_objectif() %>%
+#   left_join(ope_selection, by = "ope_id") %>%
+#   rename(valeur = lop_effectif, annee = annee.x) %>%
+#   left_join(coord_sta_id, by = "pop_id") %>%
+#   mutate(
+#     valeur = as.numeric(valeur) ,
+#     annee = as.numeric(annee),
+#     ope_surface_calculee = as.numeric(ope_surface_calculee) ,
+#     pro_libelle = as.factor(pro_libelle),
+#     pop_id = as.factor(pop_id),
+#     sta_id = as.factor(sta_id),
+#     obj_libelle = as.factor(obj_libelle),
+#     indicateur = "effectif_total") %>% 
+#   # ) %>% # creation d'une colonne pour la période (ex : 2007-2008)
+#   # mutate(periode = {
+#   #   debut <- floor((annee - annee_debut_periode) / 2) * 2 + annee_debut_periode
+#   #   paste0(debut)
+#   # }, periode = as.numeric(periode)) %>%
+#   mutate(julian = lubridate::yday(ope_date)) %>% #  Ajout de la date de pêche codée de 1 à 365
+#   select(
+#     ope_id,
+#     valeur,
+#     esp_code_alternatif,
+#     annee,
+#     ope_surface_calculee,
+#     pro_libelle,
+#     pop_id,
+#     sta_id,
+#     indicateur,
+#     # periode,
+#     x,
+#     y,
+#     ope_date, 
+#     julian, 
+#     obj_libelle
+#   ) %>% filter(obj_libelle %in% mes_reseaux)
+# # Creation du df par especes avec effectif total - periode
+# total_valeur_esp <- esp_ope_selection_graph %>%
+#   group_by(periode, esp_code_alternatif, indicateur) %>%
+#   summarise(effectif_total = sum(valeur), .groups = "drop") %>%
+#   select(esp_code_alternatif, periode, effectif_total, indicateur)
+# 
+# # Creation du df par especes avec effectif total - annee
+# total_valeur_esp_an <- esp_ope_selection_graph %>%
+#   group_by(annee, esp_code_alternatif, indicateur) %>%
+#   summarise(effectif_total = sum(valeur), .groups = "drop") %>%
+#   select(esp_code_alternatif, annee, effectif_total, indicateur)
 ```
+
 ```{r}
 table(esp_ope_selection_graph$obj_libelle)
 ```
@@ -274,12 +275,48 @@ table(esp_ope_selection_graph$obj_libelle)
 table(esp_ope_selection$esp_code_alternatif)
 
 ```
+```{r Test pour erreur de surdispersion}
+# preparer la table pour jointure
+ope_selection <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id)
 
+# Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
+coord_sta_id <- point_prelevement %>%
+  filter(pop_id %in% pop_serie_tempo) %>%
+  rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
+  select(pop_id, x, y) %>%
+  mutate(pop_id = as.factor(pop_id))
+
+# prepéarer la table pour jointure 
+esp_ope_selection_join <- esp_ope_selection %>% 
+  select(ope_id, ope_surface_calculee) %>% 
+  distinct(ope_id, .keep_all = TRUE)
+
+
+ope_effectif_glm <- ope_effectif %>%
+  mef_ajouter_type_protocole() %>%
+  left_join(ope_selection, by = "ope_id") %>%
+  inner_join(esp_ope_selection_join, by = "ope_id") %>%
+  mutate(
+    valeur = as.numeric(valeur) ,
+    annee = as.numeric(annee),
+    ope_surface_calculee = as.numeric(ope_surface_calculee),
+    pro_libelle = as.factor(pro_libelle),
+    pop_id = as.factor(pop_id),
+    sta_id = as.factor(sta_id)
+  ) %>%
+  left_join(coord_sta_id, by = "pop_id") %>% 
+  mutate(x = as.numeric(x), 
+         y = as.numeric(y))
+
+# %>% rename(espece = esp_code_alternatif)
+  
+```
 
 ```{r}
-table(esp_ope_selection_graph$esp_code_alternatif)
-
+table(ope_effectif_glm$esp_code_alternatif)
 ```
+
 
 Selection de l'espèce à traiter : ici la **Truite fario "TRF"**
 
@@ -293,8 +330,8 @@ total_valeur_esp_trf_an <- total_valeur_esp_an %>%
   filter(esp_code_alternatif == "BRE") 
 
 # Selecetion de l'espèce pour les analyses
-esp_ope_selection_trf <- esp_ope_selection_graph %>%
-  filter(esp_code_alternatif == "BRE") 
+esp_ope_selection_trf <- ope_effectif_glm %>%
+  filter(esp_code_alternatif == "TRF") 
 ```
 
 
@@ -371,21 +408,21 @@ plot_trf
 
 ```{r}
 mod_gamm_1.0 <- gamm(
-  valeur ~ s(annee, k = 15) + s(ope_surface_calculee, k = 15)  + pro_libelle,
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle,
   random = list(sta_id =  ~ 1),
   data = esp_ope_selection_trf,
   family = poisson(link = "log"),
   method = "REML"
 )
 mod_gamm_1.1 <- gamm(
-  valeur ~ s(annee, k = 15) + s(ope_surface_calculee, k = 15)  + pro_libelle,
+  valeur ~ s(annee) + offset(log(ope_surface_calculee))  + pro_libelle,
   random = list(sta_id =  ~ 1),
   data = esp_ope_selection_trf,
   family = poisson(link = "identity"),
   method = "REML"
 )
 mod_gamm_1.2 <- gamm(
-  valeur ~ s(annee, k = 15) + s(ope_surface_calculee, k = 15)  + pro_libelle,
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle,
   random = list(sta_id =  ~ 1),
   data = esp_ope_selection_trf,
   family = poisson(link = "sqrt"),
@@ -393,7 +430,7 @@ mod_gamm_1.2 <- gamm(
 )
 
 mod_gamm_1.3 <- gam(
-  valeur ~ s(annee) + s(ope_surface_calculee)  + pro_libelle+ s(x,y),
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle+ s(x,y),
   data = esp_ope_selection_trf,
   family = poisson(link = "log"),
   method = "REML"
@@ -407,6 +444,7 @@ mod_gamm_1.3 <- gam(
 acf_mod_gamm_1.0 <- as.ggplot(~ acf(residuals(mod_gamm_1.0$lme, type = "normalized"), lag.max = 20))
 acf_mod_gamm_1.1 <- as.ggplot(~ acf(residuals(mod_gamm_1.1$lme, type = "normalized"), lag.max = 20))
 acf_mod_gamm_1.2 <- as.ggplot(~ acf(residuals(mod_gamm_1.2$lme, type = "normalized"), lag.max = 20))
+acf_mod_gamm_1.3 <- as.ggplot(~ acf(residuals(mod_gamm_1.3$lme, type = "normalized"), lag.max = 20))
 
 ggarrange(
   acf_mod_gamm_1.0,
@@ -506,6 +544,10 @@ appraise(mod_gamm_1.1$gam)
 appraise(mod_gamm_1.2$gam)
 ```
 
+```{r, fig.height = 10, fig.width = 12}
+appraise(mod_gamm_1.3$gam)
+```
+
 ```{r}
 k.check(mod_gamm_1.0$gam)
 k.check(mod_gamm_1.1$gam)
@@ -545,26 +587,26 @@ draw(mod_gamm_1.2, residuals = F)
 
 ```{r, construction des modèles GLMM avec différentes fonctions de liens}
 mod_glmm_1.0 <- glmer(
-  valeur ~ annee + ope_surface_calculee + pro_libelle  + (1 |sta_id),
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle  + (1 |sta_id),
   data = esp_ope_selection_trf,
   family = poisson(link = "log")
 )
 mod_glmm_1.1 <- glmer(
-  valeur ~ annee + ope_surface_calculee + pro_libelle  + (1 |sta_id),
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle  + (1 |sta_id),
   data = esp_ope_selection_trf,
   family = poisson(link = "identity")
 )
 mod_glmm_1.2 <- glmer(
-  valeur ~ annee + ope_surface_calculee + pro_libelle  + (1 |sta_id),
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle  + (1 |sta_id),
   data = esp_ope_selection_trf,
   family = poisson(link = "sqrt")
 )
 
-mod_glmm_1.3 <- glmer(
-  valeur ~ annee + ope_surface_calculee + pro_libelle + julian + (1 |sta_id),
-  data = esp_ope_selection_trf,
-  family = poisson(link = "log")
-)
+# mod_glmm_1.3 <- glmer(
+#   valeur ~ annee + ope_surface_calculee + pro_libelle + julian + (1 |sta_id),
+#   data = esp_ope_selection_trf,
+#   family = poisson(link = "log")
+# )
 
 ```
 
@@ -573,12 +615,12 @@ mod_glmm_1.3 <- glmer(
 
 ```{r plotresid des modèles glmm, fig.height = 10, fig.width = 12}
 res_mod_glmm_1.0 <- as.ggplot(~ plotresid(mod_glmm_1.0))
-res_mod_glmm_1.1 <- as.ggplot(~ plotresid(mod_glmm_1.1))
+# res_mod_glmm_1.1 <- as.ggplot(~ plotresid(mod_glmm_1.1))
 res_mod_glmm_1.2 <- as.ggplot(~ plotresid(mod_glmm_1.2))
 
 ggarrange(
   res_mod_glmm_1.0,
-  res_mod_glmm_1.1,
+  # res_mod_glmm_1.1,
   res_mod_glmm_1.2,
   ncol = 2,
   nrow = 2,
@@ -599,7 +641,7 @@ ggarrange(
 
 ```{r, Homoscédasticité des résidus}
 overdisp.glmer(mod_glmm_1.0)
-overdisp.glmer(mod_glmm_1.1)
+# overdisp.glmer(mod_glmm_1.1)
 overdisp.glmer(mod_glmm_1.2)
 ```
 
@@ -640,26 +682,26 @@ summary(mod_glmm_qbn)
 
 ```{r, construction des modeles glmmzi}
 mod_zi_1.0 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) + obj_libelle +pro_libelle + (1 |
+  valeur ~ annee + offset(log(ope_surface_calculee)) +pro_libelle + (1 |
                                                            sta_id) ,
   data = esp_ope_selection_trf,
   family = poisson(link = "log"),
   ziformula = ~ 1
 )
 mod_zi_1.1 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) +  obj_libelle+pro_libelle + (1 | sta_id) ,
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
   family = nbinom2(link = "log"),
   data = esp_ope_selection_trf,
   ziformula = ~ 1
 )
 mod_zi_1.2 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) +  obj_libelle+pro_libelle + (1 | sta_id) ,
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
   family = truncated_poisson(link = "log"),
   data = esp_ope_selection_trf,
   ziformula = ~ 1
 )
 mod_zi_1.3 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) +  obj_libelle+pro_libelle + (1 | sta_id) ,
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
   family = truncated_nbinom2(link = "log"),
   data = esp_ope_selection_trf,
   ziformula = ~ 1
@@ -715,6 +757,27 @@ Anova(mod_zi_1.1)
 Anova(mod_zi_1.2)
 Anova(mod_zi_1.3)
 ```
+## GLMM ZI avec tendances par stations
+```{r}
+model_all <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 + annee |
+                                                                        sta_id) ,
+  family = truncated_nbinom2(link = "log"),
+  data = esp_ope_selection_trf,
+  ziformula = ~ 1
+) 
+```
+
+```{r}
+plotresid(model_all)
+```
+```{r}
+summary(model_all)
+```
+```{r}
+coef(model_all)
+```
+
 
 # References bibliographiques
 

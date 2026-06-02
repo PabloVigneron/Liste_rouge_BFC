@@ -733,6 +733,19 @@ ope_effectif_glm <- esp_ope_selection %>%
   left_join(ope_selection, by = "ope_id") %>%
   rename(valeur = lop_effectif, annee = annee.x) %>%
   left_join(coord_sta_id, by = "pop_id") %>%
+  dplyr::group_by(sta_id, ope_id, esp_code_alternatif, annee) %>%
+  summarise(valeur = sum(valeur)) %>%
+  select(
+    sta_id,
+    ope_id,
+    esp_code_alternatif,
+    annee,
+    valeur,
+    ope_surface_calculee,
+    x,
+    y,
+    ope_date
+  ) %>%
   mutate(
     valeur = as.numeric(valeur) ,
     annee = as.numeric(annee),
@@ -742,12 +755,13 @@ ope_effectif_glm <- esp_ope_selection %>%
     pop_id = as.factor(pop_id),
     sta_id = as.factor(sta_id),
     # obj_libelle = as.factor(obj_libelle),
-    indicateur = "effectif_total") %>% 
+    indicateur = "effectif_total"
+  ) %>%
   # ) %>% # creation d'une colonne pour la période (ex : 2007-2008)
   # mutate(annee = {
   #   debut <- floor((annee - annee_debut_periode) / 2) * 2 + annee_debut_periode
   #   paste0(debut)
-  # }, annee = as.numeric(annee)) %>% 
+  # }, annee = as.numeric(annee)) %>%
   mutate(julian = lubridate::yday(ope_date)) %>% #  Ajout de la date de pêche codée de 1 à 365
   select(
     ope_id,
@@ -761,18 +775,77 @@ ope_effectif_glm <- esp_ope_selection %>%
     indicateur,
     x,
     y,
-    ope_date, 
-    julian, 
+    ope_date,
+    julian
     # obj_libelle
-  ) %>% 
-  rename(espece = esp_code_alternatif)
+  ) %>%
+  rename(espece = esp_code_alternatif) %>%  
+  ungroup() 
+
 ```
+
+# CORRECTION ERREUR DF 
+
+```{r Test pour erreur de surdispersion}
+# preparer la table pour jointure
+ope_selection <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id)
+
+# prepéarer la table pour jointure 
+esp_ope_selection_join <- esp_ope_selection %>% 
+  select(ope_id, ope_surface_calculee) %>% 
+  distinct(ope_id, .keep_all = TRUE)
+
+
+ope_effectif_glm <- ope_effectif %>%
+  mef_ajouter_type_protocole() %>%
+  left_join(ope_selection, by = "ope_id") %>%
+  inner_join(esp_ope_selection_join, by = "ope_id") %>%
+  rename(espece = esp_code_alternatif)
+  
+
+```
+
+```{r Test pour erreur de surdispersion avec coord}
+# preparer la table pour jointure
+ope_selection <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id)
+
+# Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
+coord_sta_id <- point_prelevement %>%
+  filter(pop_id %in% pop_serie_tempo) %>%
+  rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
+  select(pop_id, x, y) %>%
+  mutate(pop_id = as.factor(pop_id))
+
+# prepéarer la table pour jointure 
+esp_ope_selection_join <- esp_ope_selection %>% 
+  select(ope_id, ope_surface_calculee) %>% 
+  distinct(ope_id, .keep_all = TRUE)
+
+
+ope_effectif_glm <- ope_effectif %>%
+  mef_ajouter_type_protocole() %>%
+  left_join(ope_selection, by = "ope_id") %>%
+  inner_join(esp_ope_selection_join, by = "ope_id") %>%
+  mutate(
+    valeur = as.numeric(valeur) ,
+    annee = as.numeric(annee),
+    ope_surface_calculee = as.numeric(ope_surface_calculee),
+    pro_libelle = as.factor(pro_libelle),
+    pop_id = as.factor(pop_id),
+    sta_id = as.factor(sta_id)
+  ) %>%
+  left_join(coord_sta_id, by = "pop_id") %>% 
+  mutate(x = as.numeric(x), 
+         y = as.numeric(y))%>%
+  rename(espece = esp_code_alternatif)
+  
+```
+
+
 
 ## Test ZIPGLMM avec ramdom slope 
-
-```{r}
-table(ope_effectif_glm$espece)
-```
 
 ```{r}
 truite_data <- ope_effectif_glm %>% 
@@ -993,6 +1066,11 @@ plotresid(model_che)
 summary(model)
 summary(model_che)
 ```
+```{r}
+coef(model)
+```
+
+
 ## Test modele sans ziformula ZIPGLMM
 
 
