@@ -58,6 +58,7 @@ load(file = "../processed_data/selection_pop_ope.rda")
 load(file = "../processed_data/donnees_densite_eff_abs.rda")
 load(file = "../processed_data/selection_pop_ope.rda")
 load(file = "../processed_data/selection_pop_ope_carte.rda")
+load(file = "../processed_data/assemblage_tab_par_ope.rda")
 ```
 
 ```{r Chargement des tables aspe}
@@ -267,12 +268,12 @@ mapview(
 ```
 
 ```{r}
-table(esp_ope_selection_graph$obj_libelle)
+# table(esp_ope_selection_graph$obj_libelle)
 ```
 
 
 ```{r}
-table(esp_ope_selection$esp_code_alternatif)
+# table(esp_ope_selection$esp_code_alternatif)
 
 ```
 ```{r Test pour erreur de surdispersion}
@@ -310,7 +311,12 @@ ope_effectif_glm <- ope_effectif %>%
          y = as.numeric(y))
 
 # %>% rename(espece = esp_code_alternatif)
-  
+
+# Creation du df par especes avec effectif total - annee
+total_valeur_esp <- ope_effectif_glm %>%
+  group_by(annee, esp_code_alternatif, indicateur, stade) %>%
+  summarise(effectif_total = sum(valeur), .groups = "drop") %>%
+  select(esp_code_alternatif, annee, effectif_total, indicateur, stade)
 ```
 
 ```{r}
@@ -321,22 +327,21 @@ table(ope_effectif_glm$esp_code_alternatif)
 Selection de l'espèce à traiter : ici la **Truite fario "TRF"**
 
 ```{r}
-# Selection de lespèce cible pour le graphique 
+# Selection de lespèce cible pour le graphique
 total_valeur_esp_trf <- total_valeur_esp %>%
-  filter(esp_code_alternatif == "BRE") 
+  filter(esp_code_alternatif == "TRF", 
+         stade == "ind")
 
-# Selection de lespèce cible pour le graphique 
-total_valeur_esp_trf_an <- total_valeur_esp_an %>%
-  filter(esp_code_alternatif == "BRE") 
 
 # Selecetion de l'espèce pour les analyses
 esp_ope_selection_trf <- ope_effectif_glm %>%
-  filter(esp_code_alternatif == "TRF") 
+  filter(esp_code_alternatif == "TRF", 
+         stade == "ind") 
 ```
 
 
 ```{r plot evolution effectif annee periode, fig.height = 11, fig.width = 20}
-plot_trf_annee <- ggplot(total_valeur_esp_trf_an, aes(x = annee, y = effectif_total)) +
+plot_trf_annee <- ggplot(total_valeur_esp_trf, aes(x = annee, y = effectif_total)) +
   facet_wrap2(
     esp_code_alternatif ~ indicateur,
     ncol = 3,
@@ -358,50 +363,50 @@ plot_trf_annee <- ggplot(total_valeur_esp_trf_an, aes(x = annee, y = effectif_to
     panel.grid.major = element_line(color = "#faffff", size = 0.1),
     panel.grid.minor = element_line(color = "#faffff")
   )
-
-plot_trf_periode <- ggplot(total_valeur_esp_trf, aes(x = periode, y = effectif_total)) +
-  facet_wrap2(
-    esp_code_alternatif ~ indicateur,
-    ncol = 3,
-    scales = "free_y",
-    axes = "all",
-    trim_blank = T
-  ) +
-  geom_point(shape = 21, size = 2) +
-  geom_line(linetype = 3, linewidth = 0.5) +
-  labs(x = "Période", y = "Effectif total") +
-  geom_smooth(method = "lm", color = "darkred") +
-  # geom_smooth(method = "loess",
-  #             se = F,
-  #             color = "darkred") +  # Add loess trend lines
-  theme(
-    strip.background = element_rect(color = "grey85", fill = "grey85"),
-    legend.position = "bottom",
-    panel.background = element_rect(fill = "grey95"),
-    panel.grid.major = element_line(color = "#faffff", size = 0.1),
-    panel.grid.minor = element_line(color = "#faffff")
-  )
-
-plot_trf <- ggarrange(
-  plot_trf_annee,
-  plot_trf_periode,
-  ncol = 2,
-  nrow = 1,
-  labels = c(
-    "Effectif en fonction de l'annee",
-    "Effectif en fonction de la periode (n : n+1)"
-  ),
-  font.label = list(
-    size = 14,
-    color = "darkred",
-    face = "bold",
-    family = NULL
-  ),
-  hjust = -0.5,
-  vjust = 1.9,
-  align = c("none", "h", "v", "hv")
-)
-plot_trf
+plot_trf_annee
+# plot_trf_periode <- ggplot(total_valeur_esp_trf, aes(x = periode, y = effectif_total)) +
+#   facet_wrap2(
+#     esp_code_alternatif ~ indicateur,
+#     ncol = 3,
+#     scales = "free_y",
+#     axes = "all",
+#     trim_blank = T
+#   ) +
+#   geom_point(shape = 21, size = 2) +
+#   geom_line(linetype = 3, linewidth = 0.5) +
+#   labs(x = "Période", y = "Effectif total") +
+#   geom_smooth(method = "lm", color = "darkred") +
+#   # geom_smooth(method = "loess",
+#   #             se = F,
+#   #             color = "darkred") +  # Add loess trend lines
+#   theme(
+#     strip.background = element_rect(color = "grey85", fill = "grey85"),
+#     legend.position = "bottom",
+#     panel.background = element_rect(fill = "grey95"),
+#     panel.grid.major = element_line(color = "#faffff", size = 0.1),
+#     panel.grid.minor = element_line(color = "#faffff")
+#   )
+# 
+# plot_trf <- ggarrange(
+#   plot_trf_annee,
+#   plot_trf_periode,
+#   ncol = 2,
+#   nrow = 1,
+#   labels = c(
+#     "Effectif en fonction de l'annee",
+#     "Effectif en fonction de la periode (n : n+1)"
+#   ),
+#   font.label = list(
+#     size = 14,
+#     color = "darkred",
+#     face = "bold",
+#     family = NULL
+#   ),
+#   hjust = -0.5,
+#   vjust = 1.9,
+#   align = c("none", "h", "v", "hv")
+# )
+# plot_trf
 ```
 
 ## Construction du modele GAMM
@@ -444,7 +449,7 @@ mod_gamm_1.3 <- gam(
 acf_mod_gamm_1.0 <- as.ggplot(~ acf(residuals(mod_gamm_1.0$lme, type = "normalized"), lag.max = 20))
 acf_mod_gamm_1.1 <- as.ggplot(~ acf(residuals(mod_gamm_1.1$lme, type = "normalized"), lag.max = 20))
 acf_mod_gamm_1.2 <- as.ggplot(~ acf(residuals(mod_gamm_1.2$lme, type = "normalized"), lag.max = 20))
-acf_mod_gamm_1.3 <- as.ggplot(~ acf(residuals(mod_gamm_1.3$lme, type = "normalized"), lag.max = 20))
+# acf_mod_gamm_1.3 <- as.ggplot(~ acf(residuals(mod_gamm_1.3$lme, type = "normalized"), lag.max = 20))
 
 ggarrange(
   acf_mod_gamm_1.0,
@@ -544,8 +549,8 @@ appraise(mod_gamm_1.1$gam)
 appraise(mod_gamm_1.2$gam)
 ```
 
-```{r, fig.height = 10, fig.width = 12}
-appraise(mod_gamm_1.3$gam)
+```{r}
+gam.check(mod_gamm_1.3)
 ```
 
 ```{r}
@@ -578,6 +583,183 @@ draw(mod_gamm_1.0, residuals = F)
 draw(mod_gamm_1.1, residuals = F)
 draw(mod_gamm_1.2, residuals = F)
 ```
+
+```{r}
+AIC(mod_gamm_1.0$lme,mod_gamm_1.1$lme, mod_gamm_1.2$lme)
+```
+```{r}
+summary(mod_gamm_1.0$gam)
+```
+```{r}
+plot(mod_gamm_1.0$gam, select = 1, shade = TRUE,
+     xlab = "Année", ylab = "Effet lisse s(annee)",
+     main = "Tendance temporelle estimée")
+abline(h = 0, lty = 2, col = "red")
+```
+```{r}
+library(gratia)
+
+# Prédictions sur l'échelle réponse
+new_data <- data.frame(
+  annee = c(min(esp_ope_selection_trf$annee),
+            max(esp_ope_selection_trf$annee)),
+  ope_surface_calculee = 1,  # surface standardisée
+  pro_libelle = levels(esp_ope_selection_trf$pro_libelle)[1]
+)
+
+pred <- predict(mod_gamm_1.0$gam, newdata = new_data,
+                type = "link", se.fit = TRUE)
+
+# Ratio fin/début sur l'échelle log
+diff_log <- pred$fit[2] - pred$fit[1]
+ratio     <- exp(diff_log)
+cat("Ratio d'abondance (fin/début) :", round(ratio, 2))
+```
+
+```{r}
+library(gratia)
+deriv <- derivatives(mod_gamm_1.0$gam, term = "s(annee)")
+draw(deriv)
+# Les périodes où l'IC ne chevauche pas 0 = périodes de changement significatif
+```
+```{r}
+mod_gamm_1.1 <- gamm(
+  valeur ~ s(annee, k = 15) + offset(log(ope_surface_calculee)) + pro_libelle,
+  random = list(sta_id = ~1),
+  data = esp_ope_selection_trf,
+  family = poisson(link = "log"),
+  method = "REML"
+)
+k.check(mod_gamm_1.1$gam)  # vérifier que p-value > 0.05
+```
+```{r}
+mod_gamm_1.2 <- gamm(
+  valeur ~ s(annee, k = 19) + offset(log(ope_surface_calculee)) + pro_libelle,
+  random = list(sta_id = ~1),
+  data = esp_ope_selection_trf,
+  family = poisson(link = "log"),
+  method = "REML"
+)
+k.check(mod_gamm_1.2$gam)  # vérifier que p-value > 0.05
+```
+```{r}
+# Spline cubique classique (cs) parfois plus stable
+mod_gamm_cs <- gamm(
+  valeur ~ s(annee, k = 19, bs = "cs") +
+           offset(log(ope_surface_calculee)) + pro_libelle,
+  random = list(sta_id = ~1),
+  data = esp_ope_selection_trf,
+  family = poisson(link = "log"),
+  method = "REML"
+)
+k.check(mod_gamm_cs$gam)
+```
+```{r}
+draw(mod_gamm_cs$gam, residuals = T)
+
+```
+
+```{r}
+draw(mod_gamm_1.2, residuals = T)
+```
+```{r}
+# Extraire les dérivées pour identifier les périodes de changement significatif
+library(gratia)
+deriv <- derivatives(mod_gamm_1.2$gam, term = "s(annee)")
+draw(deriv) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red")
+# Périodes où l'IC ne chevauche pas 0 = changements significatifs
+```
+```{r}
+# Dérivées du modèle k=9 pour comparaison
+deriv_k9 <- derivatives(mod_gamm_1.0$gam, term = "s(annee)")
+draw(deriv_k9) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red")
+```
+
+```{r}
+library(gratia)
+library(dplyr)
+library(ggplot2)
+
+d9  <- derivatives(mod_gamm_1.0$gam, term = "s(annee)") %>% mutate(modele = "k=9")
+d19 <- derivatives(mod_gamm_1.2$gam,    term = "s(annee)") %>% mutate(modele = "k=19")
+
+bind_rows(d9, d19) %>%
+  ggplot(aes(x = data, y = .derivative, colour = modele, fill = modele)) +
+  geom_ribbon(aes(ymin = .lower_ci, ymax = .upper_ci), alpha = 0.2, colour = NA) +
+  geom_line() +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "red") +
+  labs(title = "Comparaison des dérivées k=9 vs k=19",
+       x = "Année", y = "Dérivée")
+```
+
+```{r}
+# Spline sur les résidus annuels agrégés (tendance + variation inter-annuelle)
+mod_gamm_ar <- gamm(
+  valeur ~ s(annee, k = 19) + offset(log(ope_surface_calculee)) + pro_libelle,
+  random = list(sta_id = ~1),
+  correlation = corAR1(form = ~annee | sta_id),  # autocorrélation temporelle
+  data = esp_ope_selection_trf,
+  family = poisson(link = "log"),
+  method = "REML"
+)
+```
+```{r}
+draw(mod_gamm_ar$gam, residuals = T)
+
+```
+
+```{r}
+# Comparer les AIC
+AIC(mod_gamm_1.0$lme, mod_gamm_1.1$lme, mod_gamm_1.2$lme, mod_gamm_ar$lme, mod_gamm_cs$lme)
+
+# Comparer visuellement les courbes
+par(mfrow = c(1, 2))
+plot(mod_gamm_1.1$gam, main = "k=15", shade = TRUE)
+plot(mod_gamm_1.2$gam, main = "k=20", shade = TRUE)
+```
+```{r}
+summary(mod_gamm_1.0$gam)
+summary(mod_gamm_ar$gam)
+summary(mod_gamm_1.2$gam)
+```
+
+
+
+
+
+```{r}
+k.check(mod_gamm_ar$gam)
+
+```
+
+
+```{r}
+draw(mod_gamm_1.2$gam, residuals = T)
+```
+
+```{r}
+# Vérifier les vrais doublons
+esp_ope_selection_trf %>%
+  group_by(sta_id, annee) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  filter(n > 1) %>%
+  print(n = Inf)
+```
+
+```{r}
+# Vérifier si la structure AR1 est réellement justifiée
+intervals(mod_gamm_ar$lme, which = "var-cov")
+# Regarder la valeur du paramètre phi (corrélation AR1)
+# Si phi proche de 0 → corAR1 apporte peu
+```
+```{r}
+# Confirmer que phi (AR1) est proche de 0
+summary(mod_gamm_ar$lme)$modelStruct$corStruct
+# Si phi < 0.1-0.15 → autocorrélation négligeable → garder mod_gamm_1.2
+```
+
 
 ## Construction du modele GLMM
 

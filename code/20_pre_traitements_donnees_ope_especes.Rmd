@@ -111,6 +111,114 @@ source(file = "../R/classe_couleur_erreur.R")
 
   Les différentes tailles de référence sont donc regroupées dans le tableau *traits_biologiques* et pour chacune des espèces, la médiane de l'ensemble des valeurs recueillies a été retenue pour être inscrite comme la valeur de référence de maturité.
 
+```{r}
+library(rfishbase)
+
+# asp <- rfishbase::fecundity(
+#   "Leuciscus aspius",
+#   species_list = NULL,
+#   fields = NULL,
+#   server = c("fishbase"),
+#   version = "latest",
+#   db = NULL
+# ) %>%
+#   filter(!is.na(LengthFecunMin)) %>%
+#   filter(LengthTypeFecMin == "TL")
+# 
+# 
+# summary(asp$LengthFecunMin)
+# 
+# 
+# van <- rfishbase::fecundity(
+#   "Leuciscus leuciscus",
+#   species_list = NULL,
+#   fields = NULL,
+#   server = c("fishbase"),
+#   version = "latest",
+#   db = NULL
+# ) %>%
+#   filter(Locality == "France")
+# 
+# tox <- rfishbase::fecundity(
+#   "Parachondrostoma toxostoma",
+#   species_list = NULL,
+#   fields = NULL,
+#   server = c("fishbase"),
+#   version = "latest",
+#   db = NULL
+# ) %>%
+#   filter(Locality == "France")
+# 
+# obr <- rfishbase::fecundity(
+#   "Thymallus thymallus",
+#   species_list = NULL,
+#   fields = NULL,
+#   server = c("fishbase"),
+#   version = "latest",
+#   db = NULL
+# ) %>%
+#   filter(Locality == "France")
+# 
+# lot <- rfishbase::fecundity(
+#   "Lota lota",
+#   species_list = NULL,
+#   fields = NULL,
+#   server = c("fishbase"),
+#   version = "latest",
+#   db = NULL
+# ) %>%
+#   filter(Locality == "France")
+# 
+# loche <- rfishbase::fecundity(
+#   "Cobitis taenia",
+#   species_list = NULL,
+#   fields = NULL,
+#   server = c("fishbase"),
+#   version = "latest",
+#   db = NULL
+# ) %>%
+#   filter(Locality == "France")
+# 
+# hotu <- rfishbase::fecundity(
+#   "Chondrostoma nasus",
+#   species_list = NULL,
+#   fields = NULL,
+#   server = c("fishbase"),
+#   version = "latest",
+#   db = NULL
+# ) %>%
+#   filter(Locality == "France")
+# 
+# blageon <- rfishbase::fecundity(
+#   "Telestes souffias",
+#   species_list = NULL,
+#   fields = NULL,
+#   server = c("fishbase"),
+#   version = "latest",
+#   db = NULL
+# ) %>%
+#   filter(Locality == "France")
+# 
+# baf <- rfishbase::fecundity(
+#   "Barbus barbus",
+#   species_list = NULL,
+#   fields = NULL,
+#   server = c("fishbase"),
+#   version = "latest",
+#   db = NULL
+# ) %>%
+#   filter(Locality == "France")
+# 
+# van
+# tox
+# obr
+# lot
+# loche
+# hotu
+# blageon
+# baf
+```
+
 
 ```{r Construction_df_tailles_maturite}
 traits_biologiques <- traits_biologiques %>% # Construction d'un jeu de données contenant les tailles de maturité
@@ -135,7 +243,6 @@ mesure_individuelle <- temp_df # renommer temp_df en mesure_individuelle pour po
 mei_ope_selection <- passerelle %>%
   mef_ajouter_ope_date() %>%
   # left_join(y = mei_for_join) %>% 
-  # left_join(mei_for_join , by = "lop_id") %>% #ajouter les mei manuellement
   mef_ajouter_mei() %>%
   mef_ajouter_lots() %>%
   mef_ajouter_type_protocole() %>%
@@ -236,7 +343,6 @@ mei_ope_selection <- mei_ope_selection %>%
                          "juv","ad")) # Ajout du stade pour chacune des lignes de mei_ope_selection
 ```
 
-
 # Relation tailles / poids
 
   La mise en place des relations tailles / poids est réalisée grâce au package *apse* et au tutoriel *Construire des relations taille- poids*, réalisé par **Mr Pascal Irz** (<https://rpubs.com/kamoke/729779>). Cette relation nous permet de relier la longueur d'un poisson à son poids. Les mesures de poids sont rarement prises lors des pêches mais son pourtant nécessaires dans le calcul d'indicateurs simples comme pour les biomasses. Ainsi, nous utilisons cette relation afin d'obtenir des valeurs de poids indicatives remplaçant les valeurs *NA* de poids dans notre jeu de données *mei_ope_selection*. Elles seront alors remplacées par des estimations de poids en fonction de la taille du poissons : *poids_tp*.  
@@ -264,13 +370,6 @@ mei_tp_manquantes <- mei_ope_selection %>%
   
 mei_esp_tp_manquantes <- mei_tp_manquantes %>%
   pull(esp_code_alternatif)
-```
-
-#Modif temporaire des NA pour tester le code !!!!
-
-```{r}
-# mei_ope_selection <- mei_ope_selection %>%
-#   filter(!esp_code_alternatif %in% c("SPI", "VAI", "ABL", "BOU", "CHA", "ASP"))
 ```
 
 
@@ -397,6 +496,13 @@ erreurs_df <- erreurs_df %>%
     TRUE ~ 4)) %>%  # Pour s'assurer qu'il y a une valeur de gravité pour chaque ligne
   arrange(severity)
 ```
+ 
+On exporte le jeu de data pour corriger la base de data aspe 
+
+```{r}
+readr::write_excel_csv(erreurs_df, "../processed_data/error_data_aspe.csv")
+```
+ 
 
 Le tableau d'erreurs peut être affiché, avec en couleur, les ordres de priorités de correction des erreurs (allant de blanc à rouge). 
 
@@ -493,7 +599,7 @@ Nous sauvegardons dans un fichier .rda le jeu de données *mei_ope_selection* qu
 
 ```{r sauvegarde}
 save(mei_ope_selection,
-     file = "../processed_data/pre_traitements_donnees_especes.rda")
+file = "../processed_data/pre_traitements_donnees_especes.rda")
 ```
 
 
