@@ -860,6 +860,18 @@ plotresid(mod_glmm_qbn)
 summary(mod_glmm_qbn)
 ```
 
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
 ## Construction des modeles GLMM Zero-inlfated
 
 ```{r, construction des modeles glmmzi}

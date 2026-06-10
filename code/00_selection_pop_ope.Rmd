@@ -221,7 +221,7 @@ passerelle <- passerelle %>%
 ```{r Sélection types de pêche}
 ope_pro_libelle <- passerelle %>%
   mef_ajouter_type_protocole() %>% 
-  filter(pro_libelle %in% mes_types_de_peche) %>%  # Paramètres - Sélection des types de pêches      
+  filter(pro_libelle %in% mes_types_de_peche) %>%  # Paramètres - Sélection des types de pêches
   select(sta_id:ope_id, pro_libelle) %>%
   distinct()
 ```
@@ -233,8 +233,8 @@ ope_pro_libelle <- passerelle %>%
 
 ```{r Sélection opérations de pêche}
 ope_selection <- ope_pro_libelle %>%
-  mef_ajouter_ope_date() %>% 
-  group_by(pop_id, annee) %>% 
+  mef_ajouter_ope_date() 
+  group_by(pop_id, annee) %>%
   filter(ope_date == max(ope_date)) # Sélection d'une pêche par année (la plus tardive) par point de prélèvement
 ```
 
@@ -604,3 +604,54 @@ Sauvegarde pour la création de la carte de situation : script 02_production_car
 #   sf::st_drop_geometry() %>%
 #   readr::write_excel_csv("../processed_data/sta_id_ope_selection.csv")
 ```
+
+# ope selection 71 
+
+```{r}
+esp_ope_selection <- passerelle %>% # dataframe contenant toutes les espèces présentes dans les opérations de pêches sélectionnées
+  left_join(y=lot_poissons %>% # Ajout des lots de poissons
+              select(lop_id,
+                     esp_id = lop_esp_id,
+                     lop_effectif)) %>% 
+  left_join(y= ref_espece %>% # Ajout des références des espèces péchées
+               select(esp_id,
+                      esp_code_alternatif)) %>% 
+  left_join(y=operation %>% 
+               select(ope_id, 
+                       ope_surface_calculee, # Ajout des surfaces de pêches
+                       passage$pas_numero)) %>% 
+  mef_ajouter_ope_date() %>%  # Ajout des dates de pêches
+  select(ope_id,
+         lop_effectif,
+         lop_id,
+         esp_code_alternatif,
+         annee,
+         ope_surface_calculee) %>%
+  distinct()
+```
+
+```{r}
+mes_depts <- departements_metro_geo %>% 
+  filter (DEP %in% c( "71")) # Sélection de l'aire géographique : choix des départements 
+```
+
+```{r}
+
+ref_espece_71 <- ref_espece %>% 
+  select(esp_code_alternatif, esp_nom_commun, esp_nom_latin)
+
+liste_esp_71 <- esp_ope_selection %>% 
+  select(esp_code_alternatif) %>% 
+  left_join(y = ref_espece_71) 
+
+liste_esp_71 <- liste_esp_71 %>% 
+  group_by(esp_code_alternatif, esp_nom_commun, esp_nom_latin) %>% 
+  summarise() %>% 
+  ungroup()
+  
+```
+
+```{r}
+write_excel_csv(liste_esp_71, "../processed_data/liste_espece_71.csv")
+```
+

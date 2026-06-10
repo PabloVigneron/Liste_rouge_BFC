@@ -845,7 +845,42 @@ ope_effectif_glm <- ope_effectif %>%
   
 ```
 
+```{r Test pour erreur de surdispersion avec coord et absences}
+# preparer la table pour jointure
+ope_selection <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id)
 
+# Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
+coord_sta_id <- point_prelevement %>%
+  filter(pop_id %in% pop_serie_tempo) %>%
+  rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
+  select(pop_id, x, y) %>%
+  mutate(pop_id = as.factor(pop_id))
+
+# prepéarer la table pour jointure 
+esp_ope_selection_join <- esp_ope_selection %>% 
+  select(ope_id, ope_surface_calculee) %>% 
+  distinct(ope_id, .keep_all = TRUE)
+
+
+ope_effectif_glm <- ope_effectif_absences %>%
+  mef_ajouter_type_protocole() %>%
+  left_join(ope_selection, by = "ope_id") %>%
+  inner_join(esp_ope_selection_join, by = "ope_id") %>%
+  mutate(
+    valeur = as.numeric(valeur) ,
+    annee = as.numeric(annee),
+    ope_surface_calculee = as.numeric(ope_surface_calculee),
+    pro_libelle = as.factor(pro_libelle),
+    pop_id = as.factor(pop_id),
+    sta_id = as.factor(sta_id)
+  ) %>%
+  left_join(coord_sta_id, by = "pop_id") %>% 
+  mutate(x = as.numeric(x), 
+         y = as.numeric(y))%>%
+  rename(espece = esp_code_alternatif)
+  
+```
 
 ## Test ZIPGLMM avec ramdom slope 
 
@@ -1081,6 +1116,123 @@ truite_data <- ope_effectif_glm %>%
 ```
 
 
+```{r}
+hist(truite_data$valeur)
+```
+```{r}
+vairon_data <- ope_effectif_glm %>% 
+  filter(espece == "VAI")
+```
+
+```{r}
+epi_data <- ope_effectif_glm %>% 
+  filter(espece == "EPI")
+```
+
+```{r}
+ggplot(data = epi_data) +
+  geom_histogram(mapping = aes(x = valeur)) +
+  theme_minimal()
+```
+```{r histogramme distribution valeur effectif par espece, fig.height = 60, fig.width = 30}
+histogram_total_esp <- ggplot(data = ope_effectif_glm, aes(x = valeur)) +
+  facet_wrap2(
+    espece ~ indicateur,
+    ncol = 3,
+    scales = "free",
+    axes = "all",
+    trim_blank = T
+  ) +
+  geom_histogram(mapping = aes(x = valeur), position = "dodge", bins = 30) +
+  theme(
+    strip.background = element_rect(color = "grey85", fill = "grey85"),
+    legend.position = "bottom",
+    panel.background = element_rect(fill = "grey95")
+    # panel.grid.major = element_line(color = "#faffff", size = 0.1),
+    # panel.grid.minor = element_line(color = "#faffff")
+  )
+
+histogram_total_esp
+  
+```
+
+
+```{r histogramme distribution valeur effectif par espece avec seuil, fig.height = 60, fig.width = 15}
+library(ggplot2)
+library(ggh4x)
+library(dplyr)
+
+# Calcul des stats par espèce pour annoter
+stats_esp <- ope_effectif_glm %>%
+  group_by(espece) %>%
+  summarise(
+    pct_zero  = mean(valeur == 0) * 100,
+    pct_un    = mean(valeur == 1) * 100,
+    pct_zero1 = mean(valeur <= 1) * 100,
+    n         = n(),
+    .groups   = "drop"
+  ) %>%
+  mutate(
+    label = paste0(
+      "n=", n,
+      "  0s:", round(pct_zero), "%",
+      "  1s:", round(pct_un), "%"
+    ),
+    # Diagnostic automatique
+    modele = case_when(
+      pct_zero  > 70 ~ "Zero-inflated",
+      pct_zero1 > 60 ~ "Hurdle",
+      pct_zero  > 40 ~ "ZIP / ZINB",
+      TRUE           ~ "Poisson / NB"
+    )
+  )
+
+histogram_esp <- ggplot(data = ope_effectif_glm, aes(x = valeur)) +
+  facet_wrap2(
+    ~ espece,
+    ncol   = 3,
+    scales = "free",
+    axes   = "all",
+    trim_blank = TRUE
+  ) +
+  geom_histogram(bins = 30, fill = "steelblue4", color = "white", linewidth = 0.2) +
+  geom_vline(xintercept = 0, color = "firebrick", linetype = "dashed", linewidth = 0.5) +
+  geom_vline(xintercept = 1, color = "darkorange", linetype = "dotted",  linewidth = 0.5) +
+  # Annotation stats + diagnostic dans chaque facette
+  geom_text(
+    data    = stats_esp,
+    mapping = aes(x = Inf, y = Inf, label = label),
+    hjust   = 1.05, vjust = 1.5,
+    size    = 2.8, color = "grey30"
+  ) +
+  geom_label(
+    data    = stats_esp,
+    mapping = aes(x = Inf, y = Inf, label = modele),
+    hjust   = 1.05, vjust = 3.5,
+    size    = 2.5, fontface = "bold",
+    fill    = "white", color = "steelblue4", label.size = 0.3
+  ) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.05))) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  labs(
+    x     = "Effectif",
+    y     = "Fréquence",
+    title = "Distribution des effectifs par espèce",
+    caption = "Rouge = 0  |  Orange = 1  |  Label : % zéros, % uns → orientation modèle GLMM"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    strip.background = element_rect(fill = "grey88", color = NA),
+    strip.text       = element_text(face = "bold", size = 9),
+    panel.background = element_rect(fill = "grey97", color = NA),
+    panel.grid.major = element_line(color = "grey90"),
+    panel.grid.minor = element_blank(),
+    plot.caption     = element_text(size = 8, color = "grey50")
+  )
+
+histogram_esp
+```
+
 ```{r, construction des modeles glmmzi}
 mod_zi_1.0 <- glmmTMB(
   valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 |
@@ -1114,6 +1266,36 @@ On selectionne à l'aide du critère AIC le meilleur modèle c'est à dire le mo
 ```{r, selection du meilleur modeles}
 AIC(mod_zi_1.0, mod_zi_1.1, mod_zi_1.2, mod_zi_1.3)
 ```
+
+```{r}
+plotresid(mod_zi_1.0)
+plotresid(mod_zi_1.1)
+plotresid(mod_zi_1.2)
+plotresid(mod_zi_1.3)
+```
+```{r}
+res_mod_zi_1.0 <- DHARMa::simulateResiduals(mod_zi_1.0)
+plot(res_mod_zi_1.0)
+DHARMa::testDispersion(res_mod_zi_1.0)
+
+res_mod_zi_1.1 <- DHARMa::simulateResiduals(mod_zi_1.1)
+plot(res_mod_zi_1.1)
+DHARMa::testDispersion(res_mod_zi_1.1)
+
+res_mod_zi_1.2 <- DHARMa::simulateResiduals(mod_zi_1.2)
+plot(res_mod_zi_1.2)
+DHARMa::testDispersion(res_mod_zi_1.2)
+
+DHARMa::testOutliers(res_mod_zi_1.0 ,type = "bootstrap")
+res_mod_zi_1.3 <- DHARMa::simulateResiduals(mod_zi_1.3, n = 1000)
+plot(res_mod_zi_1.3)
+DHARMa::testDispersion(res_mod_zi_1.3)
+DHARMa::testZeroInflation(res_mod_zi_1.3)
+
+
+```
+
+
 ```{r}
 summary(mod_zi_1.3)
 ```
