@@ -882,232 +882,6 @@ ope_effectif_glm <- ope_effectif_absences %>%
   
 ```
 
-## Test ZIPGLMM avec ramdom slope 
-
-```{r}
-truite_data <- ope_effectif_glm %>% 
-  filter(espece == "TRF")
-  
-  model <- glmmTMB(
-    valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle +
-      (1 + annee |
-         sta_id),
-    # <-- intercept ET pente aléatoires par station
-    family = truncated_nbinom2(link = "log"),
-    data   = truite_data
-  )
- 
-  
-  model_all <- glmmTMB(
-    valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle +
-      (1 + annee |
-         sta_id),
-    # <-- intercept ET pente aléatoires par station
-    family = truncated_nbinom2(link = "log"),
-    data   = ope_effectif_glm,
-    ziformula = ~ 1
-  )
-```
-```{r}
-ope_effectif_glm$annee_c <- ope_effectif_glm$annee - mean(ope_effectif_glm$annee)
-
-model_all <- glmmTMB(
-  valeur ~ annee_c + offset(log(ope_surface_calculee)) + pro_libelle +
-    (1 + annee_c | sta_id),
-  family    = truncated_nbinom2(link = "log"),
-  data      = ope_effectif_glm,
-  ziformula = ~ 1
-)
-
-model_all <- glmmTMB(
-  valeur ~ annee_c + offset(log(ope_surface_calculee)) + pro_libelle +
-    (1 | sta_id) + (0 + annee_c | sta_id),   # corrélation intercept~pente supprimée
-  family    = truncated_nbinom2(link = "log"),
-  data      = ope_effectif_glm,
-  ziformula = ~ 1
-)
-
-model_all <- glmmTMB(
-  valeur ~ annee_c + offset(log(ope_surface_calculee)) + pro_libelle +
-    (1 | sta_id) + (0 + annee_c | sta_id),
-  family    = truncated_nbinom2(link = "log"),
-  data      = ope_effectif_glm,
-  ziformula = ~ 1,
-  control   = glmmTMBControl(optimizer = optim,
-                              optArgs   = list(method = "BFGS"))
-)
-
-# D'abord ajuster le modèle simple (intercept seul) pour récupérer les paramètres
-model_simple <- glmmTMB(
-  valeur ~ annee_c + offset(log(ope_surface_calculee)) + pro_libelle +
-    (1 | sta_id),
-  family    = truncated_nbinom2(link = "log"),
-  data      = ope_effectif_glm,
-  ziformula = ~ 1
-)
-
-# Utiliser ses paramètres comme point de départ
-start_params <- list(
-  beta    = fixef(model_simple)$cond,
-  betazi  = fixef(model_simple)$zi,
-  theta   = c(getME(model_simple, "theta"), 0, 0.01)  # ajout pente ~0
-)
-
-model_all <- glmmTMB(
-  valeur ~ annee_c + offset(log(ope_surface_calculee)) + pro_libelle +
-    (1 + annee_c | sta_id),
-  family    = truncated_nbinom2(link = "log"),
-  data      = ope_effectif_glm,
-  ziformula = ~ 1,
-  start     = start_params
-)
-
-
-# Vérifier la structure des données
-str(ope_effectif_glm$annee_c)
-str(ope_effectif_glm$sta_id)
-
-# Nombre d'observations par station
-table(ope_effectif_glm$sta_id) |> sort() |> head(20)
-
-# Y a-t-il des stations avec très peu d'obs ?
-stations_faibles <- names(which(table(ope_effectif_glm$sta_id) < 5))
-cat("Stations avec < 5 obs :", length(stations_faibles), "\n")
-
-# Vérifier les NA et valeurs problématiques
-sum(is.na(ope_effectif_glm$valeur))
-sum(is.na(ope_effectif_glm$annee_c))
-sum(ope_effectif_glm$ope_surface_calculee <= 0, na.rm = TRUE)  # offset log -> doit être > 0
-
-# Option A : nlminb (défaut de glmmTMB) avec plus d'itérations
-model_all <- glmmTMB(
-  valeur ~ annee_c + offset(log(ope_surface_calculee)) + pro_libelle +
-    (1 | sta_id) + (0 + annee_c | sta_id),
-  family    = truncated_nbinom2(link = "log"),
-  data      = ope_effectif_glm,
-  ziformula = ~ 1,
-  control   = glmmTMBControl(
-    optCtrl = list(iter.max = 2000, eval.max = 2000)
-  )
-)
-
-# Option B : optimiseur BFGS
-model_all <- glmmTMB(
-  valeur ~ annee_c + offset(log(ope_surface_calculee)) + pro_libelle +
-    (1 | sta_id) + (0 + annee_c | sta_id),
-  family    = truncated_nbinom2(link = "log"),
-  data      = ope_effectif_glm,
-  ziformula = ~ 1,
-  control   = glmmTMBControl(
-    optimizer = optim,
-    optArgs   = list(method = "BFGS",
-                     control = list(maxit = 2000))
-  )
-)
-
-# Option C : Nelder-Mead
-model_all <- glmmTMB(
-  valeur ~ annee_c + offset(log(ope_surface_calculee)) + pro_libelle +
-    (1 | sta_id) + (0 + annee_c | sta_id),
-  family    = truncated_nbinom2(link = "log"),
-  data      = ope_effectif_glm,
-  ziformula = ~ 1,
-  control   = glmmTMBControl(
-    optimizer = optim,
-    optArgs   = list(method  = "Nelder-Mead",
-                     control = list(maxit = 10000))
-  )
-)
-```
-```{r}
-# 1. Modèle simple qui fonctionne
-model_simple <- glmmTMB(
-  valeur ~ annee_c + offset(log(ope_surface_calculee)) + pro_libelle +
-    (1 | sta_id),
-  family    = truncated_nbinom2(link = "log"),
-  data      = ope_effectif_glm,
-  ziformula = ~ 1
-)
-
-# 2. Extraire les paramètres internes de TMB
-params_simple <- model_simple$obj$env$last.par.best
-cat("Paramètres du modèle simple :\n")
-print(params_simple)
-
-# 3. Construire les starts manuellement
-#    theta contient les paramètres de la matrice de covariance des RE
-#    Pour (1|sta) + (0+annee_c|sta) : 2 valeurs theta (log-SD intercept, log-SD pente)
-n_beta   <- length(fixef(model_simple)$cond)
-n_betazi <- length(fixef(model_simple)$zi)
-
-start_params <- list(
-  beta   = fixef(model_simple)$cond,                    # effets fixes
-  betazi = fixef(model_simple)$zi,                      # partie ZI
-  theta  = c(log(0.5),   # log-SD intercept aléatoire (depuis modèle simple)
-             log(0.01))  # log-SD pente aléatoire (proche de 0 = pentes similaires)
-)
-
-model_all <- glmmTMB(
-  valeur ~ annee_c + offset(log(ope_surface_calculee)) + pro_libelle +
-    (1 | sta_id) + (0 + annee_c | sta_id),
-  family    = truncated_nbinom2(link = "log"),
-  data      = ope_effectif_glm,
-  ziformula = ~ 1,
-  start     = start_params,
-  control   = glmmTMBControl(optCtrl = list(iter.max = 2000, eval.max = 2000))
-)
-```
-```{r}
-library(lme4)
-library(purrr)
-
-# Un modèle par station -> extrait la pente de annee
-resultats_stations <- ope_effectif_glm |>
-  group_by(sta_id) |>
-  group_map(~ {
-    tryCatch({
-      m <- glm(
-        valeur ~ annee_c + offset(log(ope_surface_calculee)),
-        family = MASS::negative.binomial(theta = 1),  # ou poisson si peu d'obs
-        data   = .x
-      )
-      data.frame(
-        sta_id      = .y$sta_id,
-        pente       = coef(m)["annee_c"],
-        se          = summary(m)$coefficients["annee_c", "Std. Error"],
-        n_obs       = nrow(.x)
-      )
-    }, error = function(e) {
-      data.frame(sta_id = .y$sta_id, pente = NA, se = NA, n_obs = nrow(.x))
-    })
-  }) |>
-  bind_rows()
-
-# Visualisation
-ggplot(resultats_stations |> filter(!is.na(pente)),
-       aes(x = reorder(sta_id, pente), y = pente,
-           ymin = pente - 1.96*se, ymax = pente + 1.96*se)) +
-  geom_point() +
-  geom_errorbar(width = 0.3) +
-  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
-  coord_flip() +
-  labs(title = "Tendance annuelle par station",
-       x = "Station", y = "Pente (effet annee)")
-```
-
-```{r}
-plotresid(model)
-plotresid(model_che)
-```
-```{r}
-summary(model)
-summary(model_che)
-```
-```{r}
-coef(model)
-```
-
-
 ## Test modele sans ziformula ZIPGLMM
 
 ```{r}
@@ -1232,8 +1006,15 @@ histogram_esp <- ggplot(data = ope_effectif_glm, aes(x = valeur)) +
 
 histogram_esp
 ```
+```{r}
+truite_data <- ope_effectif_glm %>% 
+  filter(espece == "ABL")
+```
+
+
 
 ```{r, construction des modeles glmmzi}
+# library(glmmTMB)
 mod_zi_1.0 <- glmmTMB(
   valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 |
                                                                         sta_id) ,
@@ -1250,13 +1031,15 @@ mod_zi_1.2 <- glmmTMB(
   valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 |
                                                                         sta_id) ,
   family = truncated_poisson(link = "log"),
-  data = truite_data
+  data = truite_data, 
+  ziformula = ~1
 )
 mod_zi_1.3 <- glmmTMB(
   valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 |
                                                                         sta_id) ,
   family = truncated_nbinom2(link = "log"),
-  data = truite_data
+  data = truite_data, 
+  ziformula = ~1
 )
 
 ```
@@ -1264,7 +1047,11 @@ mod_zi_1.3 <- glmmTMB(
 On selectionne à l'aide du critère AIC le meilleur modèle c'est à dire le modèle avec le plus petit AIC. 
 
 ```{r, selection du meilleur modeles}
-AIC(mod_zi_1.0, mod_zi_1.1, mod_zi_1.2, mod_zi_1.3)
+AIC(mod_zi_1.0,
+    mod_zi_1.1,
+    mod_zi_1.2,
+    mod_zi_1.3
+    )
 ```
 
 ```{r}
@@ -1273,6 +1060,16 @@ plotresid(mod_zi_1.1)
 plotresid(mod_zi_1.2)
 plotresid(mod_zi_1.3)
 ```
+
+```{r}
+summary(mod_zi_1.1)
+summary(mod_zi_1.0)
+
+```
+
+
+
+
 ```{r}
 res_mod_zi_1.0 <- DHARMa::simulateResiduals(mod_zi_1.0)
 plot(res_mod_zi_1.0)
@@ -1295,9 +1092,70 @@ DHARMa::testZeroInflation(res_mod_zi_1.3)
 
 ```
 
+```{r}
+mod_glmm_qbn <- glmer.nb(valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle+ (1|sta_id),  data = truite_data,  family = poisson(link = "log")
+)
+
+```
+
 
 ```{r}
-summary(mod_zi_1.3)
+plotresid(mod_glmm_qbn)
+res_mod_glmm_qbn <- DHARMa::simulateResiduals(mod_glmm_qbn)
+plot(res_mod_glmm_qbn)
+```
+
+```{r}
+summary(mod_glmm_qbn)
+```
+
+```{r plot des effectif par annee et par espece, fig.height = 60, fig.width = 30}
+ggplot(data = ope_effectif_glm, mapping = aes(x = annee, y = valeur)) +
+  facet_wrap2(
+    espece ~ indicateur,
+    ncol = 3,
+    scales = "free_y",
+    axes = "all",
+    trim_blank = TRUE
+  ) +
+  geom_point(shape = 21, size = 2, color = "royalblue")+
+  # geom_line(linetype = 3, linewidth = 0.5) +
+  geom_smooth(method = "glm",method.args = list(family = "poisson"),
+              se = T,
+              color = "darkblue") +  
+  labs(x = "Années", y = "Effectif total") +
+  theme(
+    strip.background = element_rect(color = "grey85", fill = "grey85"),
+    legend.position = "bottom",
+    panel.background = element_rect(fill = "grey95"),
+    panel.grid.major = element_line(color = "#faffff", size = 0.1),
+    panel.grid.minor = element_line(color = "#faffff")
+  ) 
+```
+
+```{r boxplot des effectif par protocoles et par espece, fig.height = 60, fig.width = 30}
+ggplot(data = ope_effectif_glm, mapping = aes(x = pro_libelle, y = valeur)) +
+  facet_wrap2(
+    espece ~ indicateur,
+    ncol = 3,
+    scales = "free_y",
+    axes = "all",
+    trim_blank = T
+  ) +
+  geom_boxplot(color = "royalblue") +
+  labs(x = "Protocoles de pêche", y = "Effectif") +
+  theme(
+    strip.background = element_rect(color = "grey85", fill = "grey85"),
+    legend.position = "bottom",
+    panel.background = element_rect(fill = "grey95")
+    # panel.grid.major = element_line(color = "#faffff", size = 0.1),
+    # panel.grid.minor = element_line(color = "#faffff")
+  )
+```
+
+
+```{r}
+summary(mod_zi_1.1)
 ```
 # Interpretation test : model avec truite : 
 
@@ -1404,6 +1262,10 @@ summary(mod_glmm)
 ## Application du modèle GLMM avec les effectifs
 
   Afin d'exécuter l'analyse, deux fonctions ont été créer : *zip_glmm_calcul_modele* (en charge de calculer les valeurs des modèles ZIPGLMM) et *zip_glmm_application_modele* (le but étant d'excécuter la fonction *zip_glm_calcul_modele* pour l'ensemble des combinaisons *periodes-especes-stade-indicateur*). Les analyses prennent en considération les données à l'échelle de l'opération. 
+```{r}
+source(file = "../R/zip_glmm_calcul_modele.R")
+source(file = "../R/zip_glmm_application_modele.R")
+```
 
 
 ```{r Exécution fonction ZIP_GLMM}

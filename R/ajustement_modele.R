@@ -20,6 +20,7 @@ ajustement_model <- function(model, esp) {
   if(family == "poisson" )
   ## a) Indépendance entre les résidus du modèle et les valeurs prédites
   res_model <- as.ggplot( ~ plotresid(model))
+  res_model <- as.ggplot( ~ plot(DHARMa::simulateResiduals(model)))
   
   ## b) homoscédasticité/Absence de sur-dispersion des résidus
   res_disp_model <- overdisp.glmer(model)
@@ -28,12 +29,14 @@ ajustement_model <- function(model, esp) {
   if(family == "poisson")
   ## a) Indépendance entre les résidus du modèle et les valeurs prédites
   res_model <- as.ggplot( ~ plotresid(model))  
- 
+  res_model <- as.ggplot( ~ plot(DHARMa::simulateResiduals(model)))
+  
    # Condition 3 : si GLMM ou LMM lme4 Loi normale 
   if(family == "gaussian")
   ## a) Indépendance entre les résidus du modèle et les valeurs prédites / homoscédasticité / normalité
   res_model <- as.ggplot( ~ plotresid(model))
-  
+  res_model <- as.ggplot( ~ plot(DHARMa::simulateResiduals(model)))
+
   # Condition 4 : Si GLMM binomiale négative 
   if(family == "poisson")
   
