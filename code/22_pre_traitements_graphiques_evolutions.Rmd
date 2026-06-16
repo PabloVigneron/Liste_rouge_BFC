@@ -95,6 +95,11 @@ total_valeur_esp_abs <- ope_effectif_glm %>%
 
 ```
 
+```{r}
+summary(ope_effectif_glm)
+```
+
+
 ## Df avec les effectif des espèces, non traité par classes d'ages
 
 
@@ -119,11 +124,11 @@ esp_ope_selection_graph <- esp_ope_selection %>%
     sta_id = as.factor(sta_id),
     indicateur = "effectif_total"
   ) %>% # creation d'une colonne pour la période (ex : 2007-2008)
-  mutate(periode = {
-    debut <- floor((annee - annee_debut_periode) / 2) * 2 + annee_debut_periode
-    paste0(debut, "-", debut + 1)
-  }, 
-  periode = as.numeric(periode))%>%
+  # mutate(periode = {
+  #   debut <- floor((annee - annee_debut_periode) / 2) * 2 + annee_debut_periode
+  #   paste0(debut, "-", debut + 1)
+  # }, 
+  # periode = as.numeric(periode))%>%
   select(
     ope_id,
     valeur,
@@ -134,21 +139,29 @@ esp_ope_selection_graph <- esp_ope_selection %>%
     pop_id,
     sta_id,
     indicateur, 
-    periode
+    # periode
   ) 
 # Creation du df par especes avec effectif total
 total_valeur_esp <- esp_ope_selection_graph %>%
-  group_by(periode, esp_code_alternatif, indicateur) %>%
+  group_by(annee, esp_code_alternatif, indicateur) %>%
   summarise(effectif_total = sum(valeur), .groups = "drop") %>%
-  select(esp_code_alternatif, periode, effectif_total, indicateur)
+  select(esp_code_alternatif, annee, effectif_total, indicateur)
 ```
 # Graphique evolution des effectifs totaux 
 
 ## Df traité avec les classes d'ages et ajout des absences
 
 ```{r graphique evolution effectifs par annee avec absences lm, fig.height = 30, fig.width = 15}
+total_valeur_esp_abs <- ope_effectif_glm %>%
+  group_by(annee, esp_code_alternatif, indicateur, ope_surface_calculee) %>%
+  distinct(ope_surface_calculee) %>% 
+  summarise(effectif_total = sum(valeur, na.rm = T), 
+            surface_totale = ope_surface_calculee,
+            densite_moyenne = mean (effectif_total/surface_totale), .groups = "drop") %>% 
+select(esp_code_alternatif, annee, effectif_total,densite_moyenne, surface_totale,  indicateur)
 
-effectif_total_esp_abs <- ggplot(total_valeur_esp_abs, aes(x = annee, y = effectif_total)) +
+
+effectif_total_esp_abs <- ggplot(total_valeur_esp_abs, aes(x = annee, y = densite_moyenne)) +
   facet_wrap2(
     esp_code_alternatif ~ indicateur,
     ncol = 3,
@@ -159,7 +172,7 @@ effectif_total_esp_abs <- ggplot(total_valeur_esp_abs, aes(x = annee, y = effect
   geom_point(shape = 21, size = 2) +
   geom_line(linetype = 3, linewidth = 0.5) +
   labs(x = "Années", y = "Effectif total") +
-  geom_smooth(method = "lm", se = F,color = "darkred") +
+  geom_smooth(method = "loess", se = T,color = "darkred") +
   theme(
     strip.background = element_rect(color = "grey85", fill = "grey85"),
     legend.position = "bottom",

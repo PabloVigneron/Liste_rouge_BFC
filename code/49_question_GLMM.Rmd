@@ -1,0 +1,818 @@
+---
+title: "LRR des poissons d'eau douce de BFC"
+subtitle: "49_question_GLMM"
+author: "PabloVigneron"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  bookdown::html_document2:
+   fig_caption: yes
+   tab_caption: yes
+   number_sections: yes
+   global_numbering: yes
+   toc: yes
+   toc_float:
+         toc_collapsed: yes
+         toc_depth: 2
+   code_folding: hide
+   css: "style.css"
+#bibliography: .bib
+#link-citations: true
+#cls: apa.cls
+#editor_options: 
+#  markdown: 
+#    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+Script : 49_question_GLMM
+# Installation 
+
+Chargement des packages, fonctions et des données 
+
+```{r Chargement des packages}
+library(lme4)
+library(aspe)
+library(tidyverse)
+library(aspe)
+library(sjstats)
+library(gt)
+library(glmmTMB)
+library(RVAideMemoire)
+# library(lmerTest)  # remplace lme4 automatiquement
+library(ggh4x)
+library(mgcv) # modele GAMMs
+library(gratia)
+library(patchwork)
+library(lme4)
+library(car) # fonction Anova()
+library(gstat)#semi_variogramme
+library(DHARMa) # Ajusting of the model 
+library(ggplotify)
+library(ggpubr)
+
+```
+
+```{r Chargement des données}
+load(file = "../processed_data/selection_especes.rda")
+load(file = "../processed_data/selection_pop_ope.rda")
+load(file = "../processed_data/donnees_densite_eff_abs.rda")
+load(file = "../processed_data/assemblage_tab_par_ope.rda")
+```
+
+```{r Chargement des fonctions}
+source(file = "../R/zip_glmm_calcul_modele.R")
+source(file = "../R/zip_glmm_application_modele.R")
+source(file = "../R/gamm_calcul_modele.R")
+source(file = "../R/gamm_application_modele.R")
+source(file = "../R/adequate_data_for_model.R")
+```
+
+```{r Chargement des tables de données}
+rdata_tables <- misc_nom_dernier_fichier(
+  repertoire = "../../../../Liste_rouge_BFC/raw_data",
+  pattern = "^tables")
+load(rdata_tables) # Chargement des données 
+```
+
+
+## Contexte du stage
+
+L’objectif principal de l'étude est d'évaluer les tendances démographiques des espèces de poissons d'eau douce à l'échelle de la région Bourgogne Franche-comté. Des séries chronologiques longues enregistrant plus d’une dizaine d’années ou 3 générations (critère A UICN) de données seront utilisées (sur un total disponible d’une vingtaine d'années). Ce travail s’inscrit dans la perspective de la création de la Liste rouge régionale des poissons d’eau douce de Bourgogne Franche-Comté et compte une trentaine d'espèces à évaluer.
+
+
+L’OFB a mis en place depuis 1990 des réseaux de suivi temporel de l’état des milieux aquatiques à partir des peuplements de poissons. Les échantillonnages sont réalisés tous les ans ou tout les deux ans en fonction des réseaux pluriannuels des stations identiques selon deux protocoles distincts : 
+- pêche par points (partielle)
+- pêche complète
+
+L'ensemble des données sont stocké dans la base de données **aspe** de l'OFB.
+
+Les tendances temporelles seront estimées par une analyse statistique de Modèles Additifs Généralisé Mixtes (GAMMs), de Modèles Linéaires Généralisé Mixtes (GLMM) ou de Zero-Inflated GLMM (ZIGLMM) ou Hurdle GLMM (HGLMM) en fonction de l'ajustement des modèles aux données.
+
+
+# Choix des variables
+
+Pour répondre à la question initiale, les modèles vont se construire à partir des variables suivantes : 
+
+La variable réponse : **valeur**, effectif des poissons  *variable quantitative discrète bornée*
+
+Les variables explicatives : 
+
+les co-variables : 
+
+- **annee**, *variable quantitative discrète bornée*
+
+- **ope_surface_calculee**, la surface pêchée *variable quantitative continue bornée*
+
+les facteurs :
+
+- **pro_libelle**, les protocoles utilisés (2 modalitées) *variable qualitative nominal*
+
+- **sta_id**, les stations d'échantillonages (163 modalitées) *variable qualitative nominal*
+
+
+# Exemple d'analyse avec la Truite Fario (TRF)
+
+## **Preparation du df avec absences**
+
+```{r DF avec coord et absences}
+# preparer la table pour jointure
+ope_selection <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id)
+
+# Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
+coord_sta_id <- point_prelevement %>%
+  filter(pop_id %in% pop_serie_tempo) %>%
+  rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
+  select(pop_id, x, y) %>%
+  mutate(pop_id = as.factor(pop_id))
+
+# prepéarer la table pour jointure 
+esp_ope_selection_join <- esp_ope_selection %>% 
+  select(ope_id, ope_surface_calculee) %>% 
+  distinct(ope_id, .keep_all = TRUE)
+
+
+ope_effectif_glmm_abs <- ope_effectif_absences %>%
+  mef_ajouter_type_protocole() %>%
+  left_join(ope_selection, by = "ope_id") %>%
+  inner_join(esp_ope_selection_join, by = "ope_id") %>%
+  mutate(
+    valeur = as.numeric(valeur) ,
+    annee = as.numeric(annee),
+    ope_surface_calculee = as.numeric(ope_surface_calculee),
+    pro_libelle = as.factor(pro_libelle),
+    pop_id = as.factor(pop_id),
+    sta_id = as.factor(sta_id), 
+    stade = as.factor(stade)
+  ) %>%
+  left_join(coord_sta_id, by = "pop_id") %>% 
+  mutate(x = as.numeric(x), 
+         y = as.numeric(y))%>%
+  rename(espece = esp_code_alternatif)
+```
+
+```{r}
+truite_data_abs <- ope_effectif_glmm_abs %>% 
+  filter(espece == "TRF")
+```
+
+```{r}
+head(truite_data_abs)
+```
+
+```{r histogramme distribution valeur effectif par espece avec absence, fig.height = 45, fig.width = 15}
+stats_esp <- ope_effectif_glmm_abs %>%
+  group_by(espece) %>%
+  summarise(
+    pct_zero  = mean(valeur == 0) * 100,
+    pct_un    = mean(valeur == 1) * 100,
+    pct_zero1 = mean(valeur <= 1) * 100,
+    n         = n(),
+    .groups   = "drop"
+  ) %>%
+  mutate(
+    label = paste0(
+      "n=", n,
+      "  0:", round(pct_zero), "%",
+      "  1:", round(pct_un), "%"))
+
+histogram_esp <- ggplot(data = ope_effectif_glmm_abs, aes(x = valeur)) +
+  facet_wrap2(
+    ~ espece,
+    ncol   = 3,
+    scales = "free",
+    axes   = "all",
+    trim_blank = TRUE
+  ) +
+  geom_histogram(bins = 30, fill = "steelblue4", color = "white", linewidth = 0.2) +
+  geom_vline(xintercept = 0, color = "firebrick", linetype = "dashed", linewidth = 0.5) +
+  geom_vline(xintercept = 1, color = "darkorange", linetype = "dotted",  linewidth = 0.5) +
+  geom_label(
+    data    = stats_esp,
+    mapping = aes(x = Inf, y = Inf, label = label),
+    hjust   = 1.05, vjust = 3.5,
+    size    = 4, fontface = "bold",
+    fill    = "white", color = "steelblue4", label.size = 0.5
+
+  ) +
+  scale_x_continuous() +
+  scale_y_continuous() +
+  labs(
+    x     = "Effectif",
+    y     = "Fréquence",
+    title = "Distribution des effectifs par espèce avec ajout des absences",
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    strip.background = element_rect(fill = "grey88", color = NA),
+    strip.text       = element_text(face = "bold", size = 9),
+    panel.background = element_rect(fill = "grey97", color = NA),
+    panel.grid.major = element_line(color = "grey90"),
+    panel.grid.minor = element_blank(),
+    plot.caption     = element_text(size = 8, color = "grey50")
+  )
+
+histogram_esp
+```
+
+## **Preparation du df sans absences**
+
+```{r DF avec coord sans absences}
+# preparer la table pour jointure
+ope_selection <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id)
+
+# Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
+coord_sta_id <- point_prelevement %>%
+  filter(pop_id %in% pop_serie_tempo) %>%
+  rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
+  select(pop_id, x, y) %>%
+  mutate(pop_id = as.factor(pop_id))
+
+# prepéarer la table pour jointure 
+esp_ope_selection_join <- esp_ope_selection %>% 
+  select(ope_id, ope_surface_calculee) %>% 
+  distinct(ope_id, .keep_all = TRUE)
+
+
+ope_effectif_glmm_sans_abs <- ope_effectif %>%
+  mef_ajouter_type_protocole() %>%
+  left_join(ope_selection, by = "ope_id") %>%
+  inner_join(esp_ope_selection_join, by = "ope_id") %>%
+  mutate(
+    valeur = as.numeric(valeur) ,
+    annee = as.numeric(annee),
+    ope_surface_calculee = as.numeric(ope_surface_calculee),
+    pro_libelle = as.factor(pro_libelle),
+    pop_id = as.factor(pop_id),
+    sta_id = as.factor(sta_id), 
+    stade = as.factor(stade)
+  ) %>%
+  left_join(coord_sta_id, by = "pop_id") %>% 
+  mutate(x = as.numeric(x), 
+         y = as.numeric(y))%>%
+  rename(espece = esp_code_alternatif) %>% 
+  filter(stade == "ind") # Filtrer les stades, ici les indetermines
+```
+
+```{r}
+truite_data_sans_abs <- ope_effectif_glmm_sans_abs %>% 
+  filter(espece == "TRF")
+```
+
+```{r}
+head(truite_data_sans_abs)
+```
+
+```{r histogramme distribution valeur effectif par espece sans absence, fig.height = 45, fig.width = 15}
+stats_esp_sans_abs <- ope_effectif_glmm_sans_abs %>%
+  group_by(espece) %>%
+  summarise(
+    pct_zero  = mean(valeur == 0) * 100,
+    pct_un    = mean(valeur == 1) * 100,
+    pct_zero1 = mean(valeur <= 1) * 100,
+    n         = n(),
+    .groups   = "drop"
+  ) %>%
+  mutate(
+    label = paste0(
+      "n=", n,
+      "  0:", round(pct_zero), "%",
+      "  1:", round(pct_un), "%"))
+
+histogram_esp_sans_abs <- ggplot(data = ope_effectif_glmm_sans_abs, aes(x = valeur)) +
+  facet_wrap2(
+    ~ espece,
+    ncol   = 3,
+    scales = "free",
+    axes   = "all",
+    trim_blank = TRUE
+  ) +
+  geom_histogram(bins = 30, fill = "steelblue4", color = "white", linewidth = 0.2) +
+  geom_vline(xintercept = 0, color = "firebrick", linetype = "dashed", linewidth = 0.5) +
+  geom_vline(xintercept = 1, color = "darkorange", linetype = "dotted",  linewidth = 0.5) +
+  geom_label(
+    data    = stats_esp_sans_abs,
+    mapping = aes(x = Inf, y = Inf, label = label),
+    hjust   = 1.05, vjust = 3.5,
+    size    = 4, fontface = "bold",
+    fill    = "white", color = "steelblue4", label.size = 0.5
+
+  ) +
+  scale_x_continuous() +
+  scale_y_continuous() +
+  labs(
+    x     = "Effectif",
+    y     = "Fréquence",
+    title = "Distribution des effectifs par espèce sans ajout des absences",
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    strip.background = element_rect(fill = "grey88", color = NA),
+    strip.text       = element_text(face = "bold", size = 9),
+    panel.background = element_rect(fill = "grey97", color = NA),
+    panel.grid.major = element_line(color = "grey90"),
+    panel.grid.minor = element_blank(),
+    plot.caption     = element_text(size = 8, color = "grey50")
+  )
+
+histogram_esp_sans_abs
+```
+
+
+# Zero-Inflated GLMM (ZIGLMM) ou Hurdle GLMM (HGLMM) AVEC ABSENCE
+
+```{r, construction des modeles glmmzi}
+mod_zi_1.0 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) +pro_libelle + (1 |
+                                                           sta_id) ,
+  data = truite_data_abs,
+  family = poisson(link = "log"),
+  ziformula = ~ 1
+)
+mod_zi_1.1 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = nbinom2(link = "log"),
+  data = truite_data_abs,
+  ziformula = ~ 1
+)
+mod_zi_1.2 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = truncated_poisson(link = "log"),
+  data = truite_data_abs,
+  ziformula = ~ 1
+)
+mod_zi_1.3 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = truncated_nbinom2(link = "log"),
+  data = truite_data_abs,
+  ziformula = ~ 1
+)
+```
+
+On selectionne à l'aide du critère AIC le meilleur modèle c'est à dire le modèle avec le plus petit AIC. 
+
+```{r, selection du meilleur modeles}
+AIC(mod_zi_1.0, mod_zi_1.1, mod_zi_1.2, mod_zi_1.3)
+```
+
+```{r plotresid des modèles glmm zero inflated, fig.height = 10, fig.width = 20}
+res_mod_zi_1.0 <- as.ggplot(~ plotresid(mod_zi_1.0))
+res_mod_zi_1.1 <- as.ggplot(~ plotresid(mod_zi_1.1))
+res_mod_zi_1.2 <- as.ggplot(~ plotresid(mod_zi_1.2))
+res_mod_zi_1.3 <- as.ggplot(~ plotresid(mod_zi_1.3))
+
+ggarrange(
+  res_mod_zi_1.0,
+  res_mod_zi_1.1,
+  res_mod_zi_1.2,
+  res_mod_zi_1.3,
+  ncol = 2,
+  nrow = 2,
+  labels = c("poisson", "nbinom2", "truncated_poisson", "truncated_nbinom2"),
+  font.label = list(
+    size = 13,
+    color = "darkred",
+    face = "bold",
+    family = NULL
+  ),
+  hjust = -0.1,
+  vjust = 1.6,
+  align = c("none", "h", "v", "hv")
+)
+```
+
+```{r plotresid DHARMa des modèles glmm zero inflated, fig.height = 10, fig.width = 20}
+
+sim_res_mod_zi_1.0 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.0, n = 1000), quantreg = T))
+sim_res_mod_zi_1.1 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.1, n = 1000), quantreg = T))
+sim_res_mod_zi_1.2 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.2, n = 1000), quantreg = T))
+sim_res_mod_zi_1.3 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.3, n = 1000), quantreg = T))
+
+ggarrange(
+  sim_res_mod_zi_1.0,
+  sim_res_mod_zi_1.1,
+  sim_res_mod_zi_1.2,
+  sim_res_mod_zi_1.3,
+  ncol = 2,
+  nrow = 2,
+  labels = c("poisson", "nbinom2", "truncated_poisson", "truncated_nbinom2"),
+  font.label = list(
+    size = 13,
+    color = "darkred",
+    face = "bold",
+    family = NULL
+  ),
+  hjust = -0.1,
+  vjust = 1.6,
+  align = c("none", "h", "v", "hv")
+)
+```
+
+## Summary du meilleur modèle sans absence
+
+```{r}
+summary(mod_zi_1.1)
+```
+
+```{r}
+Anova(mod_zi_1.3)
+```
+
+# Zero-Inflated GLMM (ZIGLMM) ou Hurdle GLMM (HGLMM) SANS ABSENCE
+
+```{r, construction des modeles glmmzi sans abs}
+mod_zi_1.0 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) +pro_libelle + (1 |
+                                                           sta_id) ,
+  data = truite_data_sans_abs,
+  family = poisson(link = "log"),
+  ziformula = ~ 0
+)
+mod_zi_1.1 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = nbinom2(link = "log"),
+  data = truite_data_sans_abs,
+  ziformula = ~ 0
+)
+mod_zi_1.2 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = truncated_poisson(link = "log"),
+  data = truite_data_sans_abs,
+  ziformula = ~ 0
+)
+mod_zi_1.3 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = truncated_nbinom2(link = "log"),
+  data = truite_data_sans_abs,
+  ziformula = ~ 0
+)
+```
+
+On selectionne à l'aide du critère AIC le meilleur modèle c'est à dire le modèle avec le plus petit AIC. 
+
+```{r, selection du meilleur modeles sans abs}
+AIC(mod_zi_1.0, mod_zi_1.1, mod_zi_1.2, mod_zi_1.3)
+```
+
+```{r plotresid des modèles glmm zero inflated sans abs, fig.height = 10, fig.width = 20}
+res_mod_zi_1.0 <- as.ggplot(~ plotresid(mod_zi_1.0))
+res_mod_zi_1.1 <- as.ggplot(~ plotresid(mod_zi_1.1))
+res_mod_zi_1.2 <- as.ggplot(~ plotresid(mod_zi_1.2))
+res_mod_zi_1.3 <- as.ggplot(~ plotresid(mod_zi_1.3))
+
+ggarrange(
+  res_mod_zi_1.0,
+  res_mod_zi_1.1,
+  res_mod_zi_1.2,
+  res_mod_zi_1.3,
+  ncol = 2,
+  nrow = 2,
+  labels = c("poisson", "nbinom2", "truncated_poisson", "truncated_nbinom2"),
+  font.label = list(
+    size = 13,
+    color = "darkred",
+    face = "bold",
+    family = NULL
+  ),
+  hjust = -0.1,
+  vjust = 1.6,
+  align = c("none", "h", "v", "hv")
+)
+```
+
+```{r plotresid DHARMa des modèles glmm zero inflated sans abs, fig.height = 10, fig.width = 20}
+
+sim_res_mod_zi_1.0 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.0, n = 1000), quantreg = T))
+sim_res_mod_zi_1.1 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.1, n = 1000), quantreg = T))
+sim_res_mod_zi_1.2 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.2, n = 1000), quantreg = T))
+sim_res_mod_zi_1.3 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.3, n = 1000), quantreg = T))
+
+ggarrange(
+  sim_res_mod_zi_1.0,
+  sim_res_mod_zi_1.1,
+  sim_res_mod_zi_1.2,
+  sim_res_mod_zi_1.3,
+  ncol = 2,
+  nrow = 2,
+  labels = c("poisson", "nbinom2", "truncated_poisson", "truncated_nbinom2"),
+  font.label = list(
+    size = 13,
+    color = "darkred",
+    face = "bold",
+    family = NULL
+  ),
+  hjust = -0.1,
+  vjust = 1.6,
+  align = c("none", "h", "v", "hv")
+)
+```
+
+## Summary du meilleur modèle 
+
+```{r}
+summary(mod_zi_1.3)
+```
+
+```{r}
+Anova(mod_zi_1.3)
+```
+
+
+
+## TEST ADULTE TRUITE 
+
+## **Preparation du df sans absences**
+
+```{r DF avec coord sans absences}
+# preparer la table pour jointure
+ope_selection <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id)
+
+# Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
+coord_sta_id <- point_prelevement %>%
+  filter(pop_id %in% pop_serie_tempo) %>%
+  rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
+  select(pop_id, x, y) %>%
+  mutate(pop_id = as.factor(pop_id))
+
+# prepéarer la table pour jointure 
+esp_ope_selection_join <- esp_ope_selection %>% 
+  select(ope_id, ope_surface_calculee) %>% 
+  distinct(ope_id, .keep_all = TRUE)
+
+
+ope_effectif_glmm_sans_abs <- ope_effectif %>%
+  mef_ajouter_type_protocole() %>%
+  left_join(ope_selection, by = "ope_id") %>%
+  inner_join(esp_ope_selection_join, by = "ope_id") %>%
+  mutate(
+    valeur = as.numeric(valeur) ,
+    annee = as.numeric(annee),
+    ope_surface_calculee = as.numeric(ope_surface_calculee),
+    pro_libelle = as.factor(pro_libelle),
+    pop_id = as.factor(pop_id),
+    sta_id = as.factor(sta_id), 
+    stade = as.factor(stade)
+  ) %>%
+  left_join(coord_sta_id, by = "pop_id") %>% 
+  mutate(x = as.numeric(x), 
+         y = as.numeric(y))%>%
+  rename(espece = esp_code_alternatif) %>% 
+  filter(stade == "ad") # Filtrer les stades, ici les indetermines
+```
+
+```{r}
+truite_data_sans_abs <- ope_effectif_glmm_sans_abs %>% 
+  filter(espece == "TRF")
+```
+
+### ZIP GLMM
+
+```{r, construction des modeles glmmzi sans abs}
+mod_zi_1.0 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) +pro_libelle + (1 |
+                                                           sta_id) ,
+  data = truite_data_sans_abs,
+  family = poisson(link = "log"),
+  ziformula = ~ 0
+)
+mod_zi_1.1 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = nbinom2(link = "log"),
+  data = truite_data_sans_abs,
+  ziformula = ~ 0
+)
+mod_zi_1.2 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = truncated_poisson(link = "log"),
+  data = truite_data_sans_abs,
+  ziformula = ~ 0
+)
+mod_zi_1.3 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = truncated_nbinom2(link = "log"),
+  data = truite_data_sans_abs,
+  ziformula = ~ 0
+)
+```
+
+On selectionne à l'aide du critère AIC le meilleur modèle c'est à dire le modèle avec le plus petit AIC. 
+
+```{r, selection du meilleur modeles sans abs}
+AIC(mod_zi_1.0, mod_zi_1.1, mod_zi_1.2, mod_zi_1.3)
+```
+
+```{r plotresid des modèles glmm zero inflated sans abs, fig.height = 10, fig.width = 20}
+res_mod_zi_1.0 <- as.ggplot(~ plotresid(mod_zi_1.0))
+res_mod_zi_1.1 <- as.ggplot(~ plotresid(mod_zi_1.1))
+res_mod_zi_1.2 <- as.ggplot(~ plotresid(mod_zi_1.2))
+res_mod_zi_1.3 <- as.ggplot(~ plotresid(mod_zi_1.3))
+
+ggarrange(
+  res_mod_zi_1.0,
+  res_mod_zi_1.1,
+  res_mod_zi_1.2,
+  res_mod_zi_1.3,
+  ncol = 2,
+  nrow = 2,
+  labels = c("poisson", "nbinom2", "truncated_poisson", "truncated_nbinom2"),
+  font.label = list(
+    size = 13,
+    color = "darkred",
+    face = "bold",
+    family = NULL
+  ),
+  hjust = -0.1,
+  vjust = 1.6,
+  align = c("none", "h", "v", "hv")
+)
+```
+
+```{r plotresid DHARMa des modèles glmm zero inflated sans abs, fig.height = 10, fig.width = 20}
+
+sim_res_mod_zi_1.0 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.0, n = 1000), quantreg = T))
+sim_res_mod_zi_1.1 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.1, n = 1000), quantreg = T))
+sim_res_mod_zi_1.2 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.2, n = 1000), quantreg = T))
+sim_res_mod_zi_1.3 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.3, n = 1000), quantreg = T))
+
+ggarrange(
+  sim_res_mod_zi_1.0,
+  sim_res_mod_zi_1.1,
+  sim_res_mod_zi_1.2,
+  sim_res_mod_zi_1.3,
+  ncol = 2,
+  nrow = 2,
+  labels = c("poisson", "nbinom2", "truncated_poisson", "truncated_nbinom2"),
+  font.label = list(
+    size = 13,
+    color = "darkred",
+    face = "bold",
+    family = NULL
+  ),
+  hjust = -0.1,
+  vjust = 1.6,
+  align = c("none", "h", "v", "hv")
+)
+```
+
+## Summary du meilleur modèle 
+
+```{r}
+summary(mod_zi_1.3)
+```
+
+```{r}
+Anova(mod_zi_1.3)
+```
+
+## TEST JUV TRUITE 
+
+## **Preparation du df sans absences**
+
+```{r DF avec coord sans absences}
+# preparer la table pour jointure
+ope_selection <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id)
+
+# Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
+coord_sta_id <- point_prelevement %>%
+  filter(pop_id %in% pop_serie_tempo) %>%
+  rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
+  select(pop_id, x, y) %>%
+  mutate(pop_id = as.factor(pop_id))
+
+# prepéarer la table pour jointure 
+esp_ope_selection_join <- esp_ope_selection %>% 
+  select(ope_id, ope_surface_calculee) %>% 
+  distinct(ope_id, .keep_all = TRUE)
+
+
+ope_effectif_glmm_sans_abs <- ope_effectif %>%
+  mef_ajouter_type_protocole() %>%
+  left_join(ope_selection, by = "ope_id") %>%
+  inner_join(esp_ope_selection_join, by = "ope_id") %>%
+  mutate(
+    valeur = as.numeric(valeur) ,
+    annee = as.numeric(annee),
+    ope_surface_calculee = as.numeric(ope_surface_calculee),
+    pro_libelle = as.factor(pro_libelle),
+    pop_id = as.factor(pop_id),
+    sta_id = as.factor(sta_id), 
+    stade = as.factor(stade)
+  ) %>%
+  left_join(coord_sta_id, by = "pop_id") %>% 
+  mutate(x = as.numeric(x), 
+         y = as.numeric(y))%>%
+  rename(espece = esp_code_alternatif) %>% 
+  filter(stade == "juv") # Filtrer les stades, ici les juv
+```
+
+```{r}
+truite_data_sans_abs <- ope_effectif_glmm_sans_abs %>% 
+  filter(espece == "TRF")
+```
+
+### ZIP GLMM
+
+```{r, construction des modeles glmmzi sans abs}
+mod_zi_1.0 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) +pro_libelle + (1 |
+                                                           sta_id) ,
+  data = truite_data_sans_abs,
+  family = poisson(link = "log"),
+  ziformula = ~ 0
+)
+mod_zi_1.1 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = nbinom2(link = "log"),
+  data = truite_data_sans_abs,
+  ziformula = ~ 0
+)
+mod_zi_1.2 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = truncated_poisson(link = "log"),
+  data = truite_data_sans_abs,
+  ziformula = ~ 0
+)
+mod_zi_1.3 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = truncated_nbinom2(link = "log"),
+  data = truite_data_sans_abs,
+  ziformula = ~ 0
+)
+```
+
+On selectionne à l'aide du critère AIC le meilleur modèle c'est à dire le modèle avec le plus petit AIC. 
+
+```{r, selection du meilleur modeles sans abs}
+AIC(mod_zi_1.0, mod_zi_1.1, mod_zi_1.2, mod_zi_1.3)
+```
+
+```{r plotresid des modèles glmm zero inflated sans abs, fig.height = 10, fig.width = 20}
+res_mod_zi_1.0 <- as.ggplot(~ plotresid(mod_zi_1.0))
+res_mod_zi_1.1 <- as.ggplot(~ plotresid(mod_zi_1.1))
+res_mod_zi_1.2 <- as.ggplot(~ plotresid(mod_zi_1.2))
+res_mod_zi_1.3 <- as.ggplot(~ plotresid(mod_zi_1.3))
+
+ggarrange(
+  res_mod_zi_1.0,
+  res_mod_zi_1.1,
+  res_mod_zi_1.2,
+  res_mod_zi_1.3,
+  ncol = 2,
+  nrow = 2,
+  labels = c("poisson", "nbinom2", "truncated_poisson", "truncated_nbinom2"),
+  font.label = list(
+    size = 13,
+    color = "darkred",
+    face = "bold",
+    family = NULL
+  ),
+  hjust = -0.1,
+  vjust = 1.6,
+  align = c("none", "h", "v", "hv")
+)
+```
+
+```{r plotresid DHARMa des modèles glmm zero inflated sans abs, fig.height = 10, fig.width = 20}
+
+sim_res_mod_zi_1.0 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.0, n = 1000), quantreg = T))
+sim_res_mod_zi_1.1 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.1, n = 1000), quantreg = T))
+sim_res_mod_zi_1.2 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.2, n = 1000), quantreg = T))
+sim_res_mod_zi_1.3 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.3, n = 1000), quantreg = T))
+
+ggarrange(
+  sim_res_mod_zi_1.0,
+  sim_res_mod_zi_1.1,
+  sim_res_mod_zi_1.2,
+  sim_res_mod_zi_1.3,
+  ncol = 2,
+  nrow = 2,
+  labels = c("poisson", "nbinom2", "truncated_poisson", "truncated_nbinom2"),
+  font.label = list(
+    size = 13,
+    color = "darkred",
+    face = "bold",
+    family = NULL
+  ),
+  hjust = -0.1,
+  vjust = 1.6,
+  align = c("none", "h", "v", "hv")
+)
+```
+
+## Summary du meilleur modèle 
+
+```{r}
+summary(mod_zi_1.3)
+```
+
+```{r}
+Anova(mod_zi_1.3)
+```

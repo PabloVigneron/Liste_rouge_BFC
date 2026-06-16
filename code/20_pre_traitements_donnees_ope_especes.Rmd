@@ -266,14 +266,7 @@ mei_ope_selection <- passerelle %>%
   )
 ```
 
-# Modif provisoire : Pour le df final script GLMM et GAMMS
-
 Attention **lop_effectif** correspond à l'effectis totale du lots !! Prenons l'exemple d'un lot de 4 CHA, on retrouvera 4 lignes avec chacune la valeur de 4 pour l'effectif. Pour le df finale, il faut que chaque effectif correspondent à 1 seul effectif par ligne !!!
-```{r}
-# mei_ope_selection_test <- mei_ope_selection %>% 
-#   mutate(lop_effectif_r = if_else(lop_effectif >= 1, 1, 0))
-```
-
 
   Nous retirons les passages supérieurs à 1 qui ne seront pas étudiés par soucis d'homogénéité des données (cf Paramètres). Nous ne considérons que les espèces sélectionnées suite au script 03_selection_especes (contenues dans l'objet *mes_especes*).
 
@@ -436,7 +429,6 @@ ggplot(mei_ope_selection_poids, aes(x = poids_tp, y = mei_poids, color = esp_cod
 ```
 
 Nous observons que beaucoup de valeurs "0" sont présentes dans les valeurs de poids réelles. Il s'agit très probablement de valeurs "NA" inscrites en 0. Ces dernières sont à corriger dans la base ASPE.
-
 
 
 ## Vérification des tailles 

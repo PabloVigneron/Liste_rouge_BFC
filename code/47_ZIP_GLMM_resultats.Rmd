@@ -937,29 +937,29 @@ library(ggh4x)
 library(dplyr)
 
 # Calcul des stats par espèce pour annoter
-stats_esp <- ope_effectif_glm %>%
-  group_by(espece) %>%
-  summarise(
-    pct_zero  = mean(valeur == 0) * 100,
-    pct_un    = mean(valeur == 1) * 100,
-    pct_zero1 = mean(valeur <= 1) * 100,
-    n         = n(),
-    .groups   = "drop"
-  ) %>%
-  mutate(
-    label = paste0(
-      "n=", n,
-      "  0s:", round(pct_zero), "%",
-      "  1s:", round(pct_un), "%"
-    ),
-    # Diagnostic automatique
-    modele = case_when(
-      pct_zero  > 70 ~ "Zero-inflated",
-      pct_zero1 > 60 ~ "Hurdle",
-      pct_zero  > 40 ~ "ZIP / ZINB",
-      TRUE           ~ "Poisson / NB"
-    )
-  )
+# stats_esp <- ope_effectif_glm %>%
+#   group_by(espece) %>%
+#   summarise(
+#     pct_zero  = mean(valeur == 0) * 100,
+#     pct_un    = mean(valeur == 1) * 100,
+#     pct_zero1 = mean(valeur <= 1) * 100,
+#     n         = n(),
+#     .groups   = "drop"
+#   ) %>%
+#   mutate(
+#     label = paste0(
+#       "n=", n,
+#       "  0s:", round(pct_zero), "%",
+#       "  1s:", round(pct_un), "%"
+#     ),
+#     # Diagnostic automatique
+#     modele = case_when(
+#       pct_zero  > 70 ~ "Zero-inflated",
+#       pct_zero1 > 60 ~ "Hurdle",
+#       pct_zero  > 40 ~ "ZIP / ZINB",
+#       TRUE           ~ "Poisson / NB"
+#     )
+#   )
 
 histogram_esp <- ggplot(data = ope_effectif_glm, aes(x = valeur)) +
   facet_wrap2(
@@ -973,26 +973,26 @@ histogram_esp <- ggplot(data = ope_effectif_glm, aes(x = valeur)) +
   geom_vline(xintercept = 0, color = "firebrick", linetype = "dashed", linewidth = 0.5) +
   geom_vline(xintercept = 1, color = "darkorange", linetype = "dotted",  linewidth = 0.5) +
   # Annotation stats + diagnostic dans chaque facette
-  geom_text(
-    data    = stats_esp,
-    mapping = aes(x = Inf, y = Inf, label = label),
-    hjust   = 1.05, vjust = 1.5,
-    size    = 2.8, color = "grey30"
-  ) +
-  geom_label(
-    data    = stats_esp,
-    mapping = aes(x = Inf, y = Inf, label = modele),
-    hjust   = 1.05, vjust = 3.5,
-    size    = 2.5, fontface = "bold",
-    fill    = "white", color = "steelblue4", label.size = 0.3
-  ) +
+  # geom_text(
+  #   data    = stats_esp,
+  #   mapping = aes(x = Inf, y = Inf, label = label),
+  #   hjust   = 1.05, vjust = 1.5,
+  #   size    = 2.8, color = "grey30"
+  # ) +
+  # geom_label(
+  #   data    = stats_esp,
+  #   mapping = aes(x = Inf, y = Inf, label = modele),
+  #   hjust   = 1.05, vjust = 3.5,
+  #   size    = 2.5, fontface = "bold",
+  #   fill    = "white", color = "steelblue4", label.size = 0.3
+  # ) +
   scale_x_continuous(expand = expansion(mult = c(0, 0.05))) +
   scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
   labs(
     x     = "Effectif",
     y     = "Fréquence",
     title = "Distribution des effectifs par espèce",
-    caption = "Rouge = 0  |  Orange = 1  |  Label : % zéros, % uns → orientation modèle GLMM"
+    # caption = "Rouge = 0  |  Orange = 1  |  Label : % zéros, % uns → orientation modèle GLMM"
   ) +
   theme_minimal(base_size = 11) +
   theme(

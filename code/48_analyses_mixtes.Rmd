@@ -219,7 +219,7 @@ esp_ope_selection_join <- esp_ope_selection %>%
   distinct(ope_id, .keep_all = TRUE)
 
 
-ope_effectif_glmm <- ope_effectif %>%
+ope_effectif_glmm_sa <- ope_effectif %>%
   mef_ajouter_type_protocole() %>%
   left_join(ope_selection, by = "ope_id") %>%
   inner_join(esp_ope_selection_join, by = "ope_id") %>%
@@ -327,6 +327,55 @@ plotresid(mod_zi_1.8)
 
 ```
 
+# test de prédiction 
+```{r}
+tableau <- truite_data %>% 
+  select(
+    annee, 
+    ope_surface_calculee,
+    pro_libelle, 
+    annee, 
+    sta_id
+  )
+```
+
+```{r prediction des modeles}
+ predict(mod_zi_1.1,newdata=tableau,type="response", re.form =NA)
+```
+
+```{r}
+
+x <- RVAideMemoire::seq2(truite_data$annee)
+
+plot(truite_data$valeur ~ truite_data$annee)
+
+lines(x,
+      predict(
+        mod_zi_1.1,
+        newdata = list(
+          annee = x,
+          offse = 1, 
+          sta_id = 163,
+          pro_libelle = c("Pêche complète à un ou plusieurs passages", length(x))
+        ),
+        type = "response"
+      ),
+      re.form = NA)
+
+
+```
+
+```{r}
+truite_data$pro_libelle
+```
+
+
+```{r}
+plot(truite_data$valeur ~ truite_data$pro_libelle)
+```
+
+
+
 
 ```{r}
 summary(mod_zi_1.1)
@@ -341,19 +390,117 @@ summary(mod_zi_1.8)
 ```
 
 
+# Test GAMM negative binomial
+
+```{r}
+truite_data_sa <- ope_effectif_glmm_sa %>% 
+  filter(espece == "TRF")
+```
+
+
+```{r}
+
+# Sans ajout des absences
+mod_gamm_1_sa <- gamm(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y),
+  random = list(sta_id =  ~ 1),
+  data = truite_data_sa,
+  family = nb(link = "log"),
+  method = "REML"
+)
+mod_gamm_2_sa <- gamm(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y),
+  random = list(sta_id =  ~ 1),
+  data = truite_data_sa,
+  family = nb(link = "sqrt"),
+  method = "REML"
+)
+
+mod_gamm_2_sa <- gamm(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + s(pro_libelle) + s(x,y),
+  random = list(sta_id =  ~ 1),
+  data = truite_data_sa,
+  family = nb(link = "log"),
+  method = "REML"
+)
+
+
+
+
+# Avec ajout des absences
+# mod_gamm_1 <- gamm(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y),
+#   random = list(sta_id =  ~ 1),
+#   data = truite_data,
+#   family = nb (link = "log"),
+#   method = "REML"
+# )
+# 
+# mod_gamm_2 <- gamm(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y),
+#   random = list(sta_id =  ~ 1),
+#   data = truite_data,
+#   family = nb (link = "sqrt"),
+#   method = "REML"
+# )
+
+```
+
+```{r}
+plot(mod_gamm_1_sa$gam,shade = T, residuals = T)
+```
+
+```{r}
+# install.packages("marginaleffects")
+library(marginaleffects)
+```
+
+```{r}
+plot_predictions(mod_gamm_1_sa$gam, condition = 'annee', 
+                 type = 'response', points = 0.5,
+                 rug = TRUE) +
+  labs(y = "Expected response",
+       title = "Average smooth effect of concentration",
+       subtitle = "Aggregated across treatments and types")
+```
+
+```{r}
+AIC(mod_gamm_1_sa$lme, mod_gamm_2_sa$lme, mod_gamm_1$lme, mod_gamm_2$lme)
+```
+
+```{r}
+appraise(mod_gamm_1_sa$gam)
+appraise(mod_gamm_2_sa$gam)
+appraise(mod_gamm_1$gam)
+appraise(mod_gamm_2$gam)
+
+```
 
 
 
 
 
+```{r}
+k.check(mod_gamm_1_sa$gam)
+```
+
+
+```{r, fig.height = 10, fig.width = 20}
+draw(mod_gamm_1_sa, residuals = T)
+draw(mod_gamm_2_sa, residuals = T)
+draw(mod_gamm_1, residuals = T)
+draw(mod_gamm_2, residuals = T)
+```
 
 
 
+```{r}
+summary(mod_gamm_2$gam)
+```
 
-
-
-
-
+```{r}
+summary(mod_gamm_2_sa$gam)
+```
 
 
 
@@ -396,7 +543,6 @@ mod_gamm_1.4 <- gamm(
   family = poisson(link = "sqrt"),
   method = "REML"
 )
-
 ```
 ```{r}
 AIC(mod_gamm_1.0$lme,mod_gamm_1.1$lme, mod_gamm_1.2$lme,mod_gamm_1.3$lme,mod_gamm_1.4$lme)
