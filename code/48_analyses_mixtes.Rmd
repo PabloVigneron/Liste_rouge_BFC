@@ -238,7 +238,7 @@ ope_effectif_glmm_sa <- ope_effectif %>%
 ```
 
 ```{r}
-truite_data <- ope_effectif_glmm %>% 
+truite_data <- ope_effectif_glmm_sa %>% 
   filter(espece == "TRF")
 ```
 
@@ -303,7 +303,7 @@ AIC(mod_zi_1.1, mod_zi_1.2, mod_zi_1.3, mod_zi_1.4, mod_zi_1.5, mod_zi_1.6, mod_
 
 # Relancer DHARMa sur le meilleur
 library(DHARMa)
-simulationOutput_1 <- simulateResiduals(fittedModel = mod_zi_1.1, plot = TRUE, )
+simulationOutput_1 <- simulateResiduals(fittedModel = mod_zi_1.1, plot = TRUE )
 simulationOutput_2 <- simulateResiduals(fittedModel = mod_zi_1.2, plot = TRUE)
 simulationOutput_3 <- simulateResiduals(fittedModel = mod_zi_1.3, plot = TRUE)
 
@@ -329,49 +329,46 @@ plotresid(mod_zi_1.8)
 
 # test de prédiction 
 ```{r}
-tableau <- truite_data %>% 
-  select(
-    annee, 
-    ope_surface_calculee,
-    pro_libelle, 
-    annee, 
-    sta_id
-  )
+# tableau <- truite_data %>% 
+#   select(
+#     annee, 
+#     ope_surface_calculee,
+#     pro_libelle, 
+#     annee, 
+#     sta_id
+#   )
 ```
 
 ```{r prediction des modeles}
- predict(mod_zi_1.1,newdata=tableau,type="response", re.form =NA)
+ # predict(mod_zi_1.1,newdata=tableau,type="response", re.form =NA)
 ```
 
 ```{r}
 
-x <- RVAideMemoire::seq2(truite_data$annee)
-
-plot(truite_data$valeur ~ truite_data$annee)
-
-lines(x,
-      predict(
-        mod_zi_1.1,
-        newdata = list(
-          annee = x,
-          offse = 1, 
-          sta_id = 163,
-          pro_libelle = c("Pêche complète à un ou plusieurs passages", length(x))
-        ),
-        type = "response"
-      ),
-      re.form = NA)
+# x <- RVAideMemoire::seq2(truite_data$annee)
+# 
+# plot(truite_data$valeur ~ truite_data$annee)
+# 
+# lines(x,
+#       predict(
+#         mod_zi_1.1,
+#         newdata = list(
+#           annee = x,
+#           offse = 1, 
+#           sta_id = 163,
+#           pro_libelle = c("Pêche complète à un ou plusieurs passages", length(x))
+#         ),
+#         type = "response"
+#       ),
+#       re.form = NA)
 
 
 ```
 
-```{r}
-truite_data$pro_libelle
-```
 
 
 ```{r}
-plot(truite_data$valeur ~ truite_data$pro_libelle)
+# plot(truite_data$valeur ~ truite_data$pro_libelle)
 ```
 
 
@@ -401,53 +398,160 @@ truite_data_sa <- ope_effectif_glmm_sa %>%
 ```{r}
 
 # Sans ajout des absences
-mod_gamm_1_sa <- gamm(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y),
-  random = list(sta_id =  ~ 1),
-  data = truite_data_sa,
-  family = nb(link = "log"),
-  method = "REML"
-)
-mod_gamm_2_sa <- gamm(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y),
-  random = list(sta_id =  ~ 1),
-  data = truite_data_sa,
-  family = nb(link = "sqrt"),
-  method = "REML"
-)
-
-mod_gamm_2_sa <- gamm(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + s(pro_libelle) + s(x,y),
-  random = list(sta_id =  ~ 1),
-  data = truite_data_sa,
-  family = nb(link = "log"),
-  method = "REML"
-)
-
-
-
-
-# Avec ajout des absences
-# mod_gamm_1 <- gamm(
+# mod_gamm_1_sa <- gamm(
 #   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y),
 #   random = list(sta_id =  ~ 1),
-#   data = truite_data,
-#   family = nb (link = "log"),
+#   data = truite_data_sa,
+#   family = poisson(link = "log"),
 #   method = "REML"
 # )
 # 
-# mod_gamm_2 <- gamm(
+# mod_gamm_2_sa <- gamm(
 #   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y),
 #   random = list(sta_id =  ~ 1),
-#   data = truite_data,
-#   family = nb (link = "sqrt"),
+#   data = truite_data_sa,
+#   family = poisson(link = "sqrt"),
 #   method = "REML"
 # )
+# 
+# mod_gamm_3_sa <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"), 
+#   data = truite_data_sa,
+#   family = poisson(link = "log"),
+#   method = "REML", select = T
+# )
+# 
+# mod_gamm_4_sa <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"), 
+#   data = truite_data_sa,
+#   family = poisson(link = "sqrt"),
+#   method = "REML"
+# )
+# 
+# mod_gamm_5_sa <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"), 
+#   data = truite_data_sa,
+#   family = nb(link = "log"),
+#   method = "REML"
+# )
+
+# Avec ajout des absences
+mod_gamm_1_sa <- gamm(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y),
+  random = list(sta_id =  ~ 1),
+  data = truite_data,
+  family = poisson(link = "log"),
+  method = "REML"
+)
+
+mod_gamm_2_sa <- gamm(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y),
+  random = list(sta_id =  ~ 1),
+  data = truite_data,
+  family = poisson(link = "sqrt"),
+  method = "REML"
+)
+
+mod_gamm_3_sa <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"), 
+  data = truite_data,
+  family = poisson(link = "log"),
+  method = "REML"
+)
+
+mod_gamm_4_sa <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"), 
+  data = truite_data,
+  family = poisson(link = "sqrt"),
+  method = "REML"
+)
+
+mod_gamm_5_sa <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"), 
+  data = truite_data,
+  family = nb(link = "log"),
+  method = "REML"
+)
+
 
 ```
 
 ```{r}
-plot(mod_gamm_1_sa$gam,shade = T, residuals = T)
+appraise(mod_gamm_1_sa$gam)
+appraise(mod_gamm_2_sa$gam)
+
+appraise(mod_gamm_3_sa)
+# appraise(mod_gamm_4_sa)
+appraise(mod_gamm_5_sa)
+
+draw(mod_gamm_1_sa$gam, residuals = T, scales = "fixed", shade = T)
+draw(mod_gamm_2_sa$gam, residuals = T, scales = "fixed", shade = T)
+
+draw(mod_gamm_3_sa, residuals = T, scales = "fixed", shade = T)
+draw(mod_gamm_5_sa, residuals = T, scales = "fixed", shade = T)
+
+```
+```{r}
+AIC(mod_gamm_1_sa$lme, mod_gamm_2_sa$lme, mod_gamm_3_sa, mod_gamm_5_sa, mod_gamm_6_sa )
+```
+
+
+
+```{r}
+gam.check(mod_gamm_2_sa$gam)
+
+
+gam.check(mod_gamm_3_sa)
+
+gam.check(mod_gamm_5_sa)
+gam.check(mod_gamm_6_sa)
+
+
+```
+
+```{r}
+summary(mod_gamm_1_sa$gam)
+summary(mod_gamm_2_sa$gam)
+summary(mod_gamm_3_sa)
+summary(mod_gamm_4_sa)
+summary(mod_gamm_5_sa)
+
+```
+```{r}
+# installed.packages("mgcViz")
+# library(mgcViz)
+DHARMa::plotResiduals(simulateResiduals(fittedModel = mod_gamm_5_sa, plot = TRUE, n = 1000))
+DHARMa::plotResiduals(simulateResiduals(fittedModel = mod_gamm_6_sa, plot = TRUE, n = 1000), quantreg = T )
+DHARMa::plotResiduals(simulateResiduals(fittedModel = mod_gamm_3_sa, plot = TRUE, n = 1000))
+
+```
+
+```{r}
+DHARMa::testDispersion(mod_gamm_5_sa)
+```
+
+```{r, fig.height = 7, fig.width = 12}
+draw(mod_gamm_5_sa, residuals = T, scales = "fixed", shade = T,  overall_uncertainty = TRUE, select = "s(annee)")
+
+```
+
+```{r}
+d <- gratia::derivatives(mod_gamm_5_sa, select = "s(annee)", interval = "confidence")
+draw(d)+
+    geom_hline(yintercept = 0, color = "firebrick", linetype = "dashed", linewidth = 0.5) 
+
+```
+```{r}
+# nd <- data.frame(annee = c(min(truite_data$annee), 
+#                             max(truite_data$annee)),
+#                   ope_surface_calculee = 1,  # neutralise l'offset
+#                   pro_libelle = "Pêche complète à un ou plusieurs passages")
+# 
+# pred <- predict(mod_gamm_5_sa, newdata = nd, type = "lpmatrix")
+# diff <- pred[2, ] - pred[1, ]
+# est  <- diff %*% coef(mod_gamm_5_sa)
+# se   <- sqrt(t(diff) %*% vcov(mod_gamm_5_sa) %*% diff)
+# c(estimate = est, lower = est - 1.96*se, upper = est + 1.96*se)
 ```
 
 ```{r}
@@ -456,9 +560,9 @@ library(marginaleffects)
 ```
 
 ```{r}
-plot_predictions(mod_gamm_1_sa$gam, condition = 'annee', 
+marginaleffects::plot_predictions(mod_gamm_5_sa, by  = 'annee', 
                  type = 'response', points = 0.5,
-                 rug = TRUE) +
+                 rug = FALSE, gray = T) +
   labs(y = "Expected response",
        title = "Average smooth effect of concentration",
        subtitle = "Aggregated across treatments and types")
@@ -579,7 +683,7 @@ ggarrange(
 ### Autocorelation spatial - semi-variogramme
 
 ```{r, semivariogramme pour tester autocorrelation spatiale avec uniquement la variable reponse}
-var <- variogram(valeur ~ annee + ope_surface_calculee, locations = ~ x+y, data = truite_data)
+var <- variogram(valeur ~ annee + offset(log(ope_surface_calculee)), locations = ~ x+y, data = truite_data)
 var
 plot(var, col= "black")
 ```

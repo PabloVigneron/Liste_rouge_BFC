@@ -115,7 +115,7 @@ les facteurs :
 - **sta_id**, les stations d'échantillonages (163 modalitées) *variable qualitative nominal*
 
 
-# Exemple d'analyse avec la Truite Fario (TRF)
+# Exemple d'analyse avec la Truite Fario (EPI)
 
 ## **Preparation du df avec absences**
 
@@ -158,7 +158,7 @@ ope_effectif_glmm_abs <- ope_effectif_absences %>%
 
 ```{r}
 truite_data_abs <- ope_effectif_glmm_abs %>% 
-  filter(espece == "TRF")
+  filter(espece == "EPI")
 ```
 
 ```{r}
@@ -262,7 +262,7 @@ ope_effectif_glmm_sans_abs <- ope_effectif %>%
 
 ```{r}
 truite_data_sans_abs <- ope_effectif_glmm_sans_abs %>% 
-  filter(espece == "TRF")
+  filter(espece == "EPI")
 ```
 
 ```{r}
@@ -421,7 +421,46 @@ summary(mod_zi_1.1)
 ```
 
 ```{r}
-Anova(mod_zi_1.3)
+Anova(mod_zi_1.1)
+```
+```{r}
+mod_glmm_qbn <- glmer.nb(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 |
+                                                                        sta_id),
+  data = truite_data_abs,
+  family = poisson(link = "log")
+)
+
+```
+
+```{r}
+plotresid(mod_glmm_qbn)
+```
+
+
+```{r}
+summary(mod_glmm_qbn)
+```
+
+
+```{r}
+plotResiduals(simulateResiduals(fittedModel = mod_glmm_qbn, n = 1000), quantreg = T)
+
+```
+
+```{r}
+DHARMa::testZeroInflation(mod_glmm_qbn)
+
+```
+```{r}
+DHARMa::testDispersion(mod_zi_1.3)
+DHARMa::testDispersion(mod_glmm_qbn, plot = F)
+
+```
+```{r}
+DHARMa::testOverdispersion(mod_zi_1.3)
+DHARMa::testOverdispersion(mod_glmm_qbn, plot = F)
+
 ```
 
 # Zero-Inflated GLMM (ZIGLMM) ou Hurdle GLMM (HGLMM) SANS ABSENCE
@@ -569,7 +608,7 @@ ope_effectif_glmm_sans_abs <- ope_effectif %>%
 
 ```{r}
 truite_data_sans_abs <- ope_effectif_glmm_sans_abs %>% 
-  filter(espece == "TRF")
+  filter(espece == "EPI")
 ```
 
 ### ZIP GLMM
@@ -715,7 +754,7 @@ ope_effectif_glmm_sans_abs <- ope_effectif %>%
 
 ```{r}
 truite_data_sans_abs <- ope_effectif_glmm_sans_abs %>% 
-  filter(espece == "TRF")
+  filter(espece == "EPI")
 ```
 
 ### ZIP GLMM
@@ -805,6 +844,10 @@ ggarrange(
   vjust = 1.6,
   align = c("none", "h", "v", "hv")
 )
+```
+```{r}
+DHARMa::plotResiduals(mod_zi_1.3)
+plotResiduals(simulateResiduals(fittedModel = mod_zi_1.3, n = 1000), quantreg = T)
 ```
 
 ## Summary du meilleur modèle 
