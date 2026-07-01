@@ -396,45 +396,6 @@ truite_data_sa <- ope_effectif_glmm_sa %>%
 
 
 ```{r}
-
-# Sans ajout des absences
-# mod_gamm_1_sa <- gamm(
-#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y),
-#   random = list(sta_id =  ~ 1),
-#   data = truite_data_sa,
-#   family = poisson(link = "log"),
-#   method = "REML"
-# )
-# 
-# mod_gamm_2_sa <- gamm(
-#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y),
-#   random = list(sta_id =  ~ 1),
-#   data = truite_data_sa,
-#   family = poisson(link = "sqrt"),
-#   method = "REML"
-# )
-# 
-# mod_gamm_3_sa <- gam(
-#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"), 
-#   data = truite_data_sa,
-#   family = poisson(link = "log"),
-#   method = "REML", select = T
-# )
-# 
-# mod_gamm_4_sa <- gam(
-#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"), 
-#   data = truite_data_sa,
-#   family = poisson(link = "sqrt"),
-#   method = "REML"
-# )
-# 
-# mod_gamm_5_sa <- gam(
-#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"), 
-#   data = truite_data_sa,
-#   family = nb(link = "log"),
-#   method = "REML"
-# )
-
 # Avec ajout des absences
 mod_gamm_1_sa <- gamm(
   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y),
@@ -466,35 +427,232 @@ mod_gamm_4_sa <- gam(
   method = "REML"
 )
 
-mod_gamm_5_sa <- gam(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"), 
+
+################################################
+#QP
+mod_gamm <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  data = truite_data,
+  family = quasipoisson(link = "log"),
+  method = "REML")
+
+# NB GAMM4
+mod_gamm_5 <- gamm4(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y),
+  random = ~ (1 | sta_id),
   data = truite_data,
   family = nb(link = "log"),
   method = "REML"
 )
 
+# Poisson GAM 
+mod_gamm_7 <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  data = truite_data,
+  family = poisson(link = "log"),
+  method = "REML"
+)
+# Poisson GAMM4
+mod_gamm_8 <- gamm4(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y),
+  random = ~ (1 | sta_id),
+  data = truite_data,
+  family = poisson(link = "log"),
+  method = "REML"
+)
+
+######################
+```
+
+```{r}
+mod_gamm <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle  + s(sta_id, bs = "re"),
+  data = truite_data,
+  family = nb(link = "log"),
+  method = "REML"
+)
+# NB GAM 
+mod_gamm_5 <- gam(
+  valeur ~ s(annee, k = 15) + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  data = truite_data,
+  family = nb(link = "log"),
+  method = "REML"
+)
+mod_gamm_6 <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  data = truite_data,
+  family = poisson(link = "log"),
+  method = "REML"
+)
+# mod_gamm_7 <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+#   data = truite_data,
+#   family = poisson(link = "identity"),
+#   method = "REML"
+# )
+mod_gamm_8 <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  data = truite_data,
+  family = quasipoisson(link = "log"),
+  method = "REML"
+)
+```
+
+```{r}
+appraise(mod_gamm)
+appraise(mod_gamm_5)
+appraise(mod_gamm_6)
+# appraise(mod_gamm_7)
+appraise(mod_gamm_8)
+
+```
+```{r}
+draw(mod_gamm, residuals = T, scales = "free", shade = T, select = "s(annee)")
+
+draw(mod_gamm_5, residuals = T, scales = "free", shade = T, select = "s(annee)")
+draw(mod_gamm_6, residuals = T, scales = "fixed", shade = T,  select = "s(annee)")
+# draw(mod_gamm_7, residuals = T, scales = "fixed", shade = T, select = "s(annee)")
+draw(mod_gamm_8, residuals = T, scales = "fixed", shade = T, select = "s(annee)")
+
+```
+```{r}
+k.check(mod_gamm)
+k.check(mod_gamm_5)
+k.check(mod_gamm_6)
+# k.check(mod_gamm_7)
+k.check(mod_gamm_8)
+```
+```{r}
+AIC(
+  mod_gamm,
+  mod_gamm_5,
+  mod_gamm_6,
+  # mod_gamm_7,
+  mod_gamm_8
+  )
 
 ```
 
 ```{r}
-appraise(mod_gamm_1_sa$gam)
-appraise(mod_gamm_2_sa$gam)
+var <- variogram(valeur ~ annee + offset(log(ope_surface_calculee)), locations = ~ x+y, data = truite_data_abs)
+var
+plot(var, col= "black")
+```
 
-appraise(mod_gamm_3_sa)
-# appraise(mod_gamm_4_sa)
-appraise(mod_gamm_5_sa)
 
-draw(mod_gamm_1_sa$gam, residuals = T, scales = "fixed", shade = T)
-draw(mod_gamm_2_sa$gam, residuals = T, scales = "fixed", shade = T)
+```{r}
+# DHARMa::testDispersion(mod_gamm)
+DHARMa::testDispersion(mod_gamm_5)
+DHARMa::testDispersion(mod_gamm_6)
+# DHARMa::testDispersion(mod_gamm_7)
+DHARMa::testDispersion(mod_gamm_8)
 
-draw(mod_gamm_3_sa, residuals = T, scales = "fixed", shade = T)
-draw(mod_gamm_5_sa, residuals = T, scales = "fixed", shade = T)
+```
+
+```{r}
+# simulateResiduals(fittedModel = mod_gamm, plot = TRUE, n = 1000)
+simulateResiduals(fittedModel = mod_gamm_5, plot = TRUE, n = 1000)
+simulateResiduals(fittedModel = mod_gamm_6, plot = TRUE, n = 1000)
+# simulateResiduals(fittedModel = mod_gamm_7, plot = TRUE, n = 1000)
+simulateResiduals(fittedModel = mod_gamm_8, plot = TRUE, n = 1000)
+
+```
+
+```{r}
+acf(residuals(mod_gamm_5, type = "normalized"), lag.max = 20)
+acf(residuals(mod_gamm_8$mer, type = "normalized"), lag.max = 20)
+acf(residuals(mod_gamm_7, type = "normalized"), lag.max = 20)
+```
+
+
+
+
+```{r}
+draw(gratia::derivatives(mod_gamm, select = "s(annee)", interval = "confidence")) +
+  geom_hline(
+    yintercept = 0,
+    color = "firebrick",
+    linetype = "dashed",
+    linewidth = 0.5
+  ) 
+draw(gratia::derivatives(mod_gamm_5, select = "s(annee)", interval = "confidence")) +
+  geom_hline(
+    yintercept = 0,
+    color = "firebrick",
+    linetype = "dashed",
+    linewidth = 0.5
+  ) 
+
+# draw(gratia::derivatives(mod_gamm_6, select = "s(annee)", interval = "confidence")) +
+#   geom_hline(
+#     yintercept = 0,
+#     color = "firebrick",
+#     linetype = "dashed",
+#     linewidth = 0.5
+#   ) 
+
+draw(gratia::derivatives(mod_gamm_7, select = "s(annee)", interval = "confidence")) +
+  geom_hline(
+    yintercept = 0,
+    color = "firebrick",
+    linetype = "dashed",
+    linewidth = 0.5
+  ) 
+
+draw(gratia::derivatives(mod_gamm_8$gam, select = "s(annee)", interval = "confidence")) +
+  geom_hline(
+    yintercept = 0,
+    color = "firebrick",
+    linetype = "dashed",
+    linewidth = 0.5
+  ) 
+```
+```{r}
+summary(mod_gamm_5)
+```
+
+
+### GAMM brouillon
+
+```{r}
+# appraise(mod_gamm_1_sa$gam)
+# appraise(mod_gamm_2_sa$gam)
+# 
+# appraise(mod_gamm_3_sa)
+# # appraise(mod_gamm_4_sa)
+# appraise(mod_gamm_5_sa)
+# 
+# draw(mod_gamm_1_sa$gam, residuals = T, scales = "fixed", shade = T)
+# draw(mod_gamm_2_sa$gam, residuals = T, scales = "fixed", shade = T)
+# 
+# draw(mod_gamm_3_sa, residuals = T, scales = "fixed", shade = T)
+# draw(mod_gamm_5_sa, residuals = T, scales = "fixed", shade = T)
 
 ```
 ```{r}
 AIC(mod_gamm_1_sa$lme, mod_gamm_2_sa$lme, mod_gamm_3_sa, mod_gamm_5_sa, mod_gamm_6_sa )
 ```
 
+```{r}
+# install.packages("gamm4")
+```
+
+```{r}
+library(gamm4)
+# mod_gamm_5_sa <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"), 
+#   data = truite_data,
+#   family = nb(link = "log"),
+#   method = "REML"
+# )
+# gamm4(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y),
+#   random = ~ (1 | sta_id),
+#   data = truite_data,
+#   family = nb(link = "log"),
+#   method = "REML"
+# )
+```
 
 
 ```{r}
@@ -521,7 +679,7 @@ summary(mod_gamm_5_sa)
 # installed.packages("mgcViz")
 # library(mgcViz)
 DHARMa::plotResiduals(simulateResiduals(fittedModel = mod_gamm_5_sa, plot = TRUE, n = 1000))
-DHARMa::plotResiduals(simulateResiduals(fittedModel = mod_gamm_6_sa, plot = TRUE, n = 1000), quantreg = T )
+DHARMa::plotResiduals(simulateResiduals(fittedModel = mod_gamm_6_sa, plot = TRUE, n = 1000), quantreg = T)
 DHARMa::plotResiduals(simulateResiduals(fittedModel = mod_gamm_3_sa, plot = TRUE, n = 1000))
 
 ```
@@ -541,6 +699,7 @@ draw(d)+
     geom_hline(yintercept = 0, color = "firebrick", linetype = "dashed", linewidth = 0.5) 
 
 ```
+
 ```{r}
 # nd <- data.frame(annee = c(min(truite_data$annee), 
 #                             max(truite_data$annee)),
@@ -785,8 +944,6 @@ summary(mod_gamm_1.4$gam)
 ```{r}
 coefficients(mod_gamm_1.4$gam)
 ```
-
-
 
 
 ## Modèles Additifs Généralisé Mixtes (GAMMs)

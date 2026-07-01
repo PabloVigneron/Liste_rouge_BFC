@@ -1,0 +1,378 @@
+---
+title: "LRR des poissons d'eau douce de BFC"
+subtitle: "30_calcul_indicateur_par_ope_V2"
+author: "PabloVigneron"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+Script : 30_calcul_indicateurs_par_ope
+
+  Pour rappel, cette étude se divise en plusieurs parties. Dans un premier temps, il s'agit de produire un tableau de bord combinant divers indicateurs simples, à l'échelle de chaque opération de pêche. 
+
+  Les pré-traitements nécessaires à la constitution de ce tableau de bord ont été réalisés dans les scripts précédents. Ce script permet donc la création du tableau de bord comportant plusieurs indicateurs dits "simples" afin d'observer les tendances démographiques des espèces. Ces indicateurs (densités volumiques, densités surfaciques, pourcentage de juvéniles, longueurs médianes,...) seront calculés à l'échelle des opérations de pêches retenues pour l'étude. Ces indicateurs sont calculés par espèce et par stade (*juv* / *ad*), mais également pour l'ensemble des individus (*ind*). 
+
+
+# Installation 
+
+## Chargement des packages, fonctions et des données
+
+```{r Chargement des packages}
+library(tidyverse)
+library(aspe)
+library(dplyr)
+```
+
+Nous avons besoin des jeux de données constitués lors des précédents scripts. 
+
+```{r Chargement des données}
+load(file = "../processed_data/selection_pop_ope.rda") # Chargement des données pré-enregistrées
+load(file = "../processed_data/pre_traitements_donnees_env.rda")
+load(file = "../processed_data/selection_especes.rda")
+load(file = "../processed_data/pre_traitements_donnees_especes.rda")
+```
+
+```{r Chargement des tables aspe}
+rdata_tables <- misc_nom_dernier_fichier(
+  repertoire = "../../../../Liste_rouge_BFC/raw_data",
+  pattern = "^tables")
+load(rdata_tables) # Chargement des données 
+```
+
+```{r Chargement des fonctions}
+source(file = "../R/calcul_biomasse.R")
+source(file = "../R/calcul_50_percentile.R")
+source(file = "../R/calcul_ecart_interquartile.R")
+source(file = "../R/calcul_25_percentile.R")
+source(file = "../R/calcul_75_percentile.R")
+source(file = "../R/calcul_densite_surface.R")
+```
+
+
+# Les indicateurs par opérations de pêche 
+
+## Indicateurs généraux par opérations de pêche
+
+Plusieurs indicateurs simples témoignants de la dynamique de population des poissons d'eau douce sont calculés dans un premier temps à l'opération de pêche. 
+
+
+### Effectifs totaux
+
+Les effectifs totaux de chacune des espèces sur chaque opération de pêches (*ope_id*) sont calculés à partir du jeu de données *mei_ope_selection*. Dans un premier temps, le calcul s'effectue sur l'ensemble des données (sans distinction de stade). 
+
+*NB* : Nous considerons les éventuels *NA* en *mei_id* précédemment repérés dans le script 04_pre_traitements_donnees_ope_especes (et nous leurs affectons les données d'effectifs du *lop_id* correspondant).
+
+```{r Création tableau effectif total par ope}
+ope_effectif_ind <- mei_ope_selection %>%
+  mutate(valeur_effectif = ifelse(startsWith(mei_id, "na_vigilance"), lop_effectif, 1)) %>%  # Remplace les valeurs commençant par "na_vigilance" par lop_effectif
+  group_by(ope_id, esp_code_alternatif) %>%
+  summarise(valeur = sum(valeur_effectif),
+            .groups = 'drop') %>%
+  mutate(indicateur = "effectif_total",
+         stade = "ind") %>%
+  dplyr::select(ope_id,
+    esp_code_alternatif,
+    indicateur,
+    valeur,
+    stade)
+```
+
+
+Dans un second temps, l'indicateur est calculé par stade (juvénile et adulte). 
+
+```{r Création tableau effectif total par ope et stade}
+ope_effectif_stade <- mei_ope_selection %>%
+  mutate(valeur_effectif = ifelse(startsWith(mei_id, "na_"), lop_effectif, 1)) %>%  # Remplace les valeurs commençant par "na_" par lop_effectif
+  group_by(ope_id,
+           esp_code_alternatif,
+           stade) %>%
+  summarise(valeur = sum(valeur_effectif),
+            indicateur = "effectif_total",
+            .groups = 'drop') %>%
+  dplyr::select(ope_id,
+         esp_code_alternatif,
+    indicateur,
+    valeur,
+    stade)
+
+ope_effectif <- rbind (ope_effectif_ind,
+                       ope_effectif_stade)
+```
+
+Nous avons donc une première version des effectifs sans avoir inclut les absences. Les absences des espèces correspondent au cas où une espèce a déjà été interceptée sur une station lors d'une année de pêche, mais qu'elle n'y a pas été retrouvée lors des années suivantes. 
+
+Création d'un dataframe avec toutes les combinaisons possibles d'*ope_id*, *esp_code_alternatif* et années présentes dans les données ; et ajout des *NA* :
+
+```{r Création tableau effectif total par ope et stade avec NA}
+ope_effectif_ind <- ope_effectif_ind %>% 
+  left_join(ope_selection) %>% 
+  dplyr::select(-sta_id,
+         -pro_libelle,
+         -ope_date,
+         -pop_libelle)
+
+ope_full <- mef_ajouter_abs(ope_effectif_ind,
+                      var_id = ope_id,
+                      var_taxon = esp_code_alternatif,
+                      var_effectif = valeur)
+
+ope_effectif_absences <- ope_full %>%
+  mutate(
+    valeur = ifelse(is.na(valeur), 0, valeur),
+    indicateur = 'effectif_total',
+    stade = "ind"
+  ) %>%
+  dplyr::select(ope_id, esp_code_alternatif, indicateur, valeur, stade)
+```
+
+
+### Biomasses
+
+Les biomasses de chacune des espèces sur chaque opération de pêches (*ope_id*) sont calculées à partir du jeu de données *mei_ope_selection*. Dans un premier temps, l'ensemble des stades sont gardés. 
+
+```{r Création tableau biomasse totale par ope}
+ope_biomasse <- mei_ope_selection %>% # Calcul de la biomasse par opération sans distinction de stade
+  group_by(ope_id,
+           esp_code_alternatif,
+           stade) %>%
+  summarise(valeur=sum(poids_tp, na.rm = TRUE)) %>% 
+  mutate(indicateur= "biomasse") %>% 
+  dplyr::select(ope_id,
+         esp_code_alternatif,
+         indicateur,
+         valeur,
+         stade)
+```
+
+
+Dans un second temps, l'indicateur de la biomasse est calculé par stade (*juv*, *ad* et *ind*) et les diffréentes données sont regroupées dans un tableau global relatif à l'indicateur biomasse : *ope_biomasse*.
+
+```{r Création tableau biomasse totale par ope 2}
+ope_biomasse <- ope_biomasse %>%
+  bind_rows(ope_biomasse %>%
+      filter(stade %in% c("ad", "juv")) %>%
+      group_by(indicateur,
+               ope_id,
+               esp_code_alternatif) %>%
+      summarise(stade = "ind", valeur = sum(valeur)))
+```
+
+
+### Densités surfaciques
+
+  Les densités surfaciques de chacune des espèces sur chaque opération de pêche (*ope_id*) sont calculées à partir du jeu de données *mei_ope_selection*. Dans un premier temps, l'ensemble des stades sont gardés. Il est nécessaire d'ajouter les données de surfaces prospectées lors de l'opération de pêche afin de calculer les densités surfaciques : les valeurs d'*ope_surface_calculee* sont ajoutés au dataframe principal. 
+
+```{r Ajout des données de surfaces calculées}
+mei_ope_selection <- mei_ope_selection %>%
+  left_join (y = operation %>%
+               dplyr::select (
+                 ope_id,
+                 ope_surface_calculee,
+                 # Ajout surfaces échantillonnées
+                 passage$pas_numero
+               ))
+```
+
+La fonction *calcul_densite_surface* calcule les densités surfaciques par opération, espèce et par stade : les résultats sont renvoyés dans le jeu de données *ope_densite_surf*. 
+
+```{r Calcul densités surfaciques}
+ope_densite_surf <- calcul_densite_surface(mei_ope_selection,
+                                           ope_surface_calculee,
+                                           ope_id,
+                                           esp_code_alternatif,
+                                           stade,
+                                           mei_id) 
+```
+
+### Pourcentage de juvéniles
+
+Le pourcentage de juvéniles de chacune des espèces pour chaque opération de pêche (*ope_id*)est calculé à partir du jeu de données *mei_ope_selection*. Nous utilisons les valeurs d'effectifs précèdemment calculées dans *ope_effectif*. 
+
+```{r Création dataframe pour indicateur pourcentage_juv}
+ope_pc_juv <- ope_effectif %>%
+  mutate(indicateur = "pourcentage_juveniles")
+```
+
+Le calcul de pourcentage de juvéniles par opération est effectué. Les résultats sont stockés dans le jeu de données *ope_pc_juv*.
+
+# CODE PROVISOIRE !!! SUPPRESSION DES LIGNES SANS STADE(NA)
+
+```{r calcul pourcentage de juv amelioré}
+# ope_pc_juv <- ope_pc_juv %>%
+#   ungroup() %>%
+#   # 1. Exclure les stades NA et les valeurs manquantes
+#   filter(!is.na(stade), !is.na(valeur)) %>%
+#   # 2. Agréger les doublons
+#   group_by(ope_id, esp_code_alternatif, stade) %>%
+#   summarise(valeur = sum(valeur, na.rm = TRUE), .groups = "drop") %>%
+#   # 3. Compléter les combinaisons manquantes
+#   complete(ope_id,
+#            esp_code_alternatif,
+#            stade,
+#            fill = list(valeur = 0)) %>%
+#   # 4. Pivoter en large : une colonne par stade
+#   pivot_wider(names_from = stade,
+#               values_from = valeur,
+#               values_fill = 0) %>%
+#   # 5. Calculer le pourcentage directement
+#   mutate(valeur = (juv / ind) * 100) %>%
+#   filter(!is.nan(valeur), !is.infinite(valeur))
+```
+
+## Pourcentage de juveniles suite
+
+```{r Calcul pourcentage juvéniles}
+ope_pc_juv <- ope_pc_juv %>%
+  ungroup() %>%
+  complete(ope_id,
+           esp_code_alternatif,
+           stade,
+           indicateur,
+           fill = list(valeur = 0)) %>%
+    group_by(ope_id,
+             esp_code_alternatif) %>%
+  dplyr::mutate(valeur = (valeur [stade == "juv"] / valeur [stade == "ind"])*100) %>%
+  filter(stade == "ind",
+         !is.nan(valeur))
+```
+
+# Occurence des espèces
+
+```{r}
+ope_occurence <- ope_effectif_absences %>% 
+  mutate(valeur = if_else(valeur > 0, 1, 0), 
+         indicateur = "occurence")
+```
+
+
+# Création du tableau empilé des indicateurs
+
+L'ensemble des indicateurs précèdemment calculés à l'opération sont regroupés dans le dataframe *ope_indicateur*. 
+
+```{r Création df  "ope_indicateur"}
+# Création du tableau pré-final avec tous les indicateurs calculés
+ope_indicateur <- rbind(ope_densite_surf,
+                        ope_pc_juv,
+                        ope_biomasse,
+                        ope_effectif,
+                        ope_effectif_absences, 
+                        ope_occurence)
+```
+
+Les années d'opérations ainsi que les identifiants des points de prélèvements sont ajoutés au tableau *ope_indicateur*. 
+```{r Ajout données années et pop_id}
+# Ajout des années d'opération au site et à l'année (pop_id) et (ope_date)
+ope_indicateur <- ope_indicateur %>% 
+  ungroup() %>%   
+  left_join(y=operation %>% 
+              select(ope_id,
+                     pop_id= ope_pop_id,
+                     ope_date)) %>% 
+  mef_ajouter_ope_date() %>% 
+    select(ope_id,
+           esp_code_alternatif,
+           indicateur,
+           valeur,
+           stade,
+           pop_id,
+           annee)
+```
+Ajouter les absences pour la densié sufacique 
+
+```{r ajout des absences pour la densité surfacique}
+ope_indicateur_ind <- ope_indicateur %>% 
+  filter(indicateur == "densite_surface" & stade == "ind") 
+
+
+ope_full_densite <- mef_ajouter_abs(ope_indicateur_ind,
+                      var_id = ope_id,
+                      var_taxon = esp_code_alternatif,
+                      var_effectif = valeur)
+
+ope_densite_absences <- ope_full_densite %>%
+  mutate(
+    valeur = ifelse(is.na(valeur), 0, valeur),
+    indicateur = 'densite_surface',
+    stade = "ind"
+  ) %>%
+  dplyr::select(ope_id, esp_code_alternatif, indicateur, valeur, stade)
+```
+
+
+# Création du tableau final empilé des indicateurs
+
+L'ensemble des indicateurs précèdemment calculés à l'opération sont regroupés dans le dataframe *ope_indicateur*. 
+
+```{r Création df final "ope_indicateur"}
+# Création du tableau pré-final avec tous les indicateurs calculés
+ope_indicateur <- rbind(
+  # ope_densite_surf,
+  ope_pc_juv,
+  ope_biomasse,
+  # ope_effectif,
+  ope_effectif_absences,
+  ope_densite_absences,
+  ope_occurence
+)
+```
+
+Les années d'opérations ainsi que les identifiants des points de prélèvements sont ajoutés au tableau *ope_indicateur*. 
+
+```{r Ajout données années et pop_id inal}
+# Ajout des années d'opération au site et à l'année (pop_id) et (ope_date)
+ope_indicateur <- ope_indicateur %>% 
+  ungroup() %>%   
+  left_join(y=operation %>% 
+              select(ope_id,
+                     pop_id= ope_pop_id,
+                     ope_date)) %>% 
+  mef_ajouter_ope_date() %>% 
+    select(ope_id,
+           esp_code_alternatif,
+           indicateur,
+           valeur,
+           stade,
+           pop_id,
+           annee)
+```
+
+Nous visualisons le dataframe final *ope_indicateur* regroupant donc l'ensemble des indicateurs calculés à l'opération (par espèces et par stades). Il s'agit de notre tableau de bord final à l'échelle des opérations. 
+
+```{r Visualisation tableau "ope_indicateur"}
+#Représentation graphique du tableau 
+ope_indicateur%>%
+  DT::datatable(rownames = FALSE)
+```
+
+# Sauvegardes
+
+Nous sauvegardons dans un fichier .rda le jeu de données *ope_indicateur* qui nous servira pour des analyses futures.
+
+```{r Sauvegarde}
+save(ope_indicateur,
+     mei_ope_selection,
+     ope_effectif,
+     file = "../processed_data/assemblage_tab_par_ope.rda")
+```
+
+Nous sauvegardons à part les données d'effectifs et de densités surfaciques : 
+
+```{r Sauvegarde 2}
+save(ope_effectif_absences,
+     ope_densite_surf,
+     file = "../processed_data/donnees_densite_eff_abs.rda")
+```
+
+
+# Référence bibliographique
+  
+  Irz, P., Mondy, C., Richard, B. Bonnafoux, L. (2024). aspe: An R package to analyse and visualise river fish data in France. R package version 0.4.1, https://github.com/PascalIrz/aspe/

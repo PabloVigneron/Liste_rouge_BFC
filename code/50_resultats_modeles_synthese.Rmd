@@ -1,0 +1,359 @@
+---
+title: "LRR des poissons d'eau douce de BFC"
+subtitle: "50_resultats_modeles_synthese"
+author: "PabloVigneron"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  bookdown::html_document2:
+   fig_caption: yes
+   tab_caption: yes
+   number_sections: yes
+   global_numbering: yes
+   toc: yes
+   toc_float:
+         toc_collapsed: yes
+         toc_depth: 2
+   code_folding: hide
+   css: "style.css"
+#bibliography: .bib
+#link-citations: true
+#cls: apa.cls
+#editor_options: 
+#  markdown: 
+#    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+Script : 50_resultats_modeles_synthese
+
+# Installation 
+
+Chargement des packages, fonctions et des données 
+
+```{r Chargement des packages}
+library(lme4)
+library(aspe)
+library(tidyverse)
+library(aspe)
+library(sjstats)
+library(gt)
+library(glmmTMB)
+library(RVAideMemoire)
+# library(lmerTest)  # remplace lme4 automatiquement
+library(ggh4x)
+library(mgcv) # modele GAMMs
+library(gratia)
+library(patchwork)
+library(lme4)
+library(car) # fonction Anova()
+library(gstat)#semi_variogramme
+library(DHARMa) # Ajusting of the model 
+library(ggplotify)
+library(ggpubr)
+library(poptrend)
+```
+
+```{r Chargement des données}
+load(file = "../processed_data/selection_especes.rda")
+load(file = "../processed_data/selection_pop_ope.rda")
+load(file = "../processed_data/donnees_densite_eff_abs.rda")
+load(file = "../processed_data/assemblage_tab_par_ope.rda") # Tab ope_indicateur 
+load(file = "../processed_data/calcul_indicateurs_regionaux.rda") # Pour graphique indicateurs
+
+```
+
+```{r Chargement des fonctions}
+source(file = "../R/zip_glmm_calcul_modele.R")
+source(file = "../R/zip_glmm_application_modele.R")
+source(file = "../R/gamm_calcul_modele.R")
+source(file = "../R/gamm_application_modele.R")
+source(file = "../R/adequate_data_for_model.R")
+```
+
+```{r Chargement des tables de données}
+rdata_tables <- misc_nom_dernier_fichier(
+  repertoire = "../../../../Liste_rouge_BFC/raw_data",
+  pattern = "^tables")
+load(rdata_tables) # Chargement des données 
+```
+
+L'Objectif de ce script est de réaliser une synthèse des résultats obtenue via les analyses des modeles avec les différentes espèces de poissons d'eau douce de la région Bourgogne-Franche-Comte (BFC).
+
+Plan du script 
+
+1. Densite surfacique 
+
+a. **Modèles Linéaires Généralisé Mixtes (GLMM)**
+
+b. **Modèles Additifs Généralisé Mixtes (GAMMs)**  
+
+
+2. Occurence
+
+a. **Modèles Linéaires Généralisé Mixtes (GLMM)**
+
+<!-- ##b. **Modèles Additifs Généralisé Mixtes (GAMMs)**   -->
+
+3. Biomasse
+
+a. **Modèles Linéaires Généralisé Mixtes (GLMM)**
+
+<!-- ##b. **Modèles Additifs Généralisé Mixtes (GAMMs)**   -->
+
+
+
+On commence par l'indicateur d'abondance : la densité surfacique.
+
+
+#1. Densite surfacique 
+
+On importe le jeu de donnée et on fait des ajustement pour avoir toutes les variables avec les bons noms.
+
+```{r}
+# preparer la table pour jointure
+ope_selection <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id)
+
+# Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
+coord_sta_id <- point_prelevement %>%
+  filter(pop_id %in% pop_serie_tempo) %>%
+  rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
+  select(pop_id, x, y) %>%
+  mutate(pop_id = as.factor(pop_id))
+
+# prepéarer la table pour jointure 
+esp_ope_selection_join <- esp_ope_selection %>% 
+  select(ope_id, ope_surface_calculee) %>% 
+  distinct(ope_id, .keep_all = TRUE)
+
+
+ope_effectif_glmm_abs <- ope_indicateur %>%
+  filter(indicateur == "densite_surface") %>% 
+  mef_ajouter_type_protocole() %>% 
+  left_join( y= ope_selection, by = c("ope_id", "pop_id", "annee")) %>% 
+  inner_join(esp_ope_selection_join, by = "ope_id") %>% 
+  mutate(
+    valeur = as.numeric(valeur) ,
+    annee = as.numeric(annee),
+    ope_surface_calculee = as.numeric(ope_surface_calculee),
+    pro_libelle = as.factor(pro_libelle),
+    pop_id = as.factor(pop_id),
+    sta_id = as.factor(sta_id),
+    stade = as.factor(stade)
+  ) %>%
+  left_join(coord_sta_id, by = "pop_id") %>%
+  mutate(x = as.numeric(x), y = as.numeric(y)) %>%
+  rename(espece = esp_code_alternatif) %>% 
+  filter(stade == "ind")
+```
+
+## ABLETTE (ABL)
+
+###a. **Modèles Linéaires Généralisé Mixtes (GLMM)**
+
+
+
+###b. **Modèles Additifs Généralisé Mixtes (GAMMs)**  
+```{r}
+data_esp <- ope_effectif_glmm_abs %>% 
+  filter(espece == "TRF")
+```
+
+
+Construire les modèles :
+
+```{r}
+mod_gamm_1.0 <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
+  data = data_esp,
+  family = poisson(link = "log"),
+  method = "REML"
+)
+mod_gamm_1.1 <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee))  + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
+  data = data_esp,
+  family = poisson(link = "identity"),
+  method = "REML"
+)
+mod_gamm_1.2 <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
+  data = data_esp,
+  family = poisson(link = "sqrt"),
+  method = "REML"
+)
+
+mod_gamm_1.3 <- gamm4(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y),
+  random = ~ (1 | sta_id),
+  data = data_esp,
+  family = nb(link = "log"),
+  method = "REML"
+)
+```
+
+Tester l'autocorrelation temporelle : 
+
+```{r}
+acf(residuals(mod_gamm_1.0$lme, type = "normalized"), lag.max = 20)
+acf(residuals(mod_gamm_1.1$lme, type = "normalized"), lag.max = 20)
+acf(residuals(mod_gamm_1.2$lme, type = "normalized"), lag.max = 20)
+acf(residuals(mod_gamm_1.3$lme, type = "normalized"), lag.max = 20)
+```
+
+Tester l'autocorrelation spatiale : 
+
+```{r, semivariogramme pour tester autocorrelation spatiale avec uniquement la variable reponse}
+var <- variogram(valeur ~ annee + ope_surface_calculee, locations = ~ x+y, data = data_esp)
+var
+plot(var, col= "black")
+```
+
+```{r semivariogramme ggplot}
+show.vgms(models = c("Exp",  # Exponential model
+                     "Sph",  # Spherical model
+                     "Gau",  # Gaussian model
+                     "Nug"), # Nugget model
+          nugget = 50)
+
+vfit <- fit.variogram(var, vgm(c("Exp", "Gau", "Sph")))
+vfit
+
+# Did the model-fitting process converge successfully?
+# This is not guaranteed for nonlinear models.
+attributes(vfit)$singular
+
+# For convenience, use show.vgms() to calculate the
+# predicted values for our fitted model
+fitted <-show.vgms(min = min(var$dist), 
+                   max = max(var$dist), 
+                   models ="Sph",
+                   range = vfit$range[2],
+                   sill = vfit$psill[2],
+                   nugget = vfit$psill[1],
+                   plot = FALSE)
+
+# Now we can easily plot this against the observed data
+ggplot(var, aes(dist, gamma)) + 
+  geom_point() + 
+  geom_line(data = fitted, 
+            aes(distance, semivariance),
+            linetype = 2)
+```
+
+Ajustement des modèles au données :
+
+```{r}
+appraise(mod_gamm_1.0)
+appraise(mod_gamm_1.1)
+appraise(mod_gamm_1.2)
+appraise(mod_gamm_1.3)
+```
+
+```{r}
+k.check(mod_gamm_1.0)
+k.check(mod_gamm_1.1)
+k.check(mod_gamm_1.2)
+k.check(mod_gamm_1.3)
+```
+
+
+```{r}
+res_mod_gamm_1.0 <- simulateResiduals(fittedModel = mod_gamm_1.0,
+                                      plot = TRUE,
+                                      n = 1000)
+res_mod_gamm_1.1 <- simulateResiduals(fittedModel = mod_gamm_1.1,
+                                      plot = TRUE,
+                                      n = 1000)
+res_mod_gamm_1.2 <- simulateResiduals(fittedModel = mod_gamm_1.2,
+                                      plot = TRUE,
+                                      n = 1000)
+res_mod_gamm_1.3 <- simulateResiduals(fittedModel = mod_gamm_1.3,
+                                      plot = TRUE,
+                                      n = 1000)
+res_mod_gamm_1.0
+res_mod_gamm_1.1
+res_mod_gamm_1.2
+res_mod_gamm_1.3
+```
+
+```{r}
+DHARMa::testDispersion(res_mod_gamm_1.0)
+DHARMa::testDispersion(res_mod_gamm_1.1)
+DHARMa::testDispersion(res_mod_gamm_1.2)
+DHARMa::testDispersion(res_mod_gamm_1.3)
+
+```
+
+```{r}
+concurvity(mod_gamm_1.0)
+concurvity(mod_gamm_1.1)
+concurvity(mod_gamm_1.2)
+concurvity(mod_gamm_1.3)
+```
+
+
+```{r}
+draw(mod_gamm_1.0, residuals = T)
+draw(mod_gamm_1.1, residuals = T)
+draw(mod_gamm_1.2, residuals = T)
+draw(mod_gamm_1.3, residuals = T)
+```
+
+
+Selection de modèle par l'AIC :
+
+```{r}
+AIC(
+  mod_gamm_1.0, 
+  mod_gamm_1.1,
+  mod_gamm_1.2,
+  mod_gamm_1.3
+  )
+```
+
+
+Resultats poptrend :
+
+```{r}
+trend <- poptrend::ptrend(
+  valeur ~ trend(annee, tempRE = F, type = "smooth") + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  data = data_esp,
+  family = nb(link = "log"),
+  bootType = "hessian",
+  gamModel = TRUE,
+  engine = "gam"
+)
+# Ajustement du modele
+poptrend::checkFit(trend, residuals = T)
+
+summary(trend)
+```
+
+```{r}
+#Representation graphique du modele
+plot(trend, residuals = T)
+```
+
+```{r}
+# Compute the change in the population over a time interval
+poptrend::change(trend, start = 2007 , end = 2025, alpha = 0.05)
+```
+
+
+#2. Occurence
+
+###a. **Modèles Linéaires Généralisé Mixtes (GLMM)**
+
+<!-- ##b. **Modèles Additifs Généralisé Mixtes (GAMMs)**   -->
+
+#3. Biomasse
+
+###a. **Modèles Linéaires Généralisé Mixtes (GLMM)**
+
+<!-- ##b. **Modèles Additifs Généralisé Mixtes (GAMMs)**   -->
+

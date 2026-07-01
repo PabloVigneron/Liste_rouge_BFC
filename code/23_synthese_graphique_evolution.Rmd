@@ -1,0 +1,828 @@
+---
+title: "LRR des poissons d'eau douce de BFC"
+subtitle: "23_synthese_graphique_evolution"
+author: "PabloVigneron"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  bookdown::html_document2:
+   fig_caption: yes
+   tab_caption: yes
+   number_sections: yes
+   global_numbering: yes
+   toc: yes
+   toc_float:
+         toc_collapsed: yes
+         toc_depth: 2
+   code_folding: hide
+   css: "style.css"
+#bibliography: .bib
+#link-citations: true
+#cls: apa.cls
+#editor_options: 
+#  markdown: 
+#    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+Script : 23_synthese_graphique_evolution
+# Installation 
+
+Chargement des packages, fonctions et des données 
+
+```{r Chargement des packages}
+library(lme4)
+library(aspe)
+library(tidyverse)
+library(aspe)
+library(sjstats)
+library(gt)
+library(glmmTMB)
+library(RVAideMemoire)
+# library(lmerTest)  # remplace lme4 automatiquement
+library(ggh4x)
+library(mgcv) # modele GAMMs
+library(gratia)
+library(patchwork)
+library(lme4)
+library(car) # fonction Anova()
+library(gstat)#semi_variogramme
+library(DHARMa) # Ajusting of the model 
+library(ggplotify)
+library(ggpubr)
+library(poptrend)
+```
+
+```{r Chargement des données}
+load(file = "../processed_data/selection_especes.rda")
+load(file = "../processed_data/selection_pop_ope.rda")
+load(file = "../processed_data/donnees_densite_eff_abs.rda")
+load(file = "../processed_data/assemblage_tab_par_ope.rda") # Tab ope_indicateur 
+load(file = "../processed_data/calcul_indicateurs_regionaux.rda") # Pour graphique indicateurs
+
+```
+
+```{r Chargement des fonctions}
+source(file = "../R/zip_glmm_calcul_modele.R")
+source(file = "../R/zip_glmm_application_modele.R")
+source(file = "../R/gamm_calcul_modele.R")
+source(file = "../R/gamm_application_modele.R")
+source(file = "../R/adequate_data_for_model.R")
+```
+
+```{r Chargement des tables de données}
+rdata_tables <- misc_nom_dernier_fichier(
+  repertoire = "../../../../Liste_rouge_BFC/raw_data",
+  pattern = "^tables")
+load(rdata_tables) # Chargement des données 
+```
+
+L'Objectif de ce script est de réaliser une synthèse graphique des résultats obtenue des indicateurs des différentes espèces de poissons d'eau douce de la région Bourgogne-Franche-Comte (BFC): 
+
+- **La Densité surfacique**
+
+- **La Biomasse**
+
+- **L'occurence**
+
+- **Le pourcentage de juvéniles**
+
+# Representation graphique
+
+On réalise une représentation graphique des différents indicateurs calculés pour chacune des espèces à évaluer.
+
+
+```{r indicateur labels}
+indicateur_labels <- c(
+  "densite_surface" = "Densité surfacique",
+  "effectif_total" = "Effectif total",
+  "pourcentage_juveniles" = "Pourcentage de juvéniles",
+  "taux_occurrence" = "Taux d'occurrence",
+  "biomasse" = "Biomasse"
+)
+```
+
+
+
+```{r graphique evolution indicateur régionale par annee loess, fig.height = 80, fig.width = 20}
+
+indicateur_for_graph <- reg_indicateur %>%
+  filter(stade == "ind",indicateur %in% c(
+      "biomasse",
+      "densite_surface",
+      # "effectif_total",
+      "pourcentage_juveniles", 
+      "taux_occurrence"
+  )) %>%
+  rename(espece = esp_code_alternatif) %>%
+  ggplot(aes(x = annee, y = valeur)) +
+  facet_wrap2(
+    espece ~ indicateur,
+    ncol = 4,
+    scales = "free_y",
+    axes = "all",
+    trim_blank = T, 
+    strip.position = "top",
+    labeller = labeller(indicateur = indicateur_labels)
+  ) +
+  geom_point(shape = 21, size = 2) +
+  geom_line(linetype = 3, linewidth = 0.5) +
+  labs(title = "Indicateurs de tendances à l'échelle régionale des espèces de poissons d'eau douce de BFC", x = "Années", y = "Valeur indicateur") +
+  geom_smooth(method = "loess",
+              se = F,
+              color = "darkred") +
+  # theme_bw()+
+  theme(strip.background = element_rect(color = "black", fill = "#faffff"),
+        legend.position = "bottom",
+        panel.background = element_rect(fill = "grey95"),
+        panel.grid.major = element_line(color = "#faffff", size = 0.1),
+        panel.grid.minor = element_line(color = "#faffff"),
+        axis.text.x = element_text(angle = 45)
+  ) +
+  geom_vline(
+    data = . %>% filter(
+      espece %in% c(
+        "ABL",
+        "BAF",
+        "BLN",
+        "BRB",
+        "BRE",
+        "BRO",
+        "CCO",
+        "CHA",
+        "CHE",
+        "EPI",
+        "EPT",
+        "GAR",
+        "GOU",
+        "HOT",
+        "LOF",
+        "LOR",
+        "LOT",
+        "OBR",
+        "PER",
+        "ROT",
+        "SAT",
+        "SPI",
+        "TAN",
+        "TOX",
+        "TRF",
+        "VAI",
+        "VAN",
+        "VAR"
+      ) &
+        annee == 2015
+    ),
+    aes(xintercept = 2015),
+    linetype = "dotted",
+    color = "red",
+    size = 1
+  )
+print(indicateur_for_graph)
+```
+
+```{r graphique evolution indicateur régionale par annee loess, fig.height = 80, fig.width = 20}
+indicateur_for_graph <- reg_indicateur %>%
+  filter(
+    stade == "ind",
+    indicateur %in% c(
+      "biomasse",
+      "densite_surface",
+      # "effectif_total",
+      "pourcentage_juveniles",
+      "taux_occurrence"
+    )
+  ) %>%
+  rename(espece = esp_code_alternatif) %>%
+  ggplot(aes(x = annee, y = valeur)) +
+  facet_grid2(
+    espece ~ indicateur,
+    scales = "free",
+    independent = "y",
+    axes = "all",
+    labeller = labeller(indicateur = indicateur_labels)
+  ) +
+  geom_point(shape = 21, size = 2) +
+  geom_line(linetype = 3, linewidth = 0.5) +
+  labs(title = "Indicateurs de tendances à l'échelle régionale des espèces de poissons d'eau douce de BFC", x = "Années", y = "Valeur indicateur") +
+  geom_smooth(method = "loess",
+              se = F,
+              color = "darkred") +
+  theme_bw() +
+  theme(
+    strip.background = element_rect(color = "black", fill = "#faffff"),
+    legend.position = "bottom",
+    panel.background = element_rect(fill = "grey95"),
+    panel.grid.major = element_line(color = "#faffff", size = 0.1),
+    panel.grid.minor = element_line(color = "#faffff"),
+    axis.text.x = element_text(angle = 45)
+  ) +
+  geom_vline(
+    data = . %>% filter(
+      espece %in% c(
+        "ABL",
+        "BAF",
+        "BLN",
+        "BRB",
+        "BRE",
+        "BRO",
+        "CCO",
+        "CHA",
+        "CHE",
+        "EPI",
+        "EPT",
+        "GAR",
+        "GOU",
+        "HOT",
+        "LOF",
+        "LOR",
+        "LOT",
+        "OBR",
+        "PER",
+        "ROT",
+        "SAT",
+        "SPI",
+        "TAN",
+        "TOX",
+        "TRF",
+        "VAI",
+        "VAN",
+        "VAR"
+      ) &
+        annee == 2015
+    ),
+    aes(xintercept = 2015),
+    linetype = "dotted",
+    color = "red",
+    size = 1
+  )
+
+print(indicateur_for_graph)
+```
+
+
+
+# Test glmm binomiale
+
+
+
+```{r DF avec coord et absences}
+# preparer la table pour jointure
+ope_selection <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id)
+
+# Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
+coord_sta_id <- point_prelevement %>%
+  filter(pop_id %in% pop_serie_tempo) %>%
+  rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
+  select(pop_id, x, y) %>%
+  mutate(pop_id = as.factor(pop_id))
+
+# prepéarer la table pour jointure 
+esp_ope_selection_join <- esp_ope_selection %>% 
+  select(ope_id, ope_surface_calculee) %>% 
+  distinct(ope_id, .keep_all = TRUE)
+
+occu_data <- ope_indicateur %>% 
+  filter(indicateur == "occurence") %>% 
+  mef_ajouter_type_protocole() %>%
+  left_join(ope_selection, by = c("ope_id", "pop_id", "annee")) %>% 
+  left_join(esp_ope_selection_join, by = "ope_id") %>% 
+  mutate(
+    valeur = as.numeric(valeur) ,
+    annee = as.numeric(annee),
+    ope_surface_calculee = as.numeric(ope_surface_calculee),
+    pro_libelle = as.factor(pro_libelle),
+    pop_id = as.factor(pop_id),
+    sta_id = as.factor(sta_id), 
+    stade = as.factor(stade)
+  ) %>%
+  left_join(coord_sta_id, by = "pop_id") %>% 
+  mutate(x = as.numeric(x), 
+         y = as.numeric(y))%>%
+  rename(espece = esp_code_alternatif)
+```
+
+
+```{r}
+truite_data <- occu_data %>% 
+  filter(espece == "TRF")
+```
+
+# Analse GLMM ZIP
+
+```{r}
+mod <- glmer(
+  valeur ~ annee  + ope_surface_calculee +pro_libelle + (1 |sta_id),
+  data = truite_data,
+  family = binomial(link = "logit")
+)
+
+mod_2 <- glmer(
+  valeur ~ annee  + ope_surface_calculee + pro_libelle + (1 |sta_id),
+  data = truite_data,
+  family = binomial(link = "probit")
+)
+
+mod_3 <- glmer(
+  valeur ~ annee  + ope_surface_calculee + pro_libelle + (1 |sta_id),
+  data = truite_data,
+  family = binomial(link = "cauchit")
+)
+mod_4 <- glmer(
+  valeur ~ annee  + ope_surface_calculee + pro_libelle + (1 | sta_id),
+  data = truite_data,
+  family = binomial(link = "log")
+)
+mod_5 <- glmer(
+  valeur ~ annee  + ope_surface_calculee + pro_libelle + (1 | sta_id),
+  data = truite_data,
+  family = binomial(link = "cloglog"))
+
+```
+
+```{r}
+plotresid(mod)
+plotresid(mod_2)
+plotresid(mod_3)
+# plotresid(mod_4)
+plotresid(mod_5)
+overdisp.glmer(mod_2)
+overdisp.glmer(mod_3)
+overdisp.glmer(mod)
+overdisp.glmer(mod_5)
+
+summary(mod_5)
+summary(mod_3)
+
+```
+
+```{r}
+mod_gam <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  data = truite_data,
+  family = binomial(link = "logit"),
+  method = "REML"
+)
+```
+
+```{r}
+appraise(mod_gam)
+```
+```{r}
+draw(mod_gam, residuals = T)
+```
+```{r}
+# install.packages("poptrend")
+# library(poptrend)
+
+trend <- poptrend::ptrend(
+  valeur ~ trend(annee, tempRE = F, type = "smooth") + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  data = truite_data,
+  family = binomial(link = "logit"),
+  # nGrid = 20,
+  # nBoot = 500,
+  bootType = "hessian",
+  gamModel = TRUE,
+  engine = "gam"
+)
+
+poptrend::checkFit(trend, residuals = T)
+plot(trend, residuals = T)
+
+summary(trend)
+
+# Compute the change in the population over a time interval.
+poptrend::change(trend, start = 2007 , end = 2025, alpha = 0.05)
+
+```
+
+# Resultats DENSITE 
+
+## Preparation du df pour la Densite
+
+```{r}
+# preparer la table pour jointure
+ope_selection <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id)
+
+# Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
+coord_sta_id <- point_prelevement %>%
+  filter(pop_id %in% pop_serie_tempo) %>%
+  rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
+  select(pop_id, x, y) %>%
+  mutate(pop_id = as.factor(pop_id))
+
+# prepéarer la table pour jointure 
+esp_ope_selection_join <- esp_ope_selection %>% 
+  select(ope_id, ope_surface_calculee) %>% 
+  distinct(ope_id, .keep_all = TRUE)
+
+
+ope_effectif_glmm_abs <- ope_indicateur %>%
+  filter(indicateur == "densite_surface") %>% 
+  mef_ajouter_type_protocole() %>% 
+  left_join( y= ope_selection, by = c("ope_id", "pop_id", "annee")) %>% 
+  inner_join(esp_ope_selection_join, by = "ope_id") %>% 
+  mutate(
+    valeur = as.numeric(valeur) ,
+    annee = as.numeric(annee),
+    ope_surface_calculee = as.numeric(ope_surface_calculee),
+    pro_libelle = as.factor(pro_libelle),
+    pop_id = as.factor(pop_id),
+    sta_id = as.factor(sta_id),
+    stade = as.factor(stade)
+  ) %>%
+  left_join(coord_sta_id, by = "pop_id") %>%
+  mutate(x = as.numeric(x), y = as.numeric(y)) %>%
+  rename(espece = esp_code_alternatif) %>% 
+  filter(stade == "ind")
+```
+
+
+## Representation Graphique de la densité
+
+```{r Creation du df par especes avec biomasses total par année}
+total_densite_esp <- ope_effectif_glmm_abs %>% 
+  group_by(annee, espece, indicateur) %>%
+  summarise(densite_total = mean(valeur), .groups = "drop") %>% 
+  select(espece, annee, densite_total, indicateur)
+```
+
+```{r graphique evolution densite par annee loess, fig.height = 30, fig.width = 15}
+
+densite_total_esp <- ggplot(total_densite_esp, aes(x = annee, y = densite_total)) +
+  facet_wrap2(
+    espece ~ indicateur,
+    ncol = 3,
+    scales = "free_y",
+    axes = "all",
+    trim_blank = T
+  ) +
+  geom_point(shape = 21, size = 2) +
+  geom_line(linetype = 3, linewidth = 0.5) +
+  labs(x = "Années", y = "Densite total") +
+  geom_smooth(method = "loess", se = F,color = "darkred") +
+  theme(
+    strip.background = element_rect(color = "grey85", fill = "grey85"),
+    legend.position = "bottom",
+    panel.background = element_rect(fill = "grey95"),
+    panel.grid.major = element_line(color = "#faffff", size = 0.1),
+    panel.grid.minor = element_line(color = "#faffff")
+  ) +
+  geom_vline(
+    data = . %>% filter(espece %in% c("ABL","BAF","BLN","BRB", "BRE","BRO","CCO","CHA","CHE", "EPI", "EPT", "GAR", "GOU","HOT","LOF","LOR", "LOT", "OBR", "PER", "ROT", "SAT", "SPI", "TAN", "TOX", "TRF","VAI","VAN","VAR") &
+                          annee == 2015),
+    aes(xintercept = 2015),
+    linetype = "dotted",
+    color = "red",
+    size = 1
+  )
+
+densite_total_esp
+```
+
+
+
+
+
+# TRY TREND pop Trend
+```{r DF avec coord et absences}
+# preparer la table pour jointure
+ope_selection <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id)
+
+# Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
+coord_sta_id <- point_prelevement %>%
+  filter(pop_id %in% pop_serie_tempo) %>%
+  rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
+  select(pop_id, x, y) %>%
+  mutate(pop_id = as.factor(pop_id))
+
+# prepéarer la table pour jointure 
+esp_ope_selection_join <- esp_ope_selection %>% 
+  select(ope_id, ope_surface_calculee) %>% 
+  distinct(ope_id, .keep_all = TRUE)
+
+
+ope_effectif_glmm_abs <- ope_effectif_absences %>%
+  mef_ajouter_type_protocole() %>%
+  left_join(ope_selection, by = "ope_id") %>%
+  inner_join(esp_ope_selection_join, by = "ope_id") %>%
+  mutate(
+    valeur = as.numeric(valeur) ,
+    annee = as.numeric(annee),
+    ope_surface_calculee = as.numeric(ope_surface_calculee),
+    pro_libelle = as.factor(pro_libelle),
+    pop_id = as.factor(pop_id),
+    sta_id = as.factor(sta_id), 
+    stade = as.factor(stade)
+  ) %>%
+  left_join(coord_sta_id, by = "pop_id") %>% 
+  mutate(x = as.numeric(x), 
+         y = as.numeric(y))%>%
+  rename(espece = esp_code_alternatif)
+```
+
+```{r}
+source(file = "../R/zip_glmm_calcul_modele.R")
+source(file = "../R/zip_glmm_application_modele.R")
+```
+
+```{r Etablir les périodes etudes GLMM}
+liste_periodes_etude <- list(c(2007, 2025))# Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin) 
+```
+
+```{r Exécution fonction ZIP_GLMM}
+zip_glmm_resultats <- zip_glmm_application_modele(data = ope_effectif_glmm_abs,
+                                          liste_periodes = liste_periodes_etude)
+```
+
+
+```{r Mise en forme sortie fonction ZIP_GLMM}
+zip_glmm_resultats_annee <- zip_glmm_resultats %>% 
+  filter(row_name == "annee") %>% 
+  select(periode,
+         esp_code_alternatif,
+         p_value,
+         Estimate,
+         sig, 
+         family) %>% 
+  mutate(trend = case_when(
+      Estimate > 0 ~ "\U2197",
+      Estimate < 0 ~ "\U2198",
+      TRUE ~ "."))
+```
+
+
+```{r Sélection des données résultats ZIP_GLMM}
+# Filtrer les données selon les critères spécifiés
+zip_glmm_resultats_format <- zip_glmm_resultats_annee %>%
+  filter((esp_code_alternatif == "ANG" & periode == "2007-2025") |
+    (esp_code_alternatif %in% c(c("ABL","BAF","BLN","BRB", "BRE","BRO","CCO","CHA","CHE", "EPI", "EPT", "GAR", "GOU","HOT","LOF",   "LOR", "LOT","LPM" ,"LPP", "OBR", "PER", "ROT", "SAT", "SPI", "TAN", "TOX", "TRF","VAI","VAN","VAR")) & periode == "2007-2025"))
+
+```
+
+Construction d'un tableau récapitulatif des résultats du modèle GLMM :
+
+```{r}
+df_zip_glmm_resultats <- zip_glmm_resultats_format %>%
+  select(esp_code_alternatif, periode, trend, sig, Estimate, family) %>%
+  mutate(Estimate = round(Estimate, digits = 2)) %>%
+  rename(
+    "Code Espèce" = esp_code_alternatif,
+    "Periode" = periode,
+    "Tendance" = trend,
+    "Coefficient" = Estimate,
+    "Significativité" = sig,
+    "Famille de distribution" = family
+  ) %>%
+  arrange(`Code Espèce`) # Ordonner par espèce, indicateur et stade
+
+# Lignes positives et significatives
+i_vert  <- which(
+  df_zip_glmm_resultats$Tendance == "\U2197" &
+    df_zip_glmm_resultats$Significativité %in% c("*", "**", "***")
+)
+# Lignes négatives et significatives
+i_rouge <- which(
+  df_zip_glmm_resultats$Tendance == "\U2198" &
+    df_zip_glmm_resultats$Significativité %in% c("*", "**", "***")
+)
+
+tab_zip_glmm_resultats <- df_zip_glmm_resultats %>%
+  flextable::flextable() %>%
+  flextable::autofit() %>%
+  flextable::colformat_int(j = c(1, 3), big.mark = " ") %>%
+  flextable::theme_vanilla() %>%
+  flextable::font(fontname = "calibri") %>%
+  flextable::fontsize(size = 13) %>%
+  flextable::bg(i = i_vert, bg = "darkolivegreen3") %>%   # vert clair
+  flextable::bg(i = i_rouge, bg = "coral3") %>%   # rouge clair
+  flextable::align(align = "center") %>%
+  flextable::set_caption("Synthèse des tendances des effectifs des populations de poissons d'eau douce de BFC")
+
+tab_zip_glmm_resultats
+```
+
+#
+
+```{r}
+truite_data <- ope_effectif_glmm_abs %>% 
+  filter(espece == "VAN")
+```
+
+
+
+## Estimation GAMM des tendances TRF
+```{r}
+mod <- gamm(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y),
+  random = list(sta_id =  ~ 1),
+  data = truite_data,
+  family = poisson(link = "log"),
+  method = "REML"
+)
+```
+
+
+```{r}
+draw(mod, residuals = T)
+```
+
+```{r}
+# Nombre de stations dans mon dataframe
+nb_station <- truite_data %>%
+  filter(valeur > 0) %>% 
+  summarise(total_station = n_distinct(sta_id))
+nb_station
+```
+
+
+```{r}
+trend <- poptrend::ptrend(
+  valeur ~ trend(annee, tempRE = F, type = "smooth") + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  data = truite_data,
+  family = nb(link = "log"),
+  # nGrid = 20,
+  # nBoot = 500,
+  bootType = "hessian",
+  gamModel = TRUE,
+  engine = "gam"
+)
+
+poptrend::checkFit(trend, residuals = T)
+plot(trend, residuals = T)
+
+summary(trend)
+
+# Compute the change in the population over a time interval.
+poptrend::change(trend, start = 2007 , end = 2025, alpha = 0.05)
+
+```
+Compare with glmm zip data : 
+```{r, construction des modeles glmmzi}
+mod_zi_1.0 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) +pro_libelle + (1 |
+                                                           sta_id) ,
+  data = truite_data,
+  family = poisson(link = "log"),
+  ziformula = ~ 1
+)
+mod_zi_1.1 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = nbinom2(link = "log"),
+  data = truite_data,
+  ziformula = ~ 1
+)
+mod_zi_1.2 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = truncated_poisson(link = "log"),
+  data = truite_data,
+  ziformula = ~ 1
+)
+mod_zi_1.3 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = truncated_nbinom2(link = "log"),
+  data = truite_data,
+  ziformula = ~ 1
+)
+```
+
+On selectionne à l'aide du critère AIC le meilleur modèle c'est à dire le modèle avec le plus petit AIC. 
+
+```{r, selection du meilleur modeles}
+AIC(mod_zi_1.0, mod_zi_1.1, mod_zi_1.2, mod_zi_1.3)
+```
+
+```{r plotresid des modèles glmm zero inflated, fig.height = 10, fig.width = 20}
+res_mod_zi_1.0 <- as.ggplot(~ plotresid(mod_zi_1.0))
+res_mod_zi_1.1 <- as.ggplot(~ plotresid(mod_zi_1.1))
+res_mod_zi_1.2 <- as.ggplot(~ plotresid(mod_zi_1.2))
+res_mod_zi_1.3 <- as.ggplot(~ plotresid(mod_zi_1.3))
+
+ggarrange(
+  res_mod_zi_1.0,
+  res_mod_zi_1.1,
+  res_mod_zi_1.2,
+  res_mod_zi_1.3,
+  ncol = 2,
+  nrow = 2,
+  labels = c("poisson", "nbinom2", "truncated_poisson", "truncated_nbinom2"),
+  font.label = list(
+    size = 13,
+    color = "darkred",
+    face = "bold",
+    family = NULL
+  ),
+  hjust = -0.1,
+  vjust = 1.6,
+  align = c("none", "h", "v", "hv")
+)
+```
+
+```{r plotresid DHARMa des modèles glmm zero inflated, fig.height = 10, fig.width = 20}
+
+sim_res_mod_zi_1.0 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.0, n = 1000), quantreg = T))
+sim_res_mod_zi_1.1 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.1, n = 1000), quantreg = T))
+sim_res_mod_zi_1.2 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.2, n = 1000), quantreg = T))
+sim_res_mod_zi_1.3 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.3, n = 1000), quantreg = T))
+
+ggarrange(
+  sim_res_mod_zi_1.0,
+  sim_res_mod_zi_1.1,
+  sim_res_mod_zi_1.2,
+  sim_res_mod_zi_1.3,
+  ncol = 2,
+  nrow = 2,
+  labels = c("poisson", "nbinom2", "truncated_poisson", "truncated_nbinom2"),
+  font.label = list(
+    size = 13,
+    color = "darkred",
+    face = "bold",
+    family = NULL
+  ),
+  hjust = -0.1,
+  vjust = 1.6,
+  align = c("none", "h", "v", "hv")
+)
+```
+
+```{r}
+summary(mod_zi_1.1)
+```
+```{r}
+
+```
+
+
+
+# Resultats BIOMASSE 
+
+## Preparation du df pour la Biomasse
+
+```{r preparation du df pour zip glmm biomasse}
+# Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
+coord_sta_id <- point_prelevement %>%
+  filter(pop_id %in% pop_serie_tempo) %>%
+  rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
+  select(pop_id, x, y)
+
+# preparer la table pour jointure
+ope_selection <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id)
+
+ope_biomasse_glm <- ope_indicateur %>%
+  mef_ajouter_type_protocole() %>%
+  mef_ajouter_ope_date() %>% 
+  mef_ajouter_surf_calc() %>% 
+  # mef_ajouter_objectif() %>%  # Ajout  des objectifs de pêches
+  inner_join(y = ope_selection, by = c("ope_id", "annee", "pop_id")) %>% 
+  left_join(coord_sta_id, by = "pop_id") %>%
+  mutate(
+    valeur = as.numeric(valeur) ,
+    annee = as.numeric(annee),
+    # annee_an = annee,
+    ope_surface_calculee = as.numeric(ope_surface_calculee) ,
+    pro_libelle = as.factor(pro_libelle),
+    pop_id = as.factor(pop_id),
+    sta_id = as.factor(sta_id),
+    # obj_libelle = as.factor(obj_libelle),
+    # indicateur = "effectif_total"
+    ) %>% 
+  # ) %>% # creation d'une colonne pour la période (ex : 2007-2008)
+  # mutate(annee = {
+  #   debut <- floor((annee - annee_debut_periode) / 2) * 2 + annee_debut_periode
+  #   paste0(debut)
+  # }, annee = as.numeric(annee)) %>% 
+  # mutate(julian = lubridate::yday(ope_date)) %>% #  Ajout de la date de pêche codée de 1 à 365
+  select(
+    ope_id,
+    valeur,
+    esp_code_alternatif,
+    annee,
+    ope_surface_calculee,
+    pro_libelle,
+    pop_id,
+    sta_id,
+    indicateur,
+    x,
+    y,
+    ope_date,
+    # julian, 
+    # obj_libelle
+  ) %>% 
+  rename(espece = esp_code_alternatif) %>% 
+  filter(indicateur == "biomasse")
+```
+
+
+# Resultats OCCURENCE 
+
+## Preparation du df pour l'Occurence
+
+## Representation Graphique de l'Occurence

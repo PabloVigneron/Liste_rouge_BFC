@@ -1,0 +1,350 @@
+---
+title: "LRR des poissons d'eau douce de BFC"
+subtitle: "32_analyse_indicateurs_regionaux"
+author: "PabloVigneron"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  bookdown::html_document2:
+   fig_caption: yes
+   tab_caption: yes
+   number_sections: yes
+   global_numbering: yes
+   toc: yes
+   toc_float:
+         toc_collapsed: yes
+         toc_depth: 2
+   code_folding: hide
+   css: "style.css"
+#bibliography: .bib
+#link-citations: true
+#cls: apa.cls
+#editor_options: 
+#  markdown: 
+#    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+
+# Objectif : Dynamique de population des poissons d'eau douce de Bretagne
+
+Script : 12_analyse_indicateurs_regionaux
+
+ L’ensemble des résultats relatifs aux opérations de pêche ont été compilés dans un tableau unique. Les valeurs ont été agrégées annuellement en utilisant la médiane de chaque indicateur, créant ainsi un tableau unique à l'échelle régionale. Un indicateur régional supplémentaire a été calculé : le taux d’occurrence (pourcentage de sites prospectés où l’espèce est présente).
+ 
+ À l'issue de ce nouveau script, une approche analytique bivariée aura été réalisée et une comparaison des tendances démographiques régionale avec différents modèles d'analyses sera ensuite réalisée (cf - Script 13 / 14 / 15 / 20_modele_bayesien). 
+
+
+# Installation 
+
+## Chargement des packages, fonctions et des données 
+
+```{r Chargement des packages}
+library(tidyverse) # Chargement des packages
+library(aspe)
+library(gt)
+library(ggh4x)
+library(broom)
+library(purrr)
+library(scales)
+```
+
+
+```{r Chargement des données}
+load(file = "../processed_data/selection_pop_ope.rda") # Chargement des données
+load(file = "../processed_data/pre_traitements_donnees_env.rda")
+load(file = "../processed_data/assemblage_tab_par_ope.rda")
+load(file = "../processed_data/analyse_selection_especes.rda")
+load(file = "../processed_data/calcul_indicateurs_regionaux.rda")
+```
+
+
+```{r Chargement des fonctions}
+source(file = "../R/mk_st_by_group.R") # Chargement des fonctions 
+source(file = "../R/calcul_taux_evolution.R")
+source(file = "../R/mann_kendall_sen.R")
+source(file = "../R/lm_get_pvalues.R")
+```
+
+
+```{r Chargement de la palette de couleur}
+# Définition des couleurs de l'OFB en format RGB
+pal <- c("#007844", "#92D050", "#0087C1", "#FCEE21", "#00AEEF", "#1D1D1B", "#A97B30", "#B9D9EB")
+```
+
+
+# Analyses
+
+## Analyses bivariées 
+
+Une première analyse consiste à évaluer s’il existe un lien bivarié entre la valeur de l’indicateur et l’année. La régression simple peut convenir, mais sa sensibilité aux valeurs extrêmes est une faiblesse, en particulier si celles-ci sont observées en début ou en fin de période d’étude (fort effet de levier). Elle a donc été complétée par le test non-paramétrique de Mann-Kendall pour évaluer la significativité d’une tendance monotone (Mann, 1945, Kendall, 1975), suivi de régressions « robustes » de Sen-Theil pour obtenir la valeur de la pente (Sen, 1968, Theil, 1950). Le test de Mann-Kendall est efficace pour traiter les tendances non linéaires, et ne nécessite pas de distributions normales (Yue & Wang, 2004). Cette dernière analyse est exécutée, outre sur les données agrégées à l‘échelle régionale, sur les indicateurs annuels relatifs aux points de prélèvements.
+
+### Significativité des indicateurs
+
+  Il est nécessaire d'observer si les valeurs obtenues relatives à l'ensemble de ces indicateurs regionaux sont significatifs sur l'ensemble des sous-périodes et périodes qui nous intéresse (en résonnance avec la révision de la liste rouge régionale). 
+
+
+La fonction *lm_get_pvalues* a pour but de calculer et d'extraire les *p.values* des coefficients de régression linéaire des valeurs par rapport aux années, pour chaque combinaison unique de stade, indicateur, et *esp_code_alternatif*, sur la période spécifiée par *start_year* et *end_year*. Les *p.values* obtenues pourront ensuite être utilisées pour connaître la significativité statistique des tendances temporelles des indicateurs pour les différentes espèces et stades.
+
+  Sur les espèces étudiées, les tendances temporelles de ces indicateurs seront examinées sur les différentes fenêtres temporelles préétablies grâce à la méthodologie UICN (UICN France, 2018). Les cinq fenêtres temporelles étudiées s’étendent de 33 ans pour l’anguille, à 10 ans pour le saumon atlantique, le goujon, la truite commune et le chabot celtique. 
+
+
+Application de la fonction *lm_get_pvalues* sur nos périodes d'études permettant de récupérer les valeurs issues des regressions linéaires sur les indicateurs de tendances régionales pour chaque période d'étude (seuil de significativité fixé à 0.05) : 
+
+```{r}
+# Liste des périodes à analyser
+periodes <- list(c(1990, 2023),
+                 c(2005, 2023),
+                 c(2008, 2023),
+                 c(2011, 2023),
+                 c(2013, 2023))
+
+# Application de la fonction lm_get_pvalues à chaque période
+reg_indicateur_pvalues <- purrr::map_dfr(periodes, function(p) {
+  lm_get_pvalues(reg_indicateur, start_year = p[1], end_year = p[2], significativite = 0.05)
+})
+
+# Agrégation des résultats au tableau reg_indicateur_tendances_lm
+reg_indicateur_tendances_lm <- reg_indicateur %>%
+  left_join(reg_indicateur_pvalues, by = c("stade", "indicateur", "esp_code_alternatif"))
+
+```
+
+
+## Représentation graphique des indicateurs de tendances démographiques 
+
+```{r, fig.height = 26, fig.width = 10}
+# Créer le graphique
+reg_indicateur_graph <- reg_indicateur_tendances_lm %>%
+  ggplot(aes(x = annee, y = valeur, group = stade, color = stade)) +
+  geom_point(shape = 1) +
+  facet_grid2(esp_code_alternatif ~ indicateur, scales = "free", independent = "y") +
+  scale_color_manual(values = c("juv" = "#92D080", "ad" = "#A97B30", "ind" = "black"),
+                     name = "Stade", labels = c("Adulte", "Indifférencié", "Juvénile")) +
+  labs(title = "Indicateurs de tendances à l'échelle régionale des espèces de poissons d'eau douce",
+       x = "Années", 
+       y = "Valeurs") +
+  theme_bw() +
+  theme(strip.background = element_rect(color = "black", fill = "#faffff"),
+        legend.position = "bottom",
+        panel.background = element_rect(fill = "#faf0e0"),
+        panel.grid.major = element_line(color = "lightgrey", size = 0.1),
+        panel.grid.minor = element_line(color = "lightgrey"),
+        axis.text.x = element_text(angle = 45))
+
+# Ajouter les lignes de régression avec des styles différents selon la signification
+reg_indicateur_graph <- reg_indicateur_graph +
+  geom_smooth(data = reg_indicateur_tendances_lm %>% 
+                filter(periode == "1990_2023", 
+                       significance == "significant"),
+              aes(x = annee, 
+                  y = valeur, 
+                  group = stade, 
+                  color = stade),
+              method = "lm", se = FALSE, linetype = "solid") +
+  geom_smooth(data = reg_indicateur_tendances_lm %>% 
+                filter(periode == "1990_2023", 
+                       significance == "non_significant"),
+              aes(x = annee, 
+                  y = valeur, 
+                  group = stade, 
+                  color = stade),
+              method = "lm", se = FALSE, linetype = "dashed") 
+
+print(reg_indicateur_graph)
+
+```
+
+Cette représentation graphique contient tous les indicateurs ainsi que l'ensemble des espèces. Il est très peu lisible et compliqué à interpreter (avec des droites qui influencent beaucoup l'interprétation des résultats). Le fait qu'il y ai plusieurs stades peut également compliquer la lecture et la comprehension de ce graphique. On produit donc un graphique avec les données des individus "ind" ainsi qu'avec des indicateurs restreints. 
+
+
+### Tri des espèces
+
+Nous ne retienons que les espcèes pour lesquelles nous avons un fort intérêt (au vu des premières tendances dégagées et dans l'optique de la réactualisation de la LRR). 
+
+```{r Tri espèces}
+reg_indicateur_reduit <- reg_indicateur %>% 
+  filter(esp_code_alternatif %in% c("ANG","BRO", "CHA", "CHE",
+                                    "PER", "GAR", "GOU", "LOF", "LPP",
+                                    "SAT", "TRF", "VAI", "VAR"))
+```
+
+
+### Tri des indicateurs
+
+Nous ne retienons que les indicateurs les plus pertinents à l'analyse des tendances démographiques : la densité surfacique, les pourcentages de juvéniles et les taux d'occurrences. 
+
+```{r Tri indicateurs}
+reg_indicateur_lrr_tendances_lm <- reg_indicateur_reduit %>% 
+filter(indicateur %in% c("densite_surface",
+                         "taux_occurrence",
+                         "pourcentage_juveniles")) %>% 
+  filter(!(indicateur == "densite_surface" & esp_code_alternatif == "VAI" & stade == "ad" & valeur > 0.08)) %>% # Suppression d'une valeur aberrante
+  filter(stade == "ind")
+```
+
+```{r Rebnommer les étiquettes}
+indicateur_labels <- c(
+  "densite_surface" = "Densité surfacique",
+  "pourcentage_juveniles" = "Pourcentage de juvéniles",
+  "taux_occurrence" = "Taux d'occurrence"
+)
+```
+
+
+## Représentation graphique d'une sélection d'espèces et d'indicateurs de tendances démographiques 
+
+```{r, fig.height = 20, fig.width = 10}
+reg_indicateur_graph_reduit <- reg_indicateur_lrr_tendances_lm %>%
+  filter(indicateur %in% c("densite_surface",
+                           "taux_occurrence",
+                           "pourcentage_juveniles")) %>% 
+  ggplot(aes(x = annee, 
+             y = valeur, 
+             group = stade, 
+             color = "Indifférencié")) +  # Fix color to a single legend item
+  geom_point(shape = 1) +
+  geom_smooth(method = "loess", se = FALSE) +  # Add loess trend lines
+  facet_grid2(esp_code_alternatif ~ indicateur, 
+              scales = "free", 
+              independent = "y", 
+              labeller = labeller(indicateur = indicateur_labels)) +  # Use custom labels
+  scale_color_manual(values = c("Indifférencié" = "black"),
+                     name = "Stade", labels = c("Indifférencié")) +
+  labs(title = "Indicateurs de tendances à l'échelle régionale des espèces de poissons d'eau douce",
+       x = "Années", 
+       y = "Valeurs") +
+  theme_bw() +
+  theme(strip.background = element_rect(color = "black", fill = "#faffff"),
+        legend.position = "bottom",
+        panel.background = element_rect(fill = "#faf0e0"),
+        panel.grid.major = element_line(color = "lightgrey", size = 0.1),
+        panel.grid.minor = element_line(color = "lightgrey")
+       # axis.text.x = element_text(angle = 45)
+        ) +
+  geom_vline(data = . %>% filter(esp_code_alternatif %in% c("CHA", "GOU", "SAT", "TRF") & annee == 2013), 
+             aes(xintercept = 2013), linetype = "dotted", color = "red", size = 1) +
+  geom_vline(data = . %>% filter(esp_code_alternatif %in% c("CHE", "LPP") & annee == 2005), 
+             aes(xintercept = 2005), linetype = "dotted", color = "red", size = 1) +
+  geom_vline(data = . %>% filter(esp_code_alternatif %in% c("BRO", "LOF") & annee == 2008), 
+             aes(xintercept = 2008), linetype = "dotted", color = "red", size = 1) +
+  geom_vline(data = . %>% filter(esp_code_alternatif %in% c("PER", "VAI", "VAR", "GAR") & annee == 2011), 
+             aes(xintercept = 2011), linetype = "dotted", color = "red", size = 1)
+
+
+print(reg_indicateur_graph_reduit)
+```
+
+Nous réalisons un dataframe finale compilant les significaticités des tendances (regréssion linéaire) pour les espèces et les périodes d'intérêts :  
+
+```{r Liste groupes et périodes}
+groups <- list(list(codes = "ANG", start_year = 1990, end_year = 2023),
+  list(codes = c("CHE", "LPP"), start_year = 2005, end_year = 2023),
+  list(codes = c("BRO", "LOF"), start_year = 2008, end_year = 2023),
+  list(codes = c("VAR", "GAR", "VAI", "PER"), start_year = 2011, end_year = 2023),
+  list(codes = c("SAT", "GOU", "TRF", "CHA"), start_year = 2013, end_year = 2023))
+```
+
+```{r Création df reg_indicateur_pvaues_by_group}
+# Fonction pour appliquer lm_get_pvalues à chaque groupe
+reg_indicateur_lrr_pvalues_lm <- map_dfr(groups, function(group) {
+  
+  # Filtrage des données par les codes du groupe
+  data_filtered <- reg_indicateur %>%
+    filter(esp_code_alternatif %in% group$codes)
+  
+  # Application de lm_get_pvalues sur le sous-ensemble filtré
+  lm_get_pvalues(data_filtered, 
+              start_year = group$start_year, 
+              end_year = group$end_year, 
+              significativite = 0.05)})
+
+reg_indicateur_lrr_pvalues_lm <- reg_indicateur_lrr_pvalues_lm %>% 
+  filter(indicateur %in% c("densite_surface",
+                           "pourcentage_juveniles",
+                           "taux_occurrence"),
+         stade == "ind")
+
+# Visualisation des résultats
+print(reg_indicateur_lrr_pvalues_lm)
+```
+
+
+## Synthèse des premiers résultats
+
+Toujours par soucis de lisibilité, seul les 3 indicateurs retenus apparaîtrons dans ce tableau final. Dans notre étude, les valeurs de densités surfaciques, le pourcentage de juvéniles et le taux d'occurrence semblent être les 3 données les plus parlantes et représentatives de l'état des populations de poissons d'eau douce de Bretagne. Ces informations sont alors synthétisées dans un tableau, sur différentes périodes. Les flèches vers le haut indiquent une croissance et celle vers le bas une décroissance de l'indicateur pour l'espèce concernée. 
+
+
+```{r Création tableau de synthèse}
+# Définir des palettes de couleurs harmonieuses
+tendance_palette <- c("\U2198" = "#88B04B", # rouge doux pour les tendances descendantes
+                      "\U2197" = "red") # vert doux pour les tendances montantes
+
+significativite_palette <- c(" " = "#D3D3D3",    # gris clair pour non significatif
+                             "*" = "#FFC107",  # jaune pour p < 0.05
+                             "**" = "#92D050", # orange pour p < 0.01
+                             "***" = "#007844") # violet pour p < 0.001
+
+tab_reg_indicateur_lrr_pvalues_lm <- reg_indicateur_lrr_pvalues_lm %>%
+  select(esp_code_alternatif,
+         periode,
+         indicateur,
+         trend,
+         sig) %>% 
+  arrange(esp_code_alternatif, 
+          indicateur) %>% 
+  gt() %>%
+  # Ajouter un titre et un sous-titre
+  tab_header(title = md("**Synthèse des tendances des indicateurs des populations de poissons d'eau douce de Bretagne**"),subtitle = "Analyse des tendances régionales pour les périodes spécifiées") %>%
+  cols_label(esp_code_alternatif = "Code Espèce",  # Renommer les colonnes
+    periode = "Période d'Étude",
+    indicateur = "Indicateur",
+    trend = "Tendance",
+    sig = "Significativité") %>%
+  data_color(columns = trend,colors = tendance_palette) %>% 
+  data_color(columns = sig, colors = significativite_palette) %>%
+  cols_align(align = "center",# Ajuster la taille de la police et l'alignement
+    columns = c(esp_code_alternatif, periode, indicateur, trend, sig)) %>%
+  tab_options(
+    table.font.size = "small",
+    heading.title.font.size = "medium",
+    heading.subtitle.font.size = "small")
+
+tab_reg_indicateur_lrr_pvalues_lm # Affichage du tableau
+```
+
+
+# Sauvegarde 
+
+Nous sauvegardons dans un fichier .rda les jeux de données qui nous permettrons de réaliser d'autres analyses sur les indicateurs à l'échelle régionale.
+
+```{r Sauvegarde}
+save(reg_taux_occ,
+     reg_indicateur,
+     reg_indicateur_reduit,
+     ope_indicateur,
+     file = "../processed_data/analyse_indicateurs_regionaux.rda")
+
+
+save(reg_indicateur_reduit,
+     reg_indicateur_lrr_tendances_lm,
+     reg_indicateur_lrr_pvalues_lm,
+     file = "../processed_data/analyse_indicateurs_regionaux_pour_mk_glm.rda")
+```
+
+
+# Références bibliographiques
+  
+  Irz, P., Mondy, C., Richard, B. Bonnafoux, L. (2024). aspe: An R package to analyse and visualise river fish data in France. R package version 0.4.1, https://github.com/PascalIrz/aspe/
+  
+  Kendall, M. G. (1975). Rank correlation methods. London: Griffin. Knouft JH, Ficklin DL. 2017. The potential impacts of climate change on biodiversity in flowing freshwater systems. Annual Review of Ecology, Evolution, and Systematics 48, 111–133.
+  
+  Mann, H.B. (1945). Nonparametric tests against trend. Econometrica 13, 1-245.
+  
+  Sen, P. K. (1968). Estimates of the regression coefficient based on Kendall’s Tau. Journal of the American Statistical Association 63, 1379–1389.
+  
+  Theil, H. (1950). A rank-invariant method of linear and polynomial regression analysis. Indagationes Mathematicae 1 (2), 14 p.

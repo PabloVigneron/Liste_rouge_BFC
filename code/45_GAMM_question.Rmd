@@ -449,7 +449,7 @@ mod_gamm_1.3 <- gam(
 acf_mod_gamm_1.0 <- as.ggplot(~ acf(residuals(mod_gamm_1.0$lme, type = "normalized"), lag.max = 20))
 acf_mod_gamm_1.1 <- as.ggplot(~ acf(residuals(mod_gamm_1.1$lme, type = "normalized"), lag.max = 20))
 acf_mod_gamm_1.2 <- as.ggplot(~ acf(residuals(mod_gamm_1.2$lme, type = "normalized"), lag.max = 20))
-# acf_mod_gamm_1.3 <- as.ggplot(~ acf(residuals(mod_gamm_1.3$lme, type = "normalized"), lag.max = 20))
+acf_mod_gamm_1.3 <- as.ggplot(~ acf(residuals(mod_gamm_1.3$lme, type = "normalized"), lag.max = 20))
 
 ggarrange(
   acf_mod_gamm_1.0,

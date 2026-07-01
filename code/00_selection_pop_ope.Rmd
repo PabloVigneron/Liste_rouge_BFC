@@ -392,7 +392,7 @@ final_summary_ope
 
   Nous réalisons une représentation graphique des séries temporelles constituées. Nous ajoutons les types de pêches (*pro_libelle*) associées aux opérations des séries.
 
-```{r Représentation séries temporelles, fig.height = 44, fig.width = 28}
+```{r Représentation séries temporelles, fig.height = 44, fig.width = 22}
 ope_selection %>% # Représentation graphique des stations sélectionnées et des types de pêche associées
   ggplot(
     aes(
@@ -583,20 +583,20 @@ sta_id_ope_selection <- sta_id_ope_selection %>%
 Sauvegarde pour le script suivant (sélection des espèces) : script 10_Selection_especes.
 
 ```{r Sauvegarde}
-# save(pop_serie_tempo,
-#      ope_selection,
-#      sta_id_ope_selection,
-#      passerelle,
-#      file = "../processed_data/selection_pop_ope.rda")
+save(pop_serie_tempo,
+     ope_selection,
+     sta_id_ope_selection,
+     passerelle,
+     file = "../processed_data/selection_pop_ope.rda")
 ```
 
 Sauvegarde pour la création de la carte de situation : script 02_production_carte_selection_station.
 
 ```{r Sauvegarde 2}
-# save(sta_id_ope_selection,
-#      buffer,
-#      mes_depts,
-#      file = "../processed_data/selection_pop_ope_carte.rda")
+save(sta_id_ope_selection,
+     buffer,
+     mes_depts,
+     file = "../processed_data/selection_pop_ope_carte.rda")
 ```
 
 ```{r exporter pour cartographie QGIS}

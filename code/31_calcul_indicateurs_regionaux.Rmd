@@ -35,7 +35,7 @@ library(aspe)
 ```{r Chargement des données}
 load(file = "../processed_data/selection_pop_ope.rda") # Chargement des données
 # load(file = "../processed_data/pre_traitements_donnees_env.rda")
-# load(file = "../processed_data/assemblage_tab_par_ope.rda")
+load(file = "../processed_data/assemblage_tab_par_ope.rda")
 load(file = "../processed_data/selection_especes.rda")
 ```
 
@@ -126,25 +126,44 @@ reg_pc_site_presence_esp <- combinaisons %>%
 # Affichage du résultat
 print(reg_pc_site_presence_esp)
 ```
-
-
 ## Regroupement des indicateurs à l'échelle régionale
 
 Le dataframe *reg_indicateur* regroupe l'ensemble des indicateurs calculés à l'échelle régionale. Les données sont agrégées en fonction des médianes des indicateurs par années et par stades. Une exception est faite pour l'indicateur *pourcentage_juveniles*, qui est agrégé en utilisant la moyenne et non la médiane, étant donné qu'il s'agit d'un pourcentage.
 
-```{r Construction tab reg_indicateur, fig.height = 55, fig.width = 10}
+```{r}
 # Calcul des indicateurs régionaux en fonction des médianes annuelles et par stade avec une exception pour le pourcentage de juvéniles (utilisant la moyenne)
 reg_indicateur <- ope_indicateur %>%
-  group_by(esp_code_alternatif,            # Regrouper par code alternatif de l'espèce
-           annee,                          # Regrouper par année
-           indicateur,                     # Regrouper par type d'indicateur
-           stade) %>%                       # Regrouper par stade
-  summarize(valeur = case_when(
-    indicateur == "pourcentage_juveniles" ~ mean(valeur),  # Calculer la moyenne pour le pourcentage de juvéniles
-    TRUE ~ median(valeur)                                  # Calculer la médiane pour les autres indicateurs
-  )) %>%
-  ungroup() %>%                            # Annuler le regroupement
-  distinct()                               # Supprimer les doublons
+  group_by(
+    esp_code_alternatif,
+    # Regrouper par code alternatif de l'espèce
+    annee,
+    # Regrouper par année
+    indicateur,
+    # Regrouper par type d'indicateur
+    stade
+  ) %>%  # Regrouper par stade
+  dplyr::summarize(valeur = if (unique(indicateur) == "pourcentage_juveniles") {
+    #Calculer la moyenne pour le pourcentage de juvéniles
+    mean(valeur, na.rm = TRUE)
+  } else {
+    median(valeur, na.rm = TRUE)  # Calculer la médiane pour les autres
+  }, .groups = "drop") %>%
+  distinct()
+```
+
+```{r Construction tab reg_indicateur, fig.height = 55, fig.width = 10}
+# Calcul des indicateurs régionaux en fonction des médianes annuelles et par stade avec une exception pour le pourcentage de juvéniles (utilisant la moyenne)
+# reg_indicateur <- ope_indicateur %>%
+#   group_by(esp_code_alternatif,            # Regrouper par code alternatif de l'espèce
+#            annee,                          # Regrouper par année
+#            indicateur,                     # Regrouper par type d'indicateur
+#            stade) %>%                      # Regrouper par stade 
+#   summarize(valeur = case_when(
+#     indicateur == "pourcentage_juveniles" ~ mean(valeur),  # Calculer la moyenne pour le pourcentage de juvéniles
+#     TRUE ~ median(valeur)                                  # Calculer la médiane pour les autres indicateurs
+#   )) %>%
+#   ungroup() %>%                            # Annuler le regroupement
+#   distinct()                               # Supprimer les doublons
 ```
 
 
@@ -167,14 +186,14 @@ Nous utilisons la fonction *calcul_taux_evolution* pour obtenir les taux d'évol
 
 ```{r Calcul des taux évolution}
 # Calcul des taux d'évolution depuis 1990
-reg_taux_evol_1990 <- calcul_taux_evol(df = reg_indicateur,
-                             var_x = annee,
-                             var_y = valeur,
-                             debut = 1990,
-                             esp_code_alternatif,
-                             stade,
-                             indicateur)
-print(reg_taux_evol_1990)
+# reg_taux_evol_1990 <- calcul_taux_evol(df = reg_indicateur,
+#                              var_x = annee,
+#                              var_y = valeur,
+#                              debut = 1990,
+#                              esp_code_alternatif,
+#                              stade,
+#                              indicateur)
+# print(reg_taux_evol_1990)
 ```
 
 Nous avons donc, à la fin de ce script, un tableau de bord d'indicateurs simples à l'échelle régionale. Nous allons pouvoir analyser les différentes tendances des indicateurs sur la période 1990-2023 dans le prochain script (?_analyse_indicateurs_regionaux). 
@@ -185,11 +204,13 @@ Nous avons donc, à la fin de ce script, un tableau de bord d'indicateurs simple
 Nous sauvegardons dans un fichier .rda les jeux de données qui nous permettrons de réaliser les analyses des indicateurs à l'échelle régionale.
 
 ```{r Sauvegarde}
-save(reg_taux_occ,
-     reg_taux_evol_1990,
-     reg_indicateur,
-     ope_indicateur,
-     file = "../processed_data/calcul_indicateurs_regionaux.rda")
+save(
+  # reg_taux_occ,
+  # reg_taux_evol_1990,
+  reg_indicateur,
+  ope_indicateur,
+  file = "../processed_data/calcul_indicateurs_regionaux.rda"
+)
 ```
 
 

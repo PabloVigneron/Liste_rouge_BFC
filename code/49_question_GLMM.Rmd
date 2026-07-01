@@ -220,6 +220,154 @@ histogram_esp <- ggplot(data = ope_effectif_glmm_abs, aes(x = valeur)) +
 histogram_esp
 ```
 
+## Zero-Inflated GLMM (ZIGLMM) ou Hurdle GLMM (HGLMM) AVEC ABSENCE
+
+
+
+
+
+
+```{r, construction des modeles glmmzi}
+mod_zi_1.0 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) +pro_libelle + (1 |
+                                                           sta_id) ,
+  data = truite_data_abs,
+  family = poisson(link = "log"),
+  ziformula = ~ 1
+)
+mod_zi_1.1 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = nbinom2(link = "log"),
+  data = truite_data_abs,
+  ziformula = ~ 1
+)
+mod_zi_1.2 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = truncated_poisson(link = "log"),
+  data = truite_data_abs,
+  ziformula = ~ 1
+)
+mod_zi_1.3 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = truncated_nbinom2(link = "log"),
+  data = truite_data_abs,
+  ziformula = ~ 1
+)
+```
+
+On selectionne à l'aide du critère AIC le meilleur modèle c'est à dire le modèle avec le plus petit AIC. 
+
+```{r, selection du meilleur modeles}
+AIC(mod_zi_1.0, mod_zi_1.1, mod_zi_1.2, mod_zi_1.3)
+```
+
+```{r plotresid des modèles glmm zero inflated, fig.height = 10, fig.width = 20}
+res_mod_zi_1.0 <- as.ggplot(~ plotresid(mod_zi_1.0))
+res_mod_zi_1.1 <- as.ggplot(~ plotresid(mod_zi_1.1))
+res_mod_zi_1.2 <- as.ggplot(~ plotresid(mod_zi_1.2))
+res_mod_zi_1.3 <- as.ggplot(~ plotresid(mod_zi_1.3))
+
+ggarrange(
+  res_mod_zi_1.0,
+  res_mod_zi_1.1,
+  res_mod_zi_1.2,
+  res_mod_zi_1.3,
+  ncol = 2,
+  nrow = 2,
+  labels = c("poisson", "nbinom2", "truncated_poisson", "truncated_nbinom2"),
+  font.label = list(
+    size = 13,
+    color = "darkred",
+    face = "bold",
+    family = NULL
+  ),
+  hjust = -0.1,
+  vjust = 1.6,
+  align = c("none", "h", "v", "hv")
+)
+```
+
+```{r plotresid DHARMa des modèles glmm zero inflated, fig.height = 10, fig.width = 20}
+
+sim_res_mod_zi_1.0 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.0, n = 1000), quantreg = T))
+sim_res_mod_zi_1.1 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.1, n = 1000), quantreg = T))
+sim_res_mod_zi_1.2 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.2, n = 1000), quantreg = T))
+sim_res_mod_zi_1.3 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.3, n = 1000), quantreg = T))
+
+ggarrange(
+  sim_res_mod_zi_1.0,
+  sim_res_mod_zi_1.1,
+  sim_res_mod_zi_1.2,
+  sim_res_mod_zi_1.3,
+  ncol = 2,
+  nrow = 2,
+  labels = c("poisson", "nbinom2", "truncated_poisson", "truncated_nbinom2"),
+  font.label = list(
+    size = 13,
+    color = "darkred",
+    face = "bold",
+    family = NULL
+  ),
+  hjust = -0.1,
+  vjust = 1.6,
+  align = c("none", "h", "v", "hv")
+)
+```
+
+## Summary du meilleur modèle sans absence
+
+```{r}
+summary(mod_zi_1.1)
+```
+
+```{r}
+Anova(mod_zi_1.1)
+```
+
+```{r}
+mod_glmm_qbn <- glmer.nb(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 |
+                                                                        sta_id),
+  data = truite_data_abs,
+  family = poisson(link = "log")
+)
+
+```
+
+```{r}
+plotresid(mod_glmm_qbn)
+```
+
+
+```{r}
+summary(mod_glmm_qbn)
+```
+
+
+```{r}
+plotResiduals(simulateResiduals(fittedModel = mod_glmm_qbn, n = 1000), quantreg = T)
+
+```
+
+```{r}
+DHARMa::testZeroInflation(mod_glmm_qbn)
+
+```
+```{r}
+DHARMa::testDispersion(mod_zi_1.3)
+DHARMa::testDispersion(mod_glmm_qbn, plot = F)
+
+```
+```{r}
+DHARMa::testOverdispersion(mod_zi_1.3)
+DHARMa::testOverdispersion(mod_glmm_qbn, plot = F)
+
+```
+
+
+
+
+
 ## **Preparation du df sans absences**
 
 ```{r DF avec coord sans absences}
@@ -324,144 +472,6 @@ histogram_esp_sans_abs <- ggplot(data = ope_effectif_glmm_sans_abs, aes(x = vale
 histogram_esp_sans_abs
 ```
 
-
-# Zero-Inflated GLMM (ZIGLMM) ou Hurdle GLMM (HGLMM) AVEC ABSENCE
-
-```{r, construction des modeles glmmzi}
-mod_zi_1.0 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) +pro_libelle + (1 |
-                                                           sta_id) ,
-  data = truite_data_abs,
-  family = poisson(link = "log"),
-  ziformula = ~ 1
-)
-mod_zi_1.1 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
-  family = nbinom2(link = "log"),
-  data = truite_data_abs,
-  ziformula = ~ 1
-)
-mod_zi_1.2 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
-  family = truncated_poisson(link = "log"),
-  data = truite_data_abs,
-  ziformula = ~ 1
-)
-mod_zi_1.3 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
-  family = truncated_nbinom2(link = "log"),
-  data = truite_data_abs,
-  ziformula = ~ 1
-)
-```
-
-On selectionne à l'aide du critère AIC le meilleur modèle c'est à dire le modèle avec le plus petit AIC. 
-
-```{r, selection du meilleur modeles}
-AIC(mod_zi_1.0, mod_zi_1.1, mod_zi_1.2, mod_zi_1.3)
-```
-
-```{r plotresid des modèles glmm zero inflated, fig.height = 10, fig.width = 20}
-res_mod_zi_1.0 <- as.ggplot(~ plotresid(mod_zi_1.0))
-res_mod_zi_1.1 <- as.ggplot(~ plotresid(mod_zi_1.1))
-res_mod_zi_1.2 <- as.ggplot(~ plotresid(mod_zi_1.2))
-res_mod_zi_1.3 <- as.ggplot(~ plotresid(mod_zi_1.3))
-
-ggarrange(
-  res_mod_zi_1.0,
-  res_mod_zi_1.1,
-  res_mod_zi_1.2,
-  res_mod_zi_1.3,
-  ncol = 2,
-  nrow = 2,
-  labels = c("poisson", "nbinom2", "truncated_poisson", "truncated_nbinom2"),
-  font.label = list(
-    size = 13,
-    color = "darkred",
-    face = "bold",
-    family = NULL
-  ),
-  hjust = -0.1,
-  vjust = 1.6,
-  align = c("none", "h", "v", "hv")
-)
-```
-
-```{r plotresid DHARMa des modèles glmm zero inflated, fig.height = 10, fig.width = 20}
-
-sim_res_mod_zi_1.0 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.0, n = 1000), quantreg = T))
-sim_res_mod_zi_1.1 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.1, n = 1000), quantreg = T))
-sim_res_mod_zi_1.2 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.2, n = 1000), quantreg = T))
-sim_res_mod_zi_1.3 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_zi_1.3, n = 1000), quantreg = T))
-
-ggarrange(
-  sim_res_mod_zi_1.0,
-  sim_res_mod_zi_1.1,
-  sim_res_mod_zi_1.2,
-  sim_res_mod_zi_1.3,
-  ncol = 2,
-  nrow = 2,
-  labels = c("poisson", "nbinom2", "truncated_poisson", "truncated_nbinom2"),
-  font.label = list(
-    size = 13,
-    color = "darkred",
-    face = "bold",
-    family = NULL
-  ),
-  hjust = -0.1,
-  vjust = 1.6,
-  align = c("none", "h", "v", "hv")
-)
-```
-
-## Summary du meilleur modèle sans absence
-
-```{r}
-summary(mod_zi_1.1)
-```
-
-```{r}
-Anova(mod_zi_1.1)
-```
-```{r}
-mod_glmm_qbn <- glmer.nb(
-  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 |
-                                                                        sta_id),
-  data = truite_data_abs,
-  family = poisson(link = "log")
-)
-
-```
-
-```{r}
-plotresid(mod_glmm_qbn)
-```
-
-
-```{r}
-summary(mod_glmm_qbn)
-```
-
-
-```{r}
-plotResiduals(simulateResiduals(fittedModel = mod_glmm_qbn, n = 1000), quantreg = T)
-
-```
-
-```{r}
-DHARMa::testZeroInflation(mod_glmm_qbn)
-
-```
-```{r}
-DHARMa::testDispersion(mod_zi_1.3)
-DHARMa::testDispersion(mod_glmm_qbn, plot = F)
-
-```
-```{r}
-DHARMa::testOverdispersion(mod_zi_1.3)
-DHARMa::testOverdispersion(mod_glmm_qbn, plot = F)
-
-```
 
 # Zero-Inflated GLMM (ZIGLMM) ou Hurdle GLMM (HGLMM) SANS ABSENCE
 

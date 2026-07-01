@@ -492,7 +492,7 @@ erreurs_df <- erreurs_df %>%
 On exporte le jeu de data pour corriger la base de data aspe 
 
 ```{r}
-readr::write_excel_csv(erreurs_df, "../processed_data/error_data_aspe.csv")
+# readr::write_excel_csv(erreurs_df, "../processed_data/error_data_aspe.csv")
 ```
  
 
