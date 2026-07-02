@@ -719,6 +719,7 @@ par(mfrow = c(1, 2))
 plot(mod_gamm_1.1$gam, main = "k=15", shade = TRUE)
 plot(mod_gamm_1.2$gam, main = "k=20", shade = TRUE)
 ```
+
 ```{r}
 summary(mod_gamm_1.0$gam)
 summary(mod_gamm_ar$gam)
@@ -754,6 +755,7 @@ intervals(mod_gamm_ar$lme, which = "var-cov")
 # Regarder la valeur du paramètre phi (corrélation AR1)
 # Si phi proche de 0 → corAR1 apporte peu
 ```
+
 ```{r}
 # Confirmer que phi (AR1) est proche de 0
 summary(mod_gamm_ar$lme)$modelStruct$corStruct

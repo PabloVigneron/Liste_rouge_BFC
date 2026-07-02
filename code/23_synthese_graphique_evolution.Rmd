@@ -619,29 +619,6 @@ truite_data <- ope_effectif_glmm_abs %>%
 
 
 ## Estimation GAMM des tendances TRF
-```{r}
-mod <- gamm(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y),
-  random = list(sta_id =  ~ 1),
-  data = truite_data,
-  family = poisson(link = "log"),
-  method = "REML"
-)
-```
-
-
-```{r}
-draw(mod, residuals = T)
-```
-
-```{r}
-# Nombre de stations dans mon dataframe
-nb_station <- truite_data %>%
-  filter(valeur > 0) %>% 
-  summarise(total_station = n_distinct(sta_id))
-nb_station
-```
-
 
 ```{r}
 trend <- poptrend::ptrend(
