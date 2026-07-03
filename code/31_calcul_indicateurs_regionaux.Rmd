@@ -17,7 +17,7 @@ knitr::opts_chunk$set(echo = TRUE,
 
 Script : 31_calcul_indicateurs_regionaux
 
-  Dans le script précèdent (*10_calcul_indicateurs_par_ope*), nous avons produit un tableau de bord combinant divers indicateurs simples à l'échelle de chaque opération de pêche. Ce premier tableau de bord est représentatif de la dynamique de population des poissons d'eau douce pour une année *n* à un point de prélèvement donné. La seconde étape consiste à réaliser le même travail, mais à une échelle régionale.
+  Dans le script précèdent (*30_calcul_indicateurs_par_ope*), nous avons produit un tableau de bord combinant divers indicateurs simples à l'échelle de chaque opération de pêche. Ce premier tableau de bord est représentatif de la dynamique de population des poissons d'eau douce pour une année *n* à un point de prélèvement donné. La seconde étape consiste à réaliser le même travail, mais à une échelle régionale.
 
 Ce script vise donc à créer un tableau d'indicateurs simples à l'échelle régionale. Pour les indicateurs calculés au niveau des points de prélèvement, nous agrègerons les valeurs annuelles des stations à l'échelle régionale en prenant la médiane des valeurs. À l'issue de ce script, une approche analytique pourra être réalisée. 
 
@@ -42,7 +42,7 @@ load(file = "../processed_data/selection_especes.rda")
 
 ```{r Chargement des fonctions}
 # source(file = "../R/mk_st_by_group.R") # Chargement des fonctions
-# source(file = "../R/calcul_taux_evolution.R")
+source(file = "../R/calcul_taux_evolution.R")
 # source(file = "../R/mann_kendall_sen.R")
 ```
 
@@ -140,16 +140,17 @@ reg_indicateur <- ope_indicateur %>%
     # Regrouper par année
     indicateur,
     # Regrouper par type d'indicateur
-    stade
-  ) %>%  # Regrouper par stade
-  dplyr::summarize(valeur = if (unique(indicateur) == "pourcentage_juveniles") {
-    #Calculer la moyenne pour le pourcentage de juvéniles
-    mean(valeur, na.rm = TRUE)
-  } else {
-    median(valeur, na.rm = TRUE)  # Calculer la médiane pour les autres
-  }, .groups = "drop") %>%
-  distinct()
+    stade # Regrouper par stade
+  ) %>%
+  # Calculer la moyenne pour le pourcentage de juvéniles et la densité surfacique
+  
+  dplyr::summarize(valeur = case_when(
+    first(indicateur) %in% c("pourcentage_juveniles", "densite_surface") ~ mean(valeur, na.rm = TRUE),
+    TRUE ~ median(valeur, na.rm = TRUE)# Calculer la médiane pour les autres
+  ),
+  .groups = "drop")
 ```
+
 
 ```{r Construction tab reg_indicateur, fig.height = 55, fig.width = 10}
 # Calcul des indicateurs régionaux en fonction des médianes annuelles et par stade avec une exception pour le pourcentage de juvéniles (utilisant la moyenne)
@@ -186,14 +187,14 @@ Nous utilisons la fonction *calcul_taux_evolution* pour obtenir les taux d'évol
 
 ```{r Calcul des taux évolution}
 # Calcul des taux d'évolution depuis 1990
-# reg_taux_evol_1990 <- calcul_taux_evol(df = reg_indicateur,
-#                              var_x = annee,
-#                              var_y = valeur,
-#                              debut = 1990,
-#                              esp_code_alternatif,
-#                              stade,
-#                              indicateur)
-# print(reg_taux_evol_1990)
+reg_taux_evol_2007 <- calcul_taux_evol(df = reg_indicateur,
+                             var_x = annee,
+                             var_y = valeur,
+                             debut = 2007,
+                             esp_code_alternatif,
+                             stade,
+                             indicateur)
+print(reg_taux_evol_2007)
 ```
 
 Nous avons donc, à la fin de ce script, un tableau de bord d'indicateurs simples à l'échelle régionale. Nous allons pouvoir analyser les différentes tendances des indicateurs sur la période 1990-2023 dans le prochain script (?_analyse_indicateurs_regionaux). 
@@ -205,8 +206,8 @@ Nous sauvegardons dans un fichier .rda les jeux de données qui nous permettrons
 
 ```{r Sauvegarde}
 save(
-  # reg_taux_occ,
-  # reg_taux_evol_1990,
+  reg_taux_occ,
+  reg_taux_evol_2007,
   reg_indicateur,
   ope_indicateur,
   file = "../processed_data/calcul_indicateurs_regionaux.rda"

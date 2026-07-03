@@ -1280,25 +1280,29 @@ k.check(mod_gamm_1.3)
 
 
 ```{r}
-res_mod_gamm_1.0 <- simulateResiduals(fittedModel = mod_gamm_1.0,
-                                      plot = TRUE,
-                                      n = 1000)
-res_mod_gamm_1.1 <- simulateResiduals(fittedModel = mod_gamm_1.1,
-                                      plot = TRUE,
-                                      n = 1000)
-res_mod_gamm_1.2 <- simulateResiduals(fittedModel = mod_gamm_1.2,
-                                      plot = TRUE,
-                                      n = 1000)
+# res_mod_gamm_1.0 <- simulateResiduals(fittedModel = mod_gamm_1.0,
+#                                       plot = TRUE,
+#                                       n = 1000)
+# res_mod_gamm_1.1 <- simulateResiduals(fittedModel = mod_gamm_1.1,
+#                                       plot = TRUE,
+#                                       n = 1000)
+# res_mod_gamm_1.2 <- simulateResiduals(fittedModel = mod_gamm_1.2,
+#                                       plot = TRUE,
+#                                       n = 1000)
 res_mod_gamm_1.3 <- simulateResiduals(fittedModel = mod_gamm_1.3,
+                                      plot = TRUE,
+                                      n = 1000)
+res_mod_gamm_1.4 <- simulateResiduals(fittedModel = mod_gamm_1.4,
                                       plot = TRUE,
                                       n = 1000)
 ```
 
 ```{r}
-DHARMa::testDispersion(res_mod_gamm_1.0)
-DHARMa::testDispersion(res_mod_gamm_1.1)
-DHARMa::testDispersion(res_mod_gamm_1.2)
+# DHARMa::testDispersion(res_mod_gamm_1.0)
+# DHARMa::testDispersion(res_mod_gamm_1.1)
+# DHARMa::testDispersion(res_mod_gamm_1.2)
 DHARMa::testDispersion(res_mod_gamm_1.3)
+DHARMa::testDispersion(res_mod_gamm_1.4)
 
 ```
 
@@ -2196,6 +2200,9 @@ res_mod_gamm_1.2 <- simulateResiduals(fittedModel = mod_gamm_1.2,
 res_mod_gamm_1.3 <- simulateResiduals(fittedModel = mod_gamm_1.3,
                                       plot = TRUE,
                                       n = 1000)
+res_mod_gamm_1.4 <- simulateResiduals(fittedModel = mod_gamm_1.3,
+                                      plot = TRUE,
+                                      n = 1000)
 ```
 
 ```{r}
@@ -2203,6 +2210,8 @@ DHARMa::testDispersion(res_mod_gamm_1.0)
 DHARMa::testDispersion(res_mod_gamm_1.1)
 DHARMa::testDispersion(res_mod_gamm_1.2)
 DHARMa::testDispersion(res_mod_gamm_1.3)
+DHARMa::testDispersion(res_mod_gamm_1.4)
+
 
 ```
 
@@ -2254,7 +2263,7 @@ summary(trend)
 
 ```{r}
 #Representation graphique du modele
-plot(trend, residuals = T)
+plot(trend)
 ```
 
 ```{r}
@@ -2263,6 +2272,7 @@ poptrend::change(trend, start = 2007 , end = 2025, alpha = 0.05)
 ```
 
 ## CARPE COMMUNE (CCO)
+
 ```{r}
 data_esp <- ope_effectif_glmm_abs %>% 
   filter(espece == "CCO")
@@ -2384,27 +2394,33 @@ Anova(mod_zi_1.3)
 Construire les modèles :
 
 ```{r}
-mod_gamm_1.0 <- gam(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
-  data = data_esp,
-  family = poisson(link = "log"),
-  method = "REML"
-)
-mod_gamm_1.1 <- gam(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee))  + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
-  data = data_esp,
-  family = poisson(link = "identity"),
-  method = "REML"
-)
-mod_gamm_1.2 <- gam(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
-  data = data_esp,
-  family = poisson(link = "sqrt"),
-  method = "REML"
-)
+# mod_gamm_1.0 <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
+#   data = data_esp,
+#   family = poisson(link = "log"),
+#   method = "REML"
+# )
+# mod_gamm_1.1 <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee))  + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
+#   data = data_esp,
+#   family = poisson(link = "identity"),
+#   method = "REML"
+# )
+# mod_gamm_1.2 <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
+#   data = data_esp,
+#   family = poisson(link = "sqrt"),
+#   method = "REML"
+# )
 
 mod_gamm_1.3 <- gam(
   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  data = data_esp,
+  family = nb(link = "log"),
+  method = "REML"
+)
+mod_gamm_1.4 <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(sta_id, bs = "re"),
   data = data_esp,
   family = nb(link = "log"),
   method = "REML"
@@ -2421,6 +2437,12 @@ acf(residuals(mod_gamm_1.3, type = "scaled.pearson"), lag.max = 20)
 ```
 
 Tester l'autocorrelation spatiale : 
+
+```{r}
+var <- variogram(valeur ~ annee + offset(log(ope_surface_calculee)), locations = ~ x+y, data = data_esp)
+var
+plot(var, col= "black")
+```
 
 ```{r}
 show.vgms(models = c("Exp",  # Exponential model
@@ -2472,16 +2494,19 @@ k.check(mod_gamm_1.3)
 
 
 ```{r}
-res_mod_gamm_1.0 <- simulateResiduals(fittedModel = mod_gamm_1.0,
-                                      plot = TRUE,
-                                      n = 1000)
-res_mod_gamm_1.1 <- simulateResiduals(fittedModel = mod_gamm_1.1,
-                                      plot = TRUE,
-                                      n = 1000)
-res_mod_gamm_1.2 <- simulateResiduals(fittedModel = mod_gamm_1.2,
-                                      plot = TRUE,
-                                      n = 1000)
+# res_mod_gamm_1.0 <- simulateResiduals(fittedModel = mod_gamm_1.0,
+#                                       plot = TRUE,
+#                                       n = 1000)
+# res_mod_gamm_1.1 <- simulateResiduals(fittedModel = mod_gamm_1.1,
+#                                       plot = TRUE,
+#                                       n = 1000)
+# res_mod_gamm_1.2 <- simulateResiduals(fittedModel = mod_gamm_1.2,
+#                                       plot = TRUE,
+#                                       n = 1000)
 res_mod_gamm_1.3 <- simulateResiduals(fittedModel = mod_gamm_1.3,
+                                      plot = TRUE,
+                                      n = 1000)
+res_mod_gamm_1.4 <- simulateResiduals(fittedModel = mod_gamm_1.4,
                                       plot = TRUE,
                                       n = 1000)
 ```
@@ -2491,6 +2516,7 @@ DHARMa::testDispersion(res_mod_gamm_1.0)
 DHARMa::testDispersion(res_mod_gamm_1.1)
 DHARMa::testDispersion(res_mod_gamm_1.2)
 DHARMa::testDispersion(res_mod_gamm_1.3)
+DHARMa::testDispersion(res_mod_gamm_1.4)
 
 ```
 
@@ -2514,10 +2540,11 @@ Selection de modèle par l'AIC :
 
 ```{r}
 AIC(
-  mod_gamm_1.0, 
-  mod_gamm_1.1,
-  mod_gamm_1.2,
-  mod_gamm_1.3
+  # mod_gamm_1.0, 
+  # mod_gamm_1.1,
+  # mod_gamm_1.2,
+  mod_gamm_1.3, 
+  mod_gamm_1.4
   )
 ```
 
@@ -2541,7 +2568,7 @@ summary(trend)
 
 ```{r}
 #Representation graphique du modele
-plot(trend, residuals = T)
+plot(trend)
 ```
 
 ```{r}
@@ -2677,21 +2704,27 @@ mod_gamm_1.0 <- gam(
   family = poisson(link = "log"),
   method = "REML"
 )
-mod_gamm_1.1 <- gam(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee))  + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
-  data = data_esp,
-  family = poisson(link = "identity"),
-  method = "REML"
-)
-mod_gamm_1.2 <- gam(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
-  data = data_esp,
-  family = poisson(link = "sqrt"),
-  method = "REML"
-)
+# mod_gamm_1.1 <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee))  + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
+#   data = data_esp,
+#   family = poisson(link = "identity"),
+#   method = "REML"
+# )
+# mod_gamm_1.2 <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
+#   data = data_esp,
+#   family = poisson(link = "sqrt"),
+#   method = "REML"
+# )
 
 mod_gamm_1.3 <- gam(
   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  data = data_esp,
+  family = nb(link = "log"),
+  method = "REML"
+)
+mod_gamm_1.4 <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(sta_id, bs = "re"),
   data = data_esp,
   family = nb(link = "log"),
   method = "REML"
@@ -2708,6 +2741,12 @@ acf(residuals(mod_gamm_1.3, type = "scaled.pearson"), lag.max = 20)
 ```
 
 Tester l'autocorrelation spatiale : 
+
+```{r}
+var <- variogram(valeur ~ annee + offset(log(ope_surface_calculee)), locations = ~ x+y, data = data_esp)
+var
+plot(var, col= "black")
+```
 
 ```{r}
 show.vgms(models = c("Exp",  # Exponential model
@@ -2762,22 +2801,26 @@ k.check(mod_gamm_1.3)
 res_mod_gamm_1.0 <- simulateResiduals(fittedModel = mod_gamm_1.0,
                                       plot = TRUE,
                                       n = 1000)
-res_mod_gamm_1.1 <- simulateResiduals(fittedModel = mod_gamm_1.1,
-                                      plot = TRUE,
-                                      n = 1000)
-res_mod_gamm_1.2 <- simulateResiduals(fittedModel = mod_gamm_1.2,
-                                      plot = TRUE,
-                                      n = 1000)
+# res_mod_gamm_1.1 <- simulateResiduals(fittedModel = mod_gamm_1.1,
+#                                       plot = TRUE,
+#                                       n = 1000)
+# res_mod_gamm_1.2 <- simulateResiduals(fittedModel = mod_gamm_1.2,
+#                                       plot = TRUE,
+#                                       n = 1000)
 res_mod_gamm_1.3 <- simulateResiduals(fittedModel = mod_gamm_1.3,
+                                      plot = TRUE,
+                                      n = 1000)
+res_mod_gamm_1.4 <- simulateResiduals(fittedModel = mod_gamm_1.4,
                                       plot = TRUE,
                                       n = 1000)
 ```
 
 ```{r}
 DHARMa::testDispersion(res_mod_gamm_1.0)
-DHARMa::testDispersion(res_mod_gamm_1.1)
-DHARMa::testDispersion(res_mod_gamm_1.2)
+# DHARMa::testDispersion(res_mod_gamm_1.1)
+# DHARMa::testDispersion(res_mod_gamm_1.2)
 DHARMa::testDispersion(res_mod_gamm_1.3)
+DHARMa::testDispersion(res_mod_gamm_1.4)
 
 ```
 
@@ -2802,9 +2845,10 @@ Selection de modèle par l'AIC :
 ```{r}
 AIC(
   mod_gamm_1.0, 
-  mod_gamm_1.1,
-  mod_gamm_1.2,
-  mod_gamm_1.3
+  # mod_gamm_1.1,
+  # mod_gamm_1.2,
+  mod_gamm_1.3, 
+  mod_gamm_1.4
   )
 ```
 
@@ -2828,7 +2872,7 @@ summary(trend)
 
 ```{r}
 #Representation graphique du modele
-plot(trend, residuals = T)
+plot(trend)
 ```
 
 ```{r}
@@ -2959,27 +3003,33 @@ Anova(mod_zi_1.3)
 Construire les modèles :
 
 ```{r}
-mod_gamm_1.0 <- gam(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
-  data = data_esp,
-  family = poisson(link = "log"),
-  method = "REML"
-)
-mod_gamm_1.1 <- gam(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee))  + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
-  data = data_esp,
-  family = poisson(link = "identity"),
-  method = "REML"
-)
-mod_gamm_1.2 <- gam(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
-  data = data_esp,
-  family = poisson(link = "sqrt"),
-  method = "REML"
-)
+# mod_gamm_1.0 <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
+#   data = data_esp,
+#   family = poisson(link = "log"),
+#   method = "REML"
+# )
+# mod_gamm_1.1 <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee))  + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
+#   data = data_esp,
+#   family = poisson(link = "identity"),
+#   method = "REML"
+# )
+# mod_gamm_1.2 <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
+#   data = data_esp,
+#   family = poisson(link = "sqrt"),
+#   method = "REML"
+# )
 
 mod_gamm_1.3 <- gam(
   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  data = data_esp,
+  family = nb(link = "log"),
+  method = "REML"
+)
+mod_gamm_1.4 <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(sta_id, bs = "re"),
   data = data_esp,
   family = nb(link = "log"),
   method = "REML"
@@ -2996,6 +3046,12 @@ acf(residuals(mod_gamm_1.3, type = "scaled.pearson"), lag.max = 20)
 ```
 
 Tester l'autocorrelation spatiale : 
+
+```{r}
+var <- variogram(valeur ~ annee + offset(log(ope_surface_calculee)), locations = ~ x+y, data = data_esp)
+var
+plot(var, col= "black")
+```
 
 ```{r}
 show.vgms(models = c("Exp",  # Exponential model
@@ -3032,10 +3088,12 @@ ggplot(var, aes(dist, gamma)) +
 Ajustement des modèles au données :
 
 ```{r}
-appraise(mod_gamm_1.0)
-appraise(mod_gamm_1.1)
-appraise(mod_gamm_1.2)
+# appraise(mod_gamm_1.0)
+# appraise(mod_gamm_1.1)
+# appraise(mod_gamm_1.2)
 appraise(mod_gamm_1.3)
+appraise(mod_gamm_1.4)
+
 ```
 
 ```{r}
@@ -3047,26 +3105,29 @@ k.check(mod_gamm_1.3)
 
 
 ```{r}
-res_mod_gamm_1.0 <- simulateResiduals(fittedModel = mod_gamm_1.0,
-                                      plot = TRUE,
-                                      n = 1000)
-res_mod_gamm_1.1 <- simulateResiduals(fittedModel = mod_gamm_1.1,
-                                      plot = TRUE,
-                                      n = 1000)
-res_mod_gamm_1.2 <- simulateResiduals(fittedModel = mod_gamm_1.2,
-                                      plot = TRUE,
-                                      n = 1000)
+# res_mod_gamm_1.0 <- simulateResiduals(fittedModel = mod_gamm_1.0,
+#                                       plot = TRUE,
+#                                       n = 1000)
+# res_mod_gamm_1.1 <- simulateResiduals(fittedModel = mod_gamm_1.1,
+#                                       plot = TRUE,
+#                                       n = 1000)
+# res_mod_gamm_1.2 <- simulateResiduals(fittedModel = mod_gamm_1.2,
+#                                       plot = TRUE,
+#                                       n = 1000)
 res_mod_gamm_1.3 <- simulateResiduals(fittedModel = mod_gamm_1.3,
+                                      plot = TRUE,
+                                      n = 1000)
+res_mod_gamm_1.4 <- simulateResiduals(fittedModel = mod_gamm_1.4,
                                       plot = TRUE,
                                       n = 1000)
 ```
 
 ```{r}
-DHARMa::testDispersion(res_mod_gamm_1.0)
-DHARMa::testDispersion(res_mod_gamm_1.1)
-DHARMa::testDispersion(res_mod_gamm_1.2)
+# DHARMa::testDispersion(res_mod_gamm_1.0)
+# DHARMa::testDispersion(res_mod_gamm_1.1)
+# DHARMa::testDispersion(res_mod_gamm_1.2)
 DHARMa::testDispersion(res_mod_gamm_1.3)
-
+DHARMa::testDispersion(res_mod_gamm_1.4)
 ```
 
 ```{r}
@@ -3089,10 +3150,11 @@ Selection de modèle par l'AIC :
 
 ```{r}
 AIC(
-  mod_gamm_1.0, 
-  mod_gamm_1.1,
-  mod_gamm_1.2,
-  mod_gamm_1.3
+  # mod_gamm_1.0, 
+  # mod_gamm_1.1,
+  # mod_gamm_1.2,
+  mod_gamm_1.3, 
+  mod_gamm_1.4
   )
 ```
 
@@ -3101,7 +3163,7 @@ Resultats poptrend :
 
 ```{r}
 trend <- poptrend::ptrend(
-  valeur ~ trend(annee, tempRE = F, type = "smooth") + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  valeur ~ trend(annee, tempRE = F, type = "smooth") + offset(log(ope_surface_calculee)) + pro_libelle + s(sta_id, bs = "re"),
   data = data_esp,
   family = nb(link = "log"),
   bootType = "hessian",
@@ -3116,7 +3178,7 @@ summary(trend)
 
 ```{r}
 #Representation graphique du modele
-plot(trend, residuals = T)
+plot(trend)
 ```
 
 ```{r}
@@ -3247,26 +3309,32 @@ Anova(mod_zi_1.3)
 Construire les modèles :
 
 ```{r}
-mod_gamm_1.0 <- gam(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
-  data = data_esp,
-  family = poisson(link = "log"),
-  method = "REML"
-)
-mod_gamm_1.1 <- gam(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee))  + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
-  data = data_esp,
-  family = poisson(link = "identity"),
-  method = "REML"
-)
-mod_gamm_1.2 <- gam(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
-  data = data_esp,
-  family = poisson(link = "sqrt"),
-  method = "REML"
-)
+# mod_gamm_1.0 <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
+#   data = data_esp,
+#   family = poisson(link = "log"),
+#   method = "REML"
+# )
+# mod_gamm_1.1 <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee))  + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
+#   data = data_esp,
+#   family = poisson(link = "identity"),
+#   method = "REML"
+# )
+# mod_gamm_1.2 <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
+#   data = data_esp,
+#   family = poisson(link = "sqrt"),
+#   method = "REML"
+# )
 mod_gamm_1.3 <- gam(
   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  data = data_esp,
+  family = nb(link = "log"),
+  method = "REML"
+)
+mod_gamm_1.4 <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(sta_id, bs = "re"),
   data = data_esp,
   family = nb(link = "log"),
   method = "REML"
@@ -3283,6 +3351,12 @@ acf(residuals(mod_gamm_1.3, type = "scaled.pearson"), lag.max = 20)
 ```
 
 Tester l'autocorrelation spatiale : 
+
+```{r}
+var <- variogram(valeur ~ annee + offset(log(ope_surface_calculee)), locations = ~ x+y, data = data_esp)
+var
+plot(var, col= "black")
+```
 
 ```{r}
 show.vgms(models = c("Exp",  # Exponential model
@@ -3319,10 +3393,12 @@ ggplot(var, aes(dist, gamma)) +
 Ajustement des modèles au données :
 
 ```{r}
-appraise(mod_gamm_1.0)
-appraise(mod_gamm_1.1)
-appraise(mod_gamm_1.2)
+# appraise(mod_gamm_1.0)
+# appraise(mod_gamm_1.1)
+# appraise(mod_gamm_1.2)
 appraise(mod_gamm_1.3)
+appraise(mod_gamm_1.4)
+
 ```
 
 ```{r}
@@ -3334,25 +3410,29 @@ k.check(mod_gamm_1.3)
 
 
 ```{r}
-res_mod_gamm_1.0 <- simulateResiduals(fittedModel = mod_gamm_1.0,
-                                      plot = TRUE,
-                                      n = 1000)
-res_mod_gamm_1.1 <- simulateResiduals(fittedModel = mod_gamm_1.1,
-                                      plot = TRUE,
-                                      n = 1000)
-res_mod_gamm_1.2 <- simulateResiduals(fittedModel = mod_gamm_1.2,
-                                      plot = TRUE,
-                                      n = 1000)
+# res_mod_gamm_1.0 <- simulateResiduals(fittedModel = mod_gamm_1.0,
+#                                       plot = TRUE,
+#                                       n = 1000)
+# res_mod_gamm_1.1 <- simulateResiduals(fittedModel = mod_gamm_1.1,
+#                                       plot = TRUE,
+#                                       n = 1000)
+# res_mod_gamm_1.2 <- simulateResiduals(fittedModel = mod_gamm_1.2,
+#                                       plot = TRUE,
+#                                       n = 1000)
 res_mod_gamm_1.3 <- simulateResiduals(fittedModel = mod_gamm_1.3,
+                                      plot = TRUE,
+                                      n = 1000)
+res_mod_gamm_1.4 <- simulateResiduals(fittedModel = mod_gamm_1.4,
                                       plot = TRUE,
                                       n = 1000)
 ```
 
 ```{r}
-DHARMa::testDispersion(res_mod_gamm_1.0)
-DHARMa::testDispersion(res_mod_gamm_1.1)
-DHARMa::testDispersion(res_mod_gamm_1.2)
+# DHARMa::testDispersion(res_mod_gamm_1.0)
+# DHARMa::testDispersion(res_mod_gamm_1.1)
+# DHARMa::testDispersion(res_mod_gamm_1.2)
 DHARMa::testDispersion(res_mod_gamm_1.3)
+DHARMa::testDispersion(res_mod_gamm_1.4)
 
 ```
 
@@ -3376,10 +3456,11 @@ Selection de modèle par l'AIC :
 
 ```{r}
 AIC(
-  mod_gamm_1.0, 
-  mod_gamm_1.1,
-  mod_gamm_1.2,
-  mod_gamm_1.3
+  # mod_gamm_1.0, 
+  # mod_gamm_1.1,
+  # mod_gamm_1.2,
+  mod_gamm_1.3, 
+  mod_gamm_1.4
   )
 ```
 
@@ -3403,7 +3484,7 @@ summary(trend)
 
 ```{r}
 #Representation graphique du modele
-plot(trend, residuals = T)
+plot(trend)
 ```
 
 ```{r}
@@ -3534,26 +3615,32 @@ Anova(mod_zi_1.3)
 Construire les modèles :
 
 ```{r}
-mod_gamm_1.0 <- gam(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
-  data = data_esp,
-  family = poisson(link = "log"),
-  method = "REML"
-)
-mod_gamm_1.1 <- gam(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee))  + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
-  data = data_esp,
-  family = poisson(link = "identity"),
-  method = "REML"
-)
-mod_gamm_1.2 <- gam(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
-  data = data_esp,
-  family = poisson(link = "sqrt"),
-  method = "REML"
-)
+# mod_gamm_1.0 <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
+#   data = data_esp,
+#   family = poisson(link = "log"),
+#   method = "REML"
+# )
+# mod_gamm_1.1 <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee))  + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
+#   data = data_esp,
+#   family = poisson(link = "identity"),
+#   method = "REML"
+# )
+# mod_gamm_1.2 <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
+#   data = data_esp,
+#   family = poisson(link = "sqrt"),
+#   method = "REML"
+# )
 mod_gamm_1.3 <- gam(
   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  data = data_esp,
+  family = nb(link = "log"),
+  method = "REML"
+)
+mod_gamm_1.4 <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle  + s(sta_id, bs = "re"),
   data = data_esp,
   family = nb(link = "log"),
   method = "REML"
@@ -3570,6 +3657,13 @@ acf(residuals(mod_gamm_1.3, type = "scaled.pearson"), lag.max = 20)
 ```
 
 Tester l'autocorrelation spatiale : 
+
+```{r}
+var <- variogram(valeur ~ annee + offset(log(ope_surface_calculee)), locations = ~ x+y, data = data_esp)
+var
+plot(var, col= "black")
+```
+
 
 ```{r}
 show.vgms(models = c("Exp",  # Exponential model
@@ -3606,10 +3700,12 @@ ggplot(var, aes(dist, gamma)) +
 Ajustement des modèles au données :
 
 ```{r}
-appraise(mod_gamm_1.0)
-appraise(mod_gamm_1.1)
-appraise(mod_gamm_1.2)
+# appraise(mod_gamm_1.0)
+# appraise(mod_gamm_1.1)
+# appraise(mod_gamm_1.2)
 appraise(mod_gamm_1.3)
+appraise(mod_gamm_1.4)
+
 ```
 
 ```{r}
@@ -3621,26 +3717,29 @@ k.check(mod_gamm_1.3)
 
 
 ```{r}
-res_mod_gamm_1.0 <- simulateResiduals(fittedModel = mod_gamm_1.0,
-                                      plot = TRUE,
-                                      n = 1000)
-res_mod_gamm_1.1 <- simulateResiduals(fittedModel = mod_gamm_1.1,
-                                      plot = TRUE,
-                                      n = 1000)
-res_mod_gamm_1.2 <- simulateResiduals(fittedModel = mod_gamm_1.2,
-                                      plot = TRUE,
-                                      n = 1000)
+# res_mod_gamm_1.0 <- simulateResiduals(fittedModel = mod_gamm_1.0,
+#                                       plot = TRUE,
+#                                       n = 1000)
+# res_mod_gamm_1.1 <- simulateResiduals(fittedModel = mod_gamm_1.1,
+#                                       plot = TRUE,
+#                                       n = 1000)
+# res_mod_gamm_1.2 <- simulateResiduals(fittedModel = mod_gamm_1.2,
+#                                       plot = TRUE,
+#                                       n = 1000)
 res_mod_gamm_1.3 <- simulateResiduals(fittedModel = mod_gamm_1.3,
+                                      plot = TRUE,
+                                      n = 1000)
+res_mod_gamm_1.4 <- simulateResiduals(fittedModel = mod_gamm_1.4,
                                       plot = TRUE,
                                       n = 1000)
 ```
 
 ```{r}
-DHARMa::testDispersion(res_mod_gamm_1.0)
-DHARMa::testDispersion(res_mod_gamm_1.1)
-DHARMa::testDispersion(res_mod_gamm_1.2)
+# DHARMa::testDispersion(res_mod_gamm_1.0)
+# DHARMa::testDispersion(res_mod_gamm_1.1)
+# DHARMa::testDispersion(res_mod_gamm_1.2)
 DHARMa::testDispersion(res_mod_gamm_1.3)
-
+DHARMa::testDispersion(res_mod_gamm_1.4)
 ```
 
 ```{r}
@@ -3663,10 +3762,11 @@ Selection de modèle par l'AIC :
 
 ```{r}
 AIC(
-  mod_gamm_1.0, 
-  mod_gamm_1.1,
-  mod_gamm_1.2,
-  mod_gamm_1.3
+  # mod_gamm_1.0, 
+  # mod_gamm_1.1,
+  # mod_gamm_1.2,
+  mod_gamm_1.3, 
+  mod_gamm_1.4
   )
 ```
 
@@ -3690,7 +3790,7 @@ summary(trend)
 
 ```{r}
 #Representation graphique du modele
-plot(trend, residuals = T)
+plot(trend)
 ```
 
 ```{r}
@@ -3821,27 +3921,40 @@ Anova(mod_zi_1.3)
 Construire les modèles :
 
 ```{r}
-mod_gamm_1.0 <- gam(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
-  data = data_esp,
-  family = poisson(link = "log"),
-  method = "REML"
-)
-mod_gamm_1.1 <- gam(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee))  + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
-  data = data_esp,
-  family = poisson(link = "identity"),
-  method = "REML"
-)
-mod_gamm_1.2 <- gam(
-  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
-  data = data_esp,
-  family = poisson(link = "sqrt"),
-  method = "REML"
-)
+# mod_gamm_1.0 <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
+#   data = data_esp,
+#   family = poisson(link = "log"),
+#   method = "REML"
+# )
+# mod_gamm_1.1 <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee))  + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
+#   data = data_esp,
+#   family = poisson(link = "identity"),
+#   method = "REML"
+# )
+# mod_gamm_1.2 <- gam(
+#   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x,y) + s(sta_id, bs = "re"),
+#   data = data_esp,
+#   family = poisson(link = "sqrt"),
+#   method = "REML"
+# )
 
 mod_gamm_1.3 <- gam(
   valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  data = data_esp,
+  family = nb(link = "log"),
+  method = "REML"
+)
+
+mod_gamm_1.4 <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle  + s(sta_id, bs = "re"),
+  data = data_esp,
+  family = nb(link = "log"),
+  method = "REML"
+)
+mod_gamm_1.5 <- gam(
+  valeur ~ s(annee, k = 15) + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
   data = data_esp,
   family = nb(link = "log"),
   method = "REML"
@@ -3858,6 +3971,12 @@ acf(residuals(mod_gamm_1.3, type = "scaled.pearson"), lag.max = 20)
 ```
 
 Tester l'autocorrelation spatiale : 
+
+```{r}
+var <- variogram(valeur ~ annee + offset(log(ope_surface_calculee)), locations = ~ x+y, data = data_esp)
+var
+plot(var, col= "black")
+```
 
 ```{r}
 show.vgms(models = c("Exp",  # Exponential model
@@ -3894,41 +4013,50 @@ ggplot(var, aes(dist, gamma)) +
 Ajustement des modèles au données :
 
 ```{r}
-appraise(mod_gamm_1.0)
-appraise(mod_gamm_1.1)
-appraise(mod_gamm_1.2)
+# appraise(mod_gamm_1.0)
+# appraise(mod_gamm_1.1)
+# appraise(mod_gamm_1.2)
 appraise(mod_gamm_1.3)
+appraise(mod_gamm_1.4)
 ```
 
 ```{r}
-k.check(mod_gamm_1.0)
-k.check(mod_gamm_1.1)
-k.check(mod_gamm_1.2)
+# k.check(mod_gamm_1.0)
+# k.check(mod_gamm_1.1)
+# k.check(mod_gamm_1.2)
 k.check(mod_gamm_1.3)
+k.check(mod_gamm_1.4)
 ```
 
 
 ```{r}
-res_mod_gamm_1.0 <- simulateResiduals(fittedModel = mod_gamm_1.0,
-                                      plot = TRUE,
-                                      n = 1000)
-res_mod_gamm_1.1 <- simulateResiduals(fittedModel = mod_gamm_1.1,
-                                      plot = TRUE,
-                                      n = 1000)
-res_mod_gamm_1.2 <- simulateResiduals(fittedModel = mod_gamm_1.2,
-                                      plot = TRUE,
-                                      n = 1000)
+# res_mod_gamm_1.0 <- simulateResiduals(fittedModel = mod_gamm_1.0,
+#                                       plot = TRUE,
+#                                       n = 1000)
+# res_mod_gamm_1.1 <- simulateResiduals(fittedModel = mod_gamm_1.1,
+#                                       plot = TRUE,
+#                                       n = 1000)
+# res_mod_gamm_1.2 <- simulateResiduals(fittedModel = mod_gamm_1.2,
+#                                       plot = TRUE,
+#                                       n = 1000)
 res_mod_gamm_1.3 <- simulateResiduals(fittedModel = mod_gamm_1.3,
                                       plot = TRUE,
                                       n = 1000)
+res_mod_gamm_1.4 <- simulateResiduals(fittedModel = mod_gamm_1.4,
+                                      plot = TRUE,
+                                      n = 1000)
+res_mod_gamm_1.5 <- simulateResiduals(fittedModel = mod_gamm_1.5,
+                                      plot = TRUE,
+                                      n = 1000)
 ```
 
 ```{r}
-DHARMa::testDispersion(res_mod_gamm_1.0)
-DHARMa::testDispersion(res_mod_gamm_1.1)
-DHARMa::testDispersion(res_mod_gamm_1.2)
+# DHARMa::testDispersion(res_mod_gamm_1.0)
+# DHARMa::testDispersion(res_mod_gamm_1.1)
+# DHARMa::testDispersion(res_mod_gamm_1.2)
 DHARMa::testDispersion(res_mod_gamm_1.3)
-
+DHARMa::testDispersion(res_mod_gamm_1.4)
+DHARMa::testDispersion(res_mod_gamm_1.5)
 ```
 
 ```{r}
@@ -3940,10 +4068,13 @@ concurvity(mod_gamm_1.3)
 
 
 ```{r}
-draw(mod_gamm_1.0, residuals = T)
-draw(mod_gamm_1.1, residuals = T)
-draw(mod_gamm_1.2, residuals = T)
+# draw(mod_gamm_1.0, residuals = T)
+# draw(mod_gamm_1.1, residuals = T)
+# draw(mod_gamm_1.2, residuals = T)
 draw(mod_gamm_1.3, residuals = T)
+draw(mod_gamm_1.4, residuals = T)
+draw(mod_gamm_1.5, residuals = T)
+
 ```
 
 
@@ -3951,10 +4082,12 @@ Selection de modèle par l'AIC :
 
 ```{r}
 AIC(
-  mod_gamm_1.0, 
-  mod_gamm_1.1,
-  mod_gamm_1.2,
-  mod_gamm_1.3
+  # mod_gamm_1.0, 
+  # mod_gamm_1.1,
+  # mod_gamm_1.2,
+  mod_gamm_1.3, 
+  mod_gamm_1.4, 
+  mod_gamm_1.5
   )
 ```
 
@@ -3978,7 +4111,7 @@ summary(trend)
 
 ```{r}
 #Representation graphique du modele
-plot(trend, residuals = T)
+plot(trend)
 ```
 
 ```{r}
@@ -8018,26 +8151,26 @@ Construire les modèles :
 
 ```{r}
 mod_zi_1.0 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) +pro_libelle + (1 |
+  valeur ~ scale(annee) + offset(log(ope_surface_calculee)) +pro_libelle + (1 |
                                                            sta_id) ,
   data = data_esp,
   family = poisson(link = "log"),
   ziformula = ~ 1
 )
 mod_zi_1.1 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  valeur ~ scale(annee) + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
   family = nbinom2(link = "log"),
   data = data_esp,
   ziformula = ~ 1
 )
 mod_zi_1.2 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  valeur ~ scale(annee) + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
   family = truncated_poisson(link = "log"),
   data = data_esp,
   ziformula = ~ 1
 )
 mod_zi_1.3 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  valeur ~ scale(annee) + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
   family = truncated_nbinom2(link = "log"),
   data = data_esp,
   ziformula = ~ 1
@@ -8115,11 +8248,34 @@ DHARMa::testDispersion(mod_zi_1.3, plot = T)
 Resultats du meilleur modèle : 
 
 ```{r}
-summary(mod_zi_1.3)
+summary(mod_zi_1.1)
+```
+```{r}
+mod_1.1_no_zi <- glmmTMB(
+  valeur ~ scale(annee) + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id),
+  family = nbinom2(link = "log"),
+  data = data_esp
+)
+
+AIC(mod_zi_1.1, mod_1.1_no_zi)
+anova(mod_1.1_no_zi, mod_zi_1.1)  # test du rapport de vraisemblance
 ```
 
 ```{r}
-Anova(mod_zi_1.3)
+library(DHARMa)
+res <- simulateResiduals(mod_1.1_no_zi, refit = T, n= 250)
+plot(res)
+testZeroInflation(res)  # confirme si le ZI est vraiment inutile
+```
+```{r}
+plot(res)  # déjà généré — vérifiez QQ-plot et residus vs predicted
+testDispersion(res)       # surdispersion résiduelle correctement captée par nbinom2 ?
+testOutliers(res)         # présence de valeurs aberrantes ?
+```
+
+
+```{r}
+Anova(mod_zi_1.1)
 ```
 
 

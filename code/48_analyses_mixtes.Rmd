@@ -1040,7 +1040,7 @@ liste_periodes_etude <- list(c(2007, 2025),
 
 
 ```{r Exécution fonction ZIP_GLMM}
-zip_glmm_resultats <- zip_glmm_application_modele(data = ope_effectif_glm,
+zip_glmm_resultats <- zip_glmm_application_modele(data = ope_effectif_glmm_abs,
                                           liste_periodes = liste_periodes_etude)
 ```
 

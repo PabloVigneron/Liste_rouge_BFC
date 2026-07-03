@@ -136,12 +136,12 @@ passerelle <- mef_creer_passerelle() # Création d'une passerelle
 
 ```{r}
 mes_depts <- departements_metro_geo %>% 
-  filter (DEP %in% c( "21","25","39", "58", "70","71","89")) # Sélection de l'aire géographique : choix des départements 
+  filter (DEP %in% c( "21","25","39", "58", "70","71","89", "90")) # Sélection de l'aire géographique : choix des départements 
 ```
 
 ```{r Visualisation de la zone géographique sélectionnée}
-#mes_depts %>% 
-#  mapview::mapview() # Visualisation de la zone géographique sélectionnée 
+# mes_depts %>%
+#  mapview::mapview() # Visualisation de la zone géographique sélectionnée
 ```
 
 ## Mise en place d'un buffer
@@ -559,11 +559,20 @@ Pour contextualiser, la station du **Doubs à Mouthe - Le petit Sarrageois**, av
 
 Concernant la station **Acolin à Saint-Germain-Chasseney** pour des probèmes d'accès au point de prelèvement sur un terrain privé et une perte d'autorisation d'aller sur site, la décision à été prise de changé la localisation du point de prélèvement. 
 
-Ces deux stations sont donc **retirée de l'analyse**.
+La station **Oignin à Samognat** à été compris dans le buffer d'1km, cependant elle ne fait pas partie de la région. 
+
+La station **Loue à Mouthier Haute Pierre** est retirée car seulement 3 années de suivis.
+
+La station **Amance à Pisseloup**, **La Loire à Lere** et **La Loire à Sury-Pres-Lere** ont été compris dans le buffer d'1km, cependant elles ne font pas partie de la région.
+
+Ces stations sont donc **retirée de l'analyse**.
+
+
 
 ```{r retirer les stations problématiques du df et actualisation ope_selection}
 ope_selection <- ope_selection %>%
-  filter(!sta_id == "8913", !sta_id == "19409") %>% 
+  filter(!sta_id == "8913", !sta_id == "19409", !sta_id == "25227", !sta_id == "19590", !sta_id == "9166", !sta_id == "4331694") %>% 
+  filter(!pop_id == "92836", !pop_id == "67123") %>% 
   filter(pop_id %in% pop_serie_tempo) # Sélection des pop_id contenus dans la sélection de séries temporelles
 ```
 
