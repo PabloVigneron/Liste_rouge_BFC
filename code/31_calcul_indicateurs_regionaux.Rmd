@@ -145,8 +145,8 @@ reg_indicateur <- ope_indicateur %>%
   # Calculer la moyenne pour le pourcentage de juvéniles et la densité surfacique
   
   dplyr::summarize(valeur = case_when(
-    first(indicateur) %in% c("pourcentage_juveniles", "densite_surface") ~ mean(valeur, na.rm = TRUE),
-    TRUE ~ median(valeur, na.rm = TRUE)# Calculer la médiane pour les autres
+    first(indicateur) %in% c("pourcentage_juveniles", "densite_surface", "biomasse") ~ mean(valeur, na.rm = TRUE),
+    TRUE ~ sum(valeur, na.rm = TRUE)# Calculer la médiane pour les autres
   ),
   .groups = "drop")
 ```

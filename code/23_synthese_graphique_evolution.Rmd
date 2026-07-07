@@ -95,6 +95,40 @@ L'Objectif de ce script est de réaliser une synthèse graphique des résultats 
 
 On réalise une représentation graphique des différents indicateurs calculés pour chacune des espèces à évaluer.
 
+```{r}
+# obr_data <- ope_indicateur %>%
+#   filter(esp_code_alternatif == "OBR", indicateur == "effectif_total") 
+# 
+# nb_station_negative_obr <- obr_data %>%
+#   filter(valeur == 0) %>%
+#   group_by(annee) %>%
+#   summarise(n_total = n_distinct(pop_id)) %>%
+#   ungroup()
+# 
+# nb_station_positive <- obr_data %>%
+#   filter(valeur > 0) %>%
+#   group_by(annee) %>%
+#   summarise(n_total = n_distinct(pop_id)) %>%
+#   ungroup() 
+# 
+#   
+#   
+# lot_data <- ope_indicateur %>%
+#   filter(esp_code_alternatif == "LOT", indicateur == "effectif_total") 
+# 
+# nb_station_negative <- lot_data %>%
+#   filter(valeur == 0) %>%
+#   group_by(annee) %>%
+#   summarise(n_total = n_distinct(pop_id)) %>%
+#   ungroup()
+# 
+# nb_station_positive <- lot_data %>%
+#   filter(valeur > 0) %>%
+#   group_by(annee) %>%
+#   summarise(n_total = n_distinct(pop_id)) %>%
+#   ungroup() 
+
+```
 
 ```{r indicateur labels}
 indicateur_labels <- c(
@@ -114,7 +148,7 @@ indicateur_for_graph <- reg_indicateur %>%
   filter(stade == "ind",indicateur %in% c(
       "biomasse",
       "densite_surface",
-      # "effectif_total",
+      "effectif_total",
       "pourcentage_juveniles", 
       "taux_occurrence"
   )) %>%
@@ -122,7 +156,7 @@ indicateur_for_graph <- reg_indicateur %>%
   ggplot(aes(x = annee, y = valeur)) +
   facet_wrap2(
     espece ~ indicateur,
-    ncol = 4,
+    ncol = 5,
     scales = "free_y",
     axes = "all",
     trim_blank = T, 

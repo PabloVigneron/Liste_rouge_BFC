@@ -9311,10 +9311,195 @@ plot(trend, residuals = T)
 poptrend::change(trend, start = 2007 , end = 2025, alpha = 0.05)
 ```
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #2. Occurence
+```{r}
+# preparer la table pour jointure
+ope_selection <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id)
+
+# Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
+coord_sta_id <- point_prelevement %>%
+  filter(pop_id %in% pop_serie_tempo) %>%
+  rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
+  select(pop_id, x, y) %>%
+  mutate(pop_id = as.factor(pop_id))
+
+# prepéarer la table pour jointure 
+esp_ope_selection_join <- esp_ope_selection %>% 
+  select(ope_id, ope_surface_calculee) %>% 
+  distinct(ope_id, .keep_all = TRUE)
+
+
+ope_occurence_glmm <- ope_indicateur %>%
+  filter(indicateur == "occurence") %>% 
+  mef_ajouter_type_protocole() %>% 
+  left_join( y= ope_selection, by = c("ope_id", "pop_id", "annee")) %>% 
+  inner_join(esp_ope_selection_join, by = "ope_id") %>% 
+  mutate(
+    valeur = as.numeric(valeur) ,
+    annee = as.numeric(annee),
+    ope_surface_calculee = as.numeric(ope_surface_calculee),
+    pro_libelle = as.factor(pro_libelle),
+    pop_id = as.factor(pop_id),
+    sta_id = as.factor(sta_id),
+    stade = as.factor(stade)
+  ) %>%
+  left_join(coord_sta_id, by = "pop_id") %>%
+  mutate(x = as.numeric(x), y = as.numeric(y)) %>%
+  rename(espece = esp_code_alternatif) %>% 
+  filter(stade == "ind")
+```
+
+## TRF 
+```{r}
+data_esp <- ope_occurence_glmm %>% 
+  filter(espece == "ANG")
+```
 
 ###a. **Modèles Linéaires Généralisé Mixtes (GLMM)**
 
+```{r}
+mod_glm_1.0 <- glmer(
+  valeur ~ annee  + pro_libelle + (1 |
+                                     sta_id) ,
+  data = data_esp,
+  family = binomial(link = "logit")
+)
+
+mod_glm_1.1 <- glmer(
+  valeur ~ annee  + pro_libelle + (1 |
+                                     sta_id) ,
+  data = data_esp,
+  family = binomial(link = "probit")
+)
+mod_glm_1.2 <- glmer(
+  valeur ~ annee  + pro_libelle + (1 |
+                                     sta_id) ,
+  data = data_esp,
+  family = binomial(link = "cauchit")
+)
+
+mod_glm_1.3 <- glmer(
+  valeur ~ annee  + pro_libelle + (1 |
+                                     sta_id) ,
+  data = data_esp,
+  family = binomial(link = "cloglog")
+)
+
+```
+
+On selectionne à l'aide du critère AIC le meilleur modèle c'est à dire le modèle avec le plus petit AIC. 
+
+```{r}
+AIC(
+  mod_glm_1.0,
+  mod_glm_1.1,
+  mod_glm_1.2,
+  mod_glm_1.3
+  )
+```
+
+Verification de l'ajustement des modèles au données : 
+```{r, fig.height = 10, fig.width = 20}
+res_mod_glm_1.0 <- as.ggplot(~ plotresid(mod_glm_1.0))
+res_mod_glm_1.1 <- as.ggplot(~ plotresid(mod_glm_1.1))
+res_mod_glm_1.2 <- as.ggplot(~ plotresid(mod_glm_1.2))
+res_mod_glm_1.3 <- as.ggplot(~ plotresid(mod_glm_1.3))
+
+ggarrange(
+  res_mod_glm_1.0,
+  res_mod_glm_1.1,
+  res_mod_glm_1.2,
+  res_mod_glm_1.3,
+  ncol = 2,
+  nrow = 2,
+  labels = c(
+    "logit", 
+    "probit", 
+    "cauchit",
+    "cloglog"
+    ),
+  font.label = list(
+    size = 13,
+    color = "darkred",
+    face = "bold",
+    family = NULL
+  ),
+  hjust = -0.1,
+  vjust = 1.6,
+  align = c("none", "h", "v", "hv")
+)
+```
+
+```{r, fig.height = 10, fig.width = 20}
+
+sim_res_mod_glm_1.0 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_glm_1.0, n = 1000), quantreg = T))
+sim_res_mod_glm_1.1 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_glm_1.1, n = 1000), quantreg = T))
+sim_res_mod_glm_1.2 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_glm_1.2, n = 1000), quantreg = T))
+sim_res_mod_glm_1.3 <- as.ggplot(~ plotResiduals(simulateResiduals(fittedModel = mod_glm_1.3, n = 1000), quantreg = T))
+
+ggarrange(
+  sim_res_mod_glm_1.0,
+  sim_res_mod_glm_1.1,
+  sim_res_mod_glm_1.2,
+  sim_res_mod_glm_1.3,
+  ncol = 2,
+  nrow = 2,
+  labels = c(
+    "logit", 
+    "probit", 
+    "cauchit",
+    "cloglog"
+    ),
+  font.label = list(
+    size = 13,
+    color = "darkred",
+    face = "bold",
+    family = NULL
+  ),
+  hjust = -0.1,
+  vjust = 1.6,
+  align = c("none", "h", "v", "hv")
+)
+```
+
+
+Resultats du meilleur modèle : 
+
+```{r}
+summary(mod_glm_1.1)
+summary(mod_glm_1.1)
+summary(mod_glm_1.2)
+summary(mod_glm_1.3)
+```
+
+```{r}
+Anova(mod_glm_1.2)
+```
 <!-- ##b. **Modèles Additifs Généralisé Mixtes (GAMMs)**   -->
 
 #3. Biomasse

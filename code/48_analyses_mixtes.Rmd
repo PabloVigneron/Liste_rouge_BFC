@@ -87,6 +87,43 @@ load(rdata_tables) # Chargement des données
 
 ```{r DF avec coord et absences}
 # preparer la table pour jointure
+# ope_selection <- ope_selection %>%
+#   dplyr::select(ope_id, pop_id, sta_id)
+# 
+# # Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
+# coord_sta_id <- point_prelevement %>%
+#   filter(pop_id %in% pop_serie_tempo) %>%
+#   rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
+#   select(pop_id, x, y) %>%
+#   mutate(pop_id = as.factor(pop_id))
+# 
+# # prepéarer la table pour jointure 
+# esp_ope_selection_join <- esp_ope_selection %>% 
+#   select(ope_id, ope_surface_calculee) %>% 
+#   distinct(ope_id, .keep_all = TRUE)
+# 
+# 
+# ope_effectif_glmm <- ope_effectif_absences %>%
+#   mef_ajouter_type_protocole() %>%
+#   left_join(ope_selection, by = "ope_id") %>%
+#   inner_join(esp_ope_selection_join, by = "ope_id") %>%
+#   mutate(
+#     valeur = as.numeric(valeur) ,
+#     annee = as.numeric(annee),
+#     ope_surface_calculee = as.numeric(ope_surface_calculee),
+#     pro_libelle = as.factor(pro_libelle),
+#     pop_id = as.factor(pop_id),
+#     sta_id = as.factor(sta_id)
+#   ) %>%
+#   left_join(coord_sta_id, by = "pop_id") %>% 
+#   mutate(x = as.numeric(x), 
+#          y = as.numeric(y))%>%
+#   rename(espece = esp_code_alternatif)
+```
+
+
+```{r}
+# preparer la table pour jointure
 ope_selection <- ope_selection %>%
   dplyr::select(ope_id, pop_id, sta_id)
 
@@ -103,23 +140,27 @@ esp_ope_selection_join <- esp_ope_selection %>%
   distinct(ope_id, .keep_all = TRUE)
 
 
-ope_effectif_glmm <- ope_effectif_absences %>%
-  mef_ajouter_type_protocole() %>%
-  left_join(ope_selection, by = "ope_id") %>%
-  inner_join(esp_ope_selection_join, by = "ope_id") %>%
+ope_effectif_glmm_abs <- ope_indicateur %>%
+  filter(indicateur == "effectif_total") %>% 
+  mef_ajouter_type_protocole() %>% 
+  left_join( y= ope_selection, by = c("ope_id", "pop_id", "annee")) %>% 
+  inner_join(esp_ope_selection_join, by = "ope_id") %>% 
   mutate(
     valeur = as.numeric(valeur) ,
     annee = as.numeric(annee),
     ope_surface_calculee = as.numeric(ope_surface_calculee),
     pro_libelle = as.factor(pro_libelle),
     pop_id = as.factor(pop_id),
-    sta_id = as.factor(sta_id)
+    sta_id = as.factor(sta_id),
+    stade = as.factor(stade)
   ) %>%
-  left_join(coord_sta_id, by = "pop_id") %>% 
-  mutate(x = as.numeric(x), 
-         y = as.numeric(y))%>%
-  rename(espece = esp_code_alternatif)
+  left_join(coord_sta_id, by = "pop_id") %>%
+  mutate(x = as.numeric(x), y = as.numeric(y)) %>%
+  rename(espece = esp_code_alternatif) %>% 
+  filter(stade == "ind")
 ```
+
+
 
 # Effectif en fonction des annes
 
@@ -946,98 +987,276 @@ coefficients(mod_gamm_1.4$gam)
 ```
 
 
-## Modèles Additifs Généralisé Mixtes (GAMMs)
 
-
+## Test gamm function
 ```{r}
-liste_periodes_etude <- list(c(2007, 2025), 
-                             c(2015, 2025)) # Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin) 
-```
-
-### Application du modèle GAMM avec les effectifs
-
-
-```{r Exécution fonction GAMM}
-gamm_resultats <- gamm_application_modele(data = ope_effectif_glmm,
-                                          liste_periodes = liste_periodes_etude)
-```
-
-```{r Mise en forme sortie fonction GAMM}
-gamm_resultats_annee <- gamm_resultats %>%
-  filter(row_name == "annee") %>%
-  select(periode,
-         esp_code_alternatif,
-         p_value,
-         Estimate,
-         sig) %>%
-  mutate(trend = case_when(
-      Estimate > 0 ~ "\U2197",
-      Estimate < 0 ~ "\U2198",
-      TRUE ~ "."))
-```
-
-
-```{r Sélection des données résultats GAMM}
-# Filtrer les données selon les critères spécifiés
-gamm_resultats_format <- gamm_resultats_annee %>%
-  filter((esp_code_alternatif == "ANG" & periode == "2007-2025") |
-    (esp_code_alternatif %in% c(c("ABL","BAF","BLN","BRB", "BRE","BRO","CCO","CHA","CHE", "EPI", "EPT", "GAR", "GOU","HOT","LOF",   "LOR", "LOT","LPM" ,"LPP", "OBR", "PER", "ROT", "SAT", "SPI", "TAN", "TOX", "TRF","VAI","VAN","VAR")) & periode == "2007-2025"))
-```
-
-
-Construction d'un tableau récapitulatif des résultats du modèle GAMM :
-
-```{r}
-df_gamm_resultats <- gamm_resultats_format %>%
-  select(esp_code_alternatif, periode, trend, sig, Estimate, family) %>%
-  mutate(Estimate = round(Estimate, digits = 2)) %>%
-  rename(
-    "Code Espèce" = esp_code_alternatif,
-    "Periode" = periode,
-    "Tendance" = trend,
-    "Coefficient" = Estimate,
-    "Significativité" = sig,
-    "Famille de distribution" = family
-  ) %>%
-  arrange(`Code Espèce`) # Ordonner par espèce, indicateur et stade
-
-# Lignes positives et significatives
-i_vert  <- which(
-  df_gamm_resultats$Tendance == "\U2197" &
-    df_gamm_resultats$Significativité %in% c("*", "**", "***")
-)
-# Lignes négatives et significatives
-i_rouge <- which(
-  df_gamm_resultats$Tendance == "\U2198" &
-    df_gamm_resultats$Significativité %in% c("*", "**", "***")
-)
-
-tab_gamm_resultats <- df_gamm_resultats %>%
-  flextable::flextable() %>%
-  flextable::autofit() %>%
-  flextable::colformat_int(j = c(1, 3), big.mark = " ") %>%
-  flextable::theme_vanilla() %>%
-  flextable::font(fontname = "calibri") %>%
-  flextable::fontsize(size = 13) %>%
-  flextable::bg(i = i_vert, bg = "darkolivegreen3") %>%   # vert clair
-  flextable::bg(i = i_rouge, bg = "coral3") %>%   # rouge clair
-  flextable::align(align = "center") %>%
-  flextable::set_caption("Synthèse des tendances des effectifs des populations de poissons d'eau douce de BFC")
-
-tab_gamm_resultats
-```
-
-
-
-## Modèles Linéaires Généralisé Mixtes (ZIGLMM) de zéro enflées
-
-```{r}
-liste_periodes_etude <- list(c(2007, 2025), 
-                             c(2015, 2025)) # Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin) 
+liste_periodes_etude <- list(c(2007, 2025)) # Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin) 
 ```
 
 ### Application du modèle GLMM avec les effectifs
 
+
+```{r}
+source(file = "../R/gamm_poptrend.R")
+source(file = "../R/gamm_poptrend_application.R")
+
+data_esp <- ope_effectif_glmm_abs %>% 
+  filter(espece == c("TRF"))
+
+
+gamm_poptrend_application(data = ope_effectif_glmm_abs, liste_periodes = liste_periodes_etude)
+
+```
+
+
+## Modèles Linéaires Généralisé Mixtes (ZIGLMM) de zéro enflées
+```{r}
+data_esp <- ope_effectif_glmm_abs %>% 
+  filter(espece == "TRF")
+
+mod_zi_1.2 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = truncated_poisson(link = "log"),
+  data = data_esp,
+  ziformula = ~ 1
+)
+
+source(file = "../R/gamm_poptrend.R")
+
+gamm_poptrend(data = data_esp, mon_espec = "TRF")
+  
+trend <- poptrend::ptrend(
+  valeur ~ trend(annee, tempRE = F, type = "smooth") + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  data = data_esp,
+  family = nb(link = "log"),
+  bootType = "hessian",
+  gamModel = TRUE,
+  engine = "gam"
+)
+
+appraise(trend$gam)+labs(caption = mon_espece)
+
+plot(trend, main = "TRF")
+```
+
+```{r}
+trend <- poptrend::ptrend(
+  valeur ~ trend(annee, tempRE = F, type = "smooth") + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  data = data_esp,
+  family = nb(link = "log"),
+  bootType = "hessian",
+  gamModel = TRUE,
+  engine = "gam"
+)
+library(mgcv)
+library(ggplot2)
+
+mod <- trend$gam  # le gam sous-jacent
+
+# séquence d'années sur laquelle prédire
+newdat <- data.frame(
+  annee = seq(min(data_esp$annee), max(data_esp$annee), length.out = 200),
+  ope_surface_calculee = 1,          # offset neutralisé (log(1) = 0)
+  pro_libelle = levels(data_esp$pro_libelle)[1],  # niveau de référence
+  x = mean(data_esp$x),
+  y = mean(data_esp$y),
+  sta_id = data_esp$sta_id[1]        # niveau arbitraire, exclu ensuite
+)
+
+pred <- predict(mod, newdata = newdat, type = "terms", se.fit = TRUE,
+                 exclude = c("s(x,y)", "s(sta_id)"))  # adapte les noms de smooth
+
+# récupérer uniquement le terme lié à l'année (le nom exact dépend du modèle,
+# vérifie avec : colnames(pred$fit))
+term_name <- grep("annee", colnames(pred$fit), value = TRUE)
+
+df_plot <- data.frame(
+  annee = newdat$annee,
+  fit   = pred$fit[, term_name],
+  se    = pred$se.fit[, term_name]
+)
+
+df_plot$lower <- exp(df_plot$fit - 1.96 * df_plot$se)
+df_plot$upper <- exp(df_plot$fit + 1.96 * df_plot$se)
+df_plot$index <- exp(df_plot$fit)
+
+ggplot(df_plot, aes(x = annee, y = index)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2, fill = "darkorange") +
+  geom_line(color = "darkorange", linewidth = 1) +
+  labs(x = "Année", y = "Indice relatif", title = "Tendance estimée (GAM)") +
+  theme_minimal()
+
+str(trend, max.level = 1)
+names(trend)
+class(trend)
+
+head(trend$trendFrame)
+str(trend$trendFrame)
+colnames(trend$trendFrame)
+
+library(ggplot2)
+library(dplyr)
+
+# 1. Isoler les points de la grille de prédiction (courbe lisse)
+grid_idx <- which(trend$trendFrame$isGridP)
+
+df_grid <- trend$trendFrame[grid_idx, c("annee", "trend")] %>%
+  arrange(annee)
+
+# 2. Intervalle de confiance à partir des réplicats bootstrap alignés
+boot_grid <- trend$bootTrend[grid_idx, ]
+
+ci <- t(apply(boot_grid, 1, quantile, probs = c(0.025, 0.975), na.rm = TRUE))
+df_grid$lower <- ci[, 1]
+df_grid$upper <- ci[, 2]
+
+# 3. Graphique ggplot2
+ggplot(df_grid, aes(x = annee, y = trend)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2, fill = "steelblue") +
+  geom_line(color = "steelblue", linewidth = 1) +
+  labs(
+    x = "Année",
+    y = "Indice de tendance",
+    title = "Tendance de population estimée"
+  ) +
+  theme_minimal()
+
+plot(trend)
+
+library(ggplot2)
+library(dplyr)
+
+# 1. Isoler les points de la grille de prédiction (courbe lisse)
+grid_idx <- which(trend$trendFrame$isGridP)
+
+df_grid <- trend$trendFrame[grid_idx, c("annee", "trend")] %>%
+  arrange(annee)
+
+# 2. IC à partir des réplicats bootstrap alignés
+boot_grid <- trend$bootTrend[grid_idx, ]
+ci <- t(apply(boot_grid, 1, quantile, probs = c(0.025, 0.975), na.rm = TRUE))
+df_grid$lower <- ci[, 1]
+df_grid$upper <- ci[, 2]
+
+# 3. Catégoriser la significativité par rapport à la référence (indice = 1)
+df_grid <- df_grid %>%
+  mutate(
+    signif = case_when(
+      lower > 1 ~ "Augmentation significative",
+      upper < 1 ~ "Diminution significative",
+      TRUE      ~ "Non significatif"
+    )
+  )
+
+# 4. Pour colorer un TRAIT CONTINU par segments (et non des points isolés),
+#    on découpe la courbe en segments consécutifs entre chaque paire de points
+df_seg <- df_grid %>%
+  mutate(
+    xend = lead(annee),
+    yend = lead(trend),
+    signif_seg = signif  # on garde la catégorie du point de départ du segment
+  ) %>%
+  filter(!is.na(xend))
+
+# 5. Graphique
+ggplot() +
+  geom_ribbon(data = df_grid, aes(x = annee, ymin = lower, ymax = upper),
+              alpha = 0.15, fill = "grey50") +
+  geom_segment(data = df_seg,
+               aes(x = annee, y = trend, xend = xend, yend = yend, color = signif_seg),
+               linewidth = 1.2) +
+  geom_hline(yintercept = 1, linetype = "dashed", color = "grey40") +
+  scale_color_manual(
+    name = "Tendance",
+    values = c(
+      "Augmentation significative" = "forestgreen",
+      "Diminution significative"   = "darkorange",
+      "Non significatif"           = "grey30"
+    )
+  ) +
+  labs(
+    x = "Année",
+    y = "Indice de tendance",
+    title = "Tendance de population estimée"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+range(df_grid$trend)
+summary(trend$trendFrame$trend[trend$trendFrame$isGridP])
+library(ggplot2)
+library(dplyr)
+
+# 1. Isoler les points de la grille de prédiction (courbe lisse)
+grid_idx <- which(trend$trendFrame$isGridP)
+
+df_grid <- trend$trendFrame[grid_idx, c("annee", "trend")] %>%
+  arrange(annee)
+
+# 2. IC à partir des réplicats bootstrap alignés
+boot_grid <- trend$bootTrend[grid_idx, ]
+ci <- t(apply(boot_grid, 1, quantile, probs = c(0.025, 0.975), na.rm = TRUE))
+df_grid$lower <- ci[, 1]
+df_grid$upper <- ci[, 2]
+
+# 3. Catégoriser la significativité par rapport à la référence (indice = 1)
+df_grid <- df_grid %>%
+  mutate(
+    signif = case_when(
+      lower > 1 ~ "Augmentation significative",
+      upper < 1 ~ "Diminution significative",
+      TRUE      ~ "Non significatif"
+    )
+  )
+
+# 4. Découper la courbe en segments consécutifs pour pouvoir la colorer par tronçons
+df_seg <- df_grid %>%
+  mutate(
+    xend = lead(annee),
+    yend = lead(trend),
+    signif_seg = signif
+  ) %>%
+  filter(!is.na(xend))
+
+# 5. Graphique final
+ggplot() +
+  geom_ribbon(data = df_grid, aes(x = annee, ymin = lower, ymax = upper),
+              alpha = 0.15, fill = "grey50") +
+  geom_segment(data = df_seg,
+               aes(x = annee, y = trend, xend = xend, yend = yend, color = signif_seg),
+               linewidth = 1.2) +
+  geom_hline(yintercept = 1, linetype = "dashed", color = "grey40") +
+  scale_color_manual(
+    name = "Tendance",
+    values = c(
+      "Augmentation significative" = "forestgreen",
+      "Diminution significative"   = "darkorange",
+      "Non significatif"           = "grey30"
+    )
+  ) +
+  labs(
+    x = "Année",
+    y = "Indice de tendance",
+    title = "Tendance de population estimée"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+
+
+
+
+```{r}
+source(file = "../R/zip_glmm_calcul_modele.R")
+source(file = "../R/zip_glmm_application_modele.R")
+```
+
+```{r}
+liste_periodes_etude <- list(c(2007, 2025)) # Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin) 
+```
+
+### Application du modèle GLMM avec les effectifs
 
 ```{r Exécution fonction ZIP_GLMM}
 zip_glmm_resultats <- zip_glmm_application_modele(data = ope_effectif_glmm_abs,
@@ -1048,16 +1267,23 @@ zip_glmm_resultats <- zip_glmm_application_modele(data = ope_effectif_glmm_abs,
 ```{r Mise en forme sortie fonction ZIP_GLMM}
 zip_glmm_resultats_annee <- zip_glmm_resultats %>% 
   filter(row_name == "annee") %>% 
-  select(periode,
-         esp_code_alternatif,
-         p_value,
-         Estimate,
-         sig, 
-         family) %>% 
-  mutate(trend = case_when(
+  separate_wider_delim(periode, delim = "-", 
+                        names = c("annee_debut", "annee_fin"), 
+                        cols_remove = FALSE) %>%  # garde la colonne periode originale
+  mutate(
+    annee_debut = as.numeric(annee_debut),
+    annee_fin   = as.numeric(annee_fin),
+    nb_annees   = annee_fin - annee_debut
+  ) %>% 
+  select(periode, esp_code_alternatif, p_value, Estimate, sig, family, nb_annees) %>% 
+  mutate(
+    trend = case_when(
       Estimate > 0 ~ "\U2197",
       Estimate < 0 ~ "\U2198",
-      TRUE ~ "."))
+      TRUE ~ "."
+    ),    # Ajouter le calcul de taux de changement dans la population
+    rate_change = (exp(Estimate * nb_annees) - 1) * 100
+)
 ```
 
 
@@ -1073,14 +1299,17 @@ Construction d'un tableau récapitulatif des résultats du modèle GLMM :
 
 ```{r}
 df_zip_glmm_resultats <- zip_glmm_resultats_format %>%
-  select(esp_code_alternatif, periode, trend, sig, Estimate, family) %>%
-  mutate(Estimate = round(Estimate, digits = 2)) %>%
+  select(esp_code_alternatif, periode, trend, sig, rate_change, family) %>%
+  mutate(
+    # Estimate = round(Estimate, digits = 2), 
+    rate_change = round(rate_change, 2)) %>%
   rename(
     "Code Espèce" = esp_code_alternatif,
     "Periode" = periode,
     "Tendance" = trend,
-    "Coefficient" = Estimate,
+    # "Coefficient" = Estimate,
     "Significativité" = sig,
+    "Taux de changement" = rate_change,
     "Famille de distribution" = family
   ) %>%
   arrange(`Code Espèce`) # Ordonner par espèce, indicateur et stade
@@ -1113,170 +1342,135 @@ tab_zip_glmm_resultats
 
 
 # Occurence en fonction des annes
+```{r}
+# preparer la table pour jointure
+ope_selection <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id)
 
-<!-- ## Modèles Additifs Généralisé Mixtes (GAMMs) -->
+# Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
+coord_sta_id <- point_prelevement %>%
+  filter(pop_id %in% pop_serie_tempo) %>%
+  rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
+  select(pop_id, x, y) %>%
+  mutate(pop_id = as.factor(pop_id))
 
-
-<!-- ```{r} -->
-<!-- liste_periodes_etude <- list(c(2007, 2025), -->
-<!--                              c(2015, 2025)) # Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin) -->
-<!-- ``` -->
-
-<!-- ### Application du modèle GAMM avec les occurences -->
-
-
-<!-- ```{r Exécution fonction GAMM} -->
-<!-- gamm_resultats <- gamm_application_modele(data = ope_effectif_gamm, -->
-<!--                                           liste_periodes = liste_periodes_etude) -->
-<!-- ``` -->
-
-
-<!-- ```{r Mise en forme sortie fonction GAMM} -->
-<!-- gamm_resultats_annee <- gamm_resultats %>% -->
-<!--   filter(row_name == "annee") %>% -->
-<!--   select(periode, -->
-<!--          esp_code_alternatif, -->
-<!--          p_value, -->
-<!--          Estimate, -->
-<!--          sig) %>% -->
-<!--   mutate(trend = case_when( -->
-<!--       Estimate > 0 ~ "\U2197", -->
-<!--       Estimate < 0 ~ "\U2198", -->
-<!--       TRUE ~ ".")) -->
-<!-- ``` -->
+# prepéarer la table pour jointure 
+esp_ope_selection_join <- esp_ope_selection %>% 
+  select(ope_id, ope_surface_calculee) %>% 
+  distinct(ope_id, .keep_all = TRUE)
 
 
-<!-- ```{r Sélection des données résultats GAMM} -->
-<!-- # Filtrer les données selon les critères spécifiés -->
-<!-- gamm_resultats_format <- gamm_resultats_annee %>% -->
-<!--   filter((esp_code_alternatif == "ANG" & periode == "2007-2025") | -->
-<!--     (esp_code_alternatif %in% c(c("ABL","BAF","BLN","BRB", "BRE","BRO","CCO","CHA","CHE", "EPI", "EPT", "GAR", "GOU","HOT","LOF",   "LOR", "LOT","LPM" ,"LPP", "OBR", "PER", "ROT", "SAT", "SPI", "TAN", "TOX", "TRF","VAI","VAN","VAR")) & periode == "2007-2025")) -->
-<!-- ``` -->
+ope_occurence_glmm <- ope_indicateur %>%
+  filter(indicateur == "occurence") %>% 
+  mef_ajouter_type_protocole() %>% 
+  left_join( y= ope_selection, by = c("ope_id", "pop_id", "annee")) %>% 
+  inner_join(esp_ope_selection_join, by = "ope_id") %>% 
+  mutate(
+    valeur = as.numeric(valeur) ,
+    annee = as.numeric(annee),
+    ope_surface_calculee = as.numeric(ope_surface_calculee),
+    pro_libelle = as.factor(pro_libelle),
+    pop_id = as.factor(pop_id),
+    sta_id = as.factor(sta_id),
+    stade = as.factor(stade)
+  ) %>%
+  left_join(coord_sta_id, by = "pop_id") %>%
+  mutate(x = as.numeric(x), y = as.numeric(y)) %>%
+  rename(espece = esp_code_alternatif) %>% 
+  filter(stade == "ind")
+```
+
+```{r}
+source(file = "../R/glmm_calcul_modele.R")
+source(file = "../R/glmm_application_modele.R")
+```
+
+```{r}
+liste_periodes_etude <- list(c(2007, 2025)) # Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin) 
+```
+
+### Application du modèle GLMM avec les effectifs
+
+```{r Exécution fonction GLMM}
+glmm_resultats <- glmm_application_modele(data = ope_occurence_glmm,
+                                          liste_periodes = liste_periodes_etude)
+```
 
 
-<!-- Construction d'un tableau récapitulatif des résultats du modèle GAMM : -->
-
-<!-- ```{r} -->
-<!-- df_gamm_resultats <- gamm_resultats_format %>% -->
-<!--   select(esp_code_alternatif, periode, trend, sig, Estimate, family) %>% -->
-<!--   mutate(Estimate = round(Estimate, digits = 2)) %>% -->
-<!--   rename( -->
-<!--     "Code Espèce" = esp_code_alternatif, -->
-<!--     "Periode" = periode, -->
-<!--     "Tendance" = trend, -->
-<!--     "Coefficient" = Estimate, -->
-<!--     "Significativité" = sig, -->
-<!--     "Famille de distribution" = family -->
-<!--   ) %>% -->
-<!--   arrange(`Code Espèce`) # Ordonner par espèce, indicateur et stade -->
-
-<!-- # Lignes positives et significatives -->
-<!-- i_vert  <- which( -->
-<!--   df_gamm_resultats$Tendance == "\U2197" & -->
-<!--     df_gamm_resultats$Significativité %in% c("*", "**", "***") -->
-<!-- ) -->
-<!-- # Lignes négatives et significatives -->
-<!-- i_rouge <- which( -->
-<!--   df_gamm_resultats$Tendance == "\U2198" & -->
-<!--     df_gamm_resultats$Significativité %in% c("*", "**", "***") -->
-<!-- ) -->
-
-<!-- tab_gamm_resultats <- df_gamm_resultats %>% -->
-<!--   flextable::flextable() %>% -->
-<!--   flextable::autofit() %>% -->
-<!--   flextable::colformat_int(j = c(1, 3), big.mark = " ") %>% -->
-<!--   flextable::theme_vanilla() %>% -->
-<!--   flextable::font(fontname = "calibri") %>% -->
-<!--   flextable::fontsize(size = 13) %>% -->
-<!--   flextable::bg(i = i_vert, bg = "darkolivegreen3") %>%   # vert clair -->
-<!--   flextable::bg(i = i_rouge, bg = "coral3") %>%   # rouge clair -->
-<!--   flextable::align(align = "center") %>% -->
-<!--   flextable::set_caption("Synthèse des tendances des effectifs des populations de poissons d'eau douce de BFC") -->
-
-<!-- tab_gamm_resultats -->
-<!-- ``` -->
+```{r Mise en forme sortie fonction GLMM}
+glmm_resultats_annee <- glmm_resultats %>% 
+  filter(row_name == "annee") %>% 
+  separate_wider_delim(periode, delim = "-", 
+                        names = c("annee_debut", "annee_fin"), 
+                        cols_remove = FALSE) %>%  # garde la colonne periode originale
+  mutate(
+    annee_debut = as.numeric(annee_debut),
+    annee_fin   = as.numeric(annee_fin),
+    nb_annees   = annee_fin - annee_debut
+  ) %>% 
+  select(periode, esp_code_alternatif, p_value, Estimate, sig, family, nb_annees) %>% 
+  mutate(
+    trend = case_when(
+      Estimate > 0 ~ "\U2197",
+      Estimate < 0 ~ "\U2198",
+      TRUE ~ "."
+    )
+    # ,    # Ajouter le calcul de taux de changement dans la population
+    # rate_change = (exp(Estimate * nb_annees) - 1) * 100
+)
+```
 
 
+```{r Sélection des données résultats GLMM}
+# Filtrer les données selon les critères spécifiés
+glmm_resultats_format <- glmm_resultats_annee %>%
+  filter((esp_code_alternatif == "ANG" & periode == "2007-2025") |
+    (esp_code_alternatif %in% c(c("ABL","BAF","BLN","BRB", "BRE","BRO","CCO","CHA","CHE", "EPI", "EPT", "GAR", "GOU","HOT","LOF",   "LOR", "LOT","LPM" ,"LPP", "OBR", "PER", "ROT", "SAT", "SPI", "TAN", "TOX", "TRF","VAI","VAN","VAR")) & periode == "2007-2025"))
 
-<!-- ## Modèles Linéaires Généralisé Mixtes (ZIGLMM) de zéro enflées -->
+```
 
-<!-- ```{r} -->
-<!-- liste_periodes_etude <- list(c(2007, 2025), -->
-<!--                              c(2015, 2025)) # Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin) -->
-<!-- ``` -->
+Construction d'un tableau récapitulatif des résultats du modèle GLMM :
 
-<!-- ### Application du modèle GLMM avec les occurences -->
+```{r}
+df_glmm_resultats <- glmm_resultats_format %>%
+  select(esp_code_alternatif, periode, trend, sig, rate_change, family) %>%
+  mutate(
+    # rate_change = round(rate_change, 2)
+    Estimate = round(Estimate, digits = 2),
+    ) %>%
+  rename(
+    "Code Espèce" = esp_code_alternatif,
+    "Periode" = periode,
+    "Tendance" = trend,
+    "Coefficient" = Estimate,
+    "Significativité" = sig,
+    # "Taux de changement" = rate_change,
+    "Famille de distribution" = family
+  ) %>%
+  arrange(`Code Espèce`) # Ordonner par espèce, indicateur et stade
 
+# Lignes positives et significatives
+i_vert  <- which(
+  df_glmm_resultats$Tendance == "\U2197" &
+    df_glmm_resultats$Significativité %in% c("*", "**", "***")
+)
+# Lignes négatives et significatives
+i_rouge <- which(
+  df_glmm_resultats$Tendance == "\U2198" &
+    df_glmm_resultats$Significativité %in% c("*", "**", "***")
+)
 
-<!-- ```{r Exécution fonction ZIP_GLMM} -->
-<!-- zip_glmm_resultats <- zip_glmm_application_modele(data = ope_effectif_glm, -->
-<!--                                           liste_periodes = liste_periodes_etude) -->
-<!-- ``` -->
+tab_glmm_resultats <- df_glmm_resultats %>%
+  flextable::flextable() %>%
+  flextable::autofit() %>%
+  flextable::colformat_int(j = c(1, 3), big.mark = " ") %>%
+  flextable::theme_vanilla() %>%
+  flextable::font(fontname = "calibri") %>%
+  flextable::fontsize(size = 13) %>%
+  flextable::bg(i = i_vert, bg = "darkolivegreen3") %>%   # vert clair
+  flextable::bg(i = i_rouge, bg = "coral3") %>%   # rouge clair
+  flextable::align(align = "center") %>%
+  flextable::set_caption("Synthèse des tendances des Occurences des populations de poissons d'eau douce de BFC")
 
-
-<!-- ```{r Mise en forme sortie fonction ZIP_GLMM} -->
-<!-- zip_glmm_resultats_annee <- zip_glmm_resultats %>% -->
-<!--   filter(row_name == "annee") %>% -->
-<!--   select(periode, -->
-<!--          esp_code_alternatif, -->
-<!--          p_value, -->
-<!--          Estimate, -->
-<!--          sig, -->
-<!--          family) %>% -->
-<!--   mutate(trend = case_when( -->
-<!--       Estimate > 0 ~ "\U2197", -->
-<!--       Estimate < 0 ~ "\U2198", -->
-<!--       TRUE ~ ".")) -->
-<!-- ``` -->
-
-
-<!-- ```{r Sélection des données résultats ZIP_GLMM} -->
-<!-- # Filtrer les données selon les critères spécifiés -->
-<!-- zip_glmm_resultats_format <- zip_glmm_resultats_annee %>% -->
-<!--   filter((esp_code_alternatif == "ANG" & periode == "2007-2025") | -->
-<!--     (esp_code_alternatif %in% c(c("ABL","BAF","BLN","BRB", "BRE","BRO","CCO","CHA","CHE", "EPI", "EPT", "GAR", "GOU","HOT","LOF",   "LOR", "LOT","LPM" ,"LPP", "OBR", "PER", "ROT", "SAT", "SPI", "TAN", "TOX", "TRF","VAI","VAN","VAR")) & periode == "2007-2025")) -->
-
-<!-- ``` -->
-
-<!-- Construction d'un tableau récapitulatif des résultats du modèle GLMM : -->
-
-<!-- ```{r} -->
-<!-- df_zip_glmm_resultats <- zip_glmm_resultats_format %>% -->
-<!--   select(esp_code_alternatif, periode, trend, sig, Estimate, family) %>% -->
-<!--   mutate(Estimate = round(Estimate, digits = 2)) %>% -->
-<!--   rename( -->
-<!--     "Code Espèce" = esp_code_alternatif, -->
-<!--     "Periode" = periode, -->
-<!--     "Tendance" = trend, -->
-<!--     "Coefficient" = Estimate, -->
-<!--     "Significativité" = sig, -->
-<!--     "Famille de distribution" = family -->
-<!--   ) %>% -->
-<!--   arrange(`Code Espèce`) # Ordonner par espèce, indicateur et stade -->
-
-<!-- # Lignes positives et significatives -->
-<!-- i_vert  <- which( -->
-<!--   df_zip_glmm_resultats$Tendance == "\U2197" & -->
-<!--     df_zip_glmm_resultats$Significativité %in% c("*", "**", "***") -->
-<!-- ) -->
-<!-- # Lignes négatives et significatives -->
-<!-- i_rouge <- which( -->
-<!--   df_zip_glmm_resultats$Tendance == "\U2198" & -->
-<!--     df_zip_glmm_resultats$Significativité %in% c("*", "**", "***") -->
-<!-- ) -->
-
-<!-- tab_zip_glmm_resultats <- df_zip_glmm_resultats %>% -->
-<!--   flextable::flextable() %>% -->
-<!--   flextable::autofit() %>% -->
-<!--   flextable::colformat_int(j = c(1, 3), big.mark = " ") %>% -->
-<!--   flextable::theme_vanilla() %>% -->
-<!--   flextable::font(fontname = "calibri") %>% -->
-<!--   flextable::fontsize(size = 13) %>% -->
-<!--   flextable::bg(i = i_vert, bg = "darkolivegreen3") %>%   # vert clair -->
-<!--   flextable::bg(i = i_rouge, bg = "coral3") %>%   # rouge clair -->
-<!--   flextable::align(align = "center") %>% -->
-<!--   flextable::set_caption("Synthèse des tendances des effectifs des populations de poissons d'eau douce de BFC") -->
-
-<!-- tab_zip_glmm_resultats -->
-<!-- ``` -->
-
+tab_glmm_resultats
+```
