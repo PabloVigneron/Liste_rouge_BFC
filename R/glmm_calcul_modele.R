@@ -80,7 +80,7 @@ glmm_calcul_modele <- function(data, mon_espece) {
     lme4::glmer(
       valeur ~ annee  + pro_libelle + (1 |
                                          sta_id) ,
-      data = data_esp,
+      data = filtered_data,
       family = binomial(link = "logit")
     )
   }, error = function(e)
@@ -90,7 +90,7 @@ glmm_calcul_modele <- function(data, mon_espece) {
     lme4::glmer(
       valeur ~ annee  + pro_libelle + (1 |
                                          sta_id) ,
-      data = data_esp,
+      data = filtered_data,
       family = binomial(link = "probit")
     )
   }, error = function(e)
@@ -100,7 +100,7 @@ glmm_calcul_modele <- function(data, mon_espece) {
     lme4::glmer(
       valeur ~ annee  + pro_libelle + (1 |
                                          sta_id) ,
-      data = data_esp,
+      data = filtered_data,
       family = binomial(link = "cauchit")
     )
   }, error = function(e)
@@ -110,7 +110,7 @@ glmm_calcul_modele <- function(data, mon_espece) {
     lme4::glmer(
       valeur ~ annee  + pro_libelle + (1 |
                                          sta_id) ,
-      data = data_esp,
+      data = filtered_data,
       family = binomial(link = "cloglog")
     )
   }, error = function(e)

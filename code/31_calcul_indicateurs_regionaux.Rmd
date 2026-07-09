@@ -75,10 +75,20 @@ occur <- ope_indicateur %>%
   summarise(n_occur = n_distinct(ope_id))   # Compte le nombre d'ope_id et l'assigne à n_occur
 
 # Compte le nombre total d'opérations distinctes pour chaque année
+# n_ope_par_an <- ope_indicateur %>%
+#   filter(stade == "ind",                        # Filtre les lignes où le stade ="ind"
+#          indicateur == "effectif_total") %>% # Filtre les lignes où l'indicateur ="effectif_total"
+#   group_by(annee) %>%                       # Groupe par année
+#   summarise(n_ope = n_distinct(ope_id))     # Compte le nombre distinct d'ope_id et l'assigne à n_ope
+```
+
+```{r}
+# Compte le nombre total d'opérations distinctes pour chaque année par espèce
 n_ope_par_an <- ope_indicateur %>%
   filter(stade == "ind",                        # Filtre les lignes où le stade ="ind"
          indicateur == "effectif_total") %>% # Filtre les lignes où l'indicateur ="effectif_total"
-  group_by(annee) %>%                       # Groupe par année
+  group_by(annee, 
+           esp_code_alternatif) %>%                       # Groupe par année
   summarise(n_ope = n_distinct(ope_id))     # Compte le nombre distinct d'ope_id et l'assigne à n_ope
 ```
 

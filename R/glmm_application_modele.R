@@ -24,7 +24,7 @@ glmm_application_modele <- function(data,
       unique()
     
     results <- map(especes, function(esp) {
-      zip_glmm_calcul_modele(data = period_data, mon_espece = esp)
+      glmm_calcul_modele(data = period_data, mon_espece = esp)
     }) %>%
       keep(~ !is.null(.)) %>%
       map_dfr(~ mutate(.x, row_name = rownames(.x), periode = period_label))
