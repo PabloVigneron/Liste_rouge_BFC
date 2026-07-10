@@ -88,20 +88,13 @@ load(rdata_tables) # Chargement des données
 ```{r}
 # preparer la table pour jointure
 ope_selection <- ope_selection %>%
-  dplyr::select(ope_id, pop_id, sta_id)
-
-# Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
-coord_sta_id <- point_prelevement %>%
-  filter(pop_id %in% pop_serie_tempo) %>%
-  rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
-  select(pop_id, x, y) %>%
+  dplyr::select(ope_id, pop_id, sta_id) %>% 
   mutate(pop_id = as.factor(pop_id))
 
 # prepéarer la table pour jointure 
 esp_ope_selection_join <- esp_ope_selection %>% 
   select(ope_id, ope_surface_calculee) %>% 
   distinct(ope_id, .keep_all = TRUE)
-
 
 ope_effectif_glmm_abs <- ope_indicateur %>%
   filter(indicateur == "effectif_total") %>% 
@@ -116,127 +109,11 @@ ope_effectif_glmm_abs <- ope_indicateur %>%
     pop_id = as.factor(pop_id),
     sta_id = as.factor(sta_id),
     stade = as.factor(stade)
-  ) %>%
-  left_join(coord_sta_id, by = "pop_id") %>%
-  mutate(x = as.numeric(x), y = as.numeric(y)) %>%
+  ) %>% 
   rename(espece = esp_code_alternatif) %>% 
   filter(stade == "ind")
 ```
-# Filtre spatial
 
-```{r}
-library(COGiter)
-library(sf)
-library(mapview)
-library(tidyverse)
-```
-
-## Sélection de l'aire géographique 
-
-### Ajout des departements 
-
-```{r}
-mes_depts <- departements_metro_geo %>% 
-  filter (DEP %in% c( "21","25","39", "58", "70","71","89", "90")) # Sélection de l'aire géographique : choix des départements 
-```
-
-```{r Visualisation de la zone géographique sélectionnée}
-mes_depts %>%
- mapview::mapview() # Visualisation de la zone géographique sélectionnée
-```
-
-
-### Ajout des bassins versants 
-```{r}
-bassins_versants <- sf::st_read("../raw_data/Cartographie/BV_FXX/BassinHydrographique_FXX.shp")
-```
-
-```{r}
-# bassins_versants %>% 
-#   mapview::mapview()
-```
-
-### Ajout coordonnees dans le df **ope_indicateur**
-
-```{r}
-# Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
-coord_sta_id <- point_prelevement %>%
-  filter(pop_id %in% pop_serie_tempo) %>%
-  rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
-  select(pop_id, x, y) %>%
-  mutate(pop_id = as.character(pop_id))
-
-ope_indicateur_coord <- ope_indicateur %>%
-  mutate(pop_id = as.character(pop_id)) %>% 
-  left_join(coord_sta_id, by = "pop_id") %>% 
-  mutate(x = as.numeric(x), y = as.numeric(y)) 
-
-```
-
-
-```{r}
-ope_indicateur_coord_sf <- ope_indicateur_coord %>%
-  sf::st_as_sf(coords = c("x", "y"), crs = 2154, remove = F) # Remove = F pour gerder les coordonnées après la conversion en objet sf 
-
-```
-
-```{r Visualisation point prélèvements}
-mapview( # Visualisation des points de prélèvements présents dans l'aire géographique sélectionnée
-  list(bassins_versants),
-  layer.name = c("bassins versants"),
-  col.regions = list("#0A9F9D", "darkseagreen")
-) + mapview (ope_indicateur_coord_sf, shape = 20, color = "darkred", lwd =1)
-```
-
-On verifie que les couches ont la même source de données (CRS), ex : Lambert 93, crs = 2154
-
-```{r}
-# st_crs(bassins_versants)
-# st_crs(ope_indicateur_coord_sf)
-```
-
-
-Pour joindre les deux couches, on utilise la jointure st_joint() : 
-
-Conflit avec le moteur s2 (géométries sphériques) :  Depuis sf 1.0+, le moteur s2 est activé par défaut et peut mal gérer certains cas en CRS projeté (Lambert-93). On le desactive temporairement pour le join :
-
-```{r}
-sf::sf_use_s2(FALSE)
-
-ope_indicateur_coord_bv <- sf::st_join(
-  ope_indicateur_coord_sf,
-  bassins_versants,
-  join = sf::st_within
-)
-
-sf::sf_use_s2(TRUE)  # remettre l'état par défaut après
-
-ope_indicateur_coord_bv <- ope_indicateur_coord_bv %>% 
-  select(
-    ope_id, 
-    esp_code_alternatif, 
-    indicateur, 
-    valeur, 
-    stade, 
-    pop_id, 
-    annee, 
-    x, 
-    y,
-    LbBH
-  ) %>% 
-    st_drop_geometry() %>% 
-  rename(bassin_versant = LbBH)
-```
-
-
-```{r}
-ope_indicateur_correction_bv <- ope_indicateur_coord_bv %>%
-  filter(
-    esp_code_alternatif == "OBR" &
-      bassin_versant == "Rhône-Méditerranée" |
-      bassin_versant == "Loire-Bretagne"
-  )
-```
 
 
 
@@ -652,6 +529,39 @@ liste_periodes_etude <- list(c(2007, 2025)) # Liste des périodes (chaque pério
 
 ### Application du modèle GLMM avec les effectifs
 
+```{r}
+trf_data <- ope_effectif_glmm_abs %>% 
+  filter( espece == "TRF" & departements == c("25", "39"))
+```
+
+```{r}
+zip_glmm_resultats <- zip_glmm_application_modele(data = trf_data,
+                                          liste_periodes = liste_periodes_etude)
+```
+
+```{r Mise en forme sortie fonction ZIP_GLMM}
+zip_glmm_resultats_annee <- zip_glmm_resultats %>% 
+  filter(row_name == "annee") %>% 
+  separate_wider_delim(periode, delim = "-", 
+                        names = c("annee_debut", "annee_fin"), 
+                        cols_remove = FALSE) %>%  # garde la colonne periode originale
+  mutate(
+    annee_debut = as.numeric(annee_debut),
+    annee_fin   = as.numeric(annee_fin),
+    nb_annees   = annee_fin - annee_debut
+  ) %>% 
+  select(periode, esp_code_alternatif, p_value, Estimate, sig, family, nb_annees) %>% 
+  mutate(
+    trend = case_when(
+      Estimate > 0 ~ "\U2197",
+      Estimate < 0 ~ "\U2198",
+      TRUE ~ "."
+    ),    # Ajouter le calcul de taux de changement dans la population
+    rate_change = (exp(Estimate * nb_annees) - 1) * 100
+)
+```
+
+
 ```{r Exécution fonction ZIP_GLMM}
 zip_glmm_resultats <- zip_glmm_application_modele(data = ope_effectif_glmm_abs,
                                           liste_periodes = liste_periodes_etude)
@@ -739,26 +649,20 @@ tab_zip_glmm_resultats
 ```{r}
 # preparer la table pour jointure
 ope_selection <- ope_selection %>%
-  dplyr::select(ope_id, pop_id, sta_id)
-
-# Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
-coord_sta_id <- point_prelevement %>%
-  filter(pop_id %in% pop_serie_tempo) %>%
-  rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
-  select(pop_id, x, y) %>%
+  dplyr::select(ope_id, pop_id, sta_id) %>% 
   mutate(pop_id = as.factor(pop_id))
 
-# prepéarer la table pour jointure 
-esp_ope_selection_join <- esp_ope_selection %>% 
-  select(ope_id, ope_surface_calculee) %>% 
+# prepéarer la table pour jointure
+esp_ope_selection_join <- esp_ope_selection %>%
+  select(ope_id, ope_surface_calculee) %>%
   distinct(ope_id, .keep_all = TRUE)
 
 
 ope_occurence_glmm <- ope_indicateur %>%
-  filter(indicateur == "occurence") %>% 
-  mef_ajouter_type_protocole() %>% 
-  left_join( y= ope_selection, by = c("ope_id", "pop_id", "annee")) %>% 
-  inner_join(esp_ope_selection_join, by = "ope_id") %>% 
+  filter(indicateur == "occurence") %>%
+  mef_ajouter_type_protocole() %>%
+  left_join(y = ope_selection, by = c("ope_id", "pop_id", "annee")) %>%
+  inner_join(esp_ope_selection_join, by = "ope_id") %>%
   mutate(
     valeur = as.numeric(valeur) ,
     annee = as.numeric(annee),
@@ -768,9 +672,7 @@ ope_occurence_glmm <- ope_indicateur %>%
     sta_id = as.factor(sta_id),
     stade = as.factor(stade)
   ) %>%
-  left_join(coord_sta_id, by = "pop_id") %>%
-  mutate(x = as.numeric(x), y = as.numeric(y)) %>%
-  rename(espece = esp_code_alternatif) %>% 
+  rename(espece = esp_code_alternatif) %>%
   filter(stade == "ind")
 ```
 
@@ -871,6 +773,53 @@ tab_glmm_resultats <- df_glmm_resultats %>%
 
 tab_glmm_resultats
 ```
+
+
+
+
+
+
+```{r}
+install.packages("VGAM")
+library(VGAM)
+```
+```{r}
+library(lme4)   # ou glmmTMB
+
+# Exemple avec glmmTMB
+mod_logit   <- glmmTMB(y ~ x + (1|groupe), family = binomial(link = "logit"),   data = df)
+mod_probit  <- glmmTMB(y ~ x + (1|groupe), family = binomial(link = "probit"),  data = df)
+mod_cauchit <- glmmTMB(y ~ x + (1|groupe), family = binomial(link = "cauchit"), data = df)
+
+# Prédiction sur l'échelle du lien
+eta <- predict(mod_probit, type = "link")
+
+# Transformation inverse -> probabilité
+p_logit   <- plogis(coef(summary(mod_logit))$cond[,"Estimate"])   # attention: à faire sur eta, pas sur beta seul si covariables multiples
+p_probit  <- pnorm(eta)
+p_cauchit <- pcauchy(eta)
+```
+```{r}
+
+```
+
+
+```{r}
+library(VGAM)
+
+eta <- c(-1, 0, 0.5, 1.2)
+
+logitlink(eta, inverse = TRUE)    # équivalent à plogis(eta)
+probitlink(eta, inverse = TRUE)   # équivalent à pnorm(eta)
+cauchitlink(eta, inverse = TRUE)  # équivalent à pcauchy(eta)
+```
+
+
+
+
+
+
+
 
 # Sauvergarde
 

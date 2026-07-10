@@ -21,6 +21,8 @@ Script : 30_calcul_indicateurs_par_ope
 
   Les pré-traitements nécessaires à la constitution de ce tableau de bord ont été réalisés dans les scripts précédents. Ce script permet donc la création du tableau de bord comportant plusieurs indicateurs dits "simples" afin d'observer les tendances démographiques des espèces. Ces indicateurs (densités volumiques, densités surfaciques, pourcentage de juvéniles, longueurs médianes,...) seront calculés à l'échelle des opérations de pêches retenues pour l'étude. Ces indicateurs sont calculés par espèce et par stade (*juv* / *ad*), mais également pour l'ensemble des individus (*ind*). 
 
+De plus, ayant pris connaissance de modification dans le traitement des espèces d'après la méthodologie liste rouge. En effet, l'ombre commun est à évaluer uniquement dans son aire de réaprtitio naturelle soit uniquement le bassin versant "Rhône-Méditerranée-Corse". Pour cela, on va ajouter une colonne **bassins_versants** dans le df **ope_indicateur**. Pour tester des variations de tendances par départements, on y joindra également une colonne **departements**.
+
 
 # Installation 
 
@@ -31,6 +33,10 @@ library(tidyverse)
 library(aspe)
 library(dplyr)
 library(rlang)
+library(COGiter)
+library(sf)
+library(mapview)
+library(testthat)
 ```
 
 Nous avons besoin des jeux de données constitués lors des précédents scripts. 
@@ -136,170 +142,168 @@ ope_effectif_absences <- ope_full %>%
   dplyr::select(ope_id, esp_code_alternatif, indicateur, valeur, stade)
 ```
 
-Test fonction mef_ajouter_abs_par_station : 
+Test fonction mef_ajouter_abs_par_station pour verification : 
 
 ```{r}
-library(testthat)
-
 # =============================================================================
 # Fonction à tester
 # =============================================================================
-mef_ajouter_abs_par_station <- function(df, var_id, var_taxon, var_effectif)
-{
-  var_id <- enquo(var_id)
-  var_taxon <- enquo(var_taxon)
-  var_effectif <- enquo(var_effectif)
-  
-  df %>%
-    droplevels() %>%
-    left_join(operation %>%
-                select(ope_id, pop_id = ope_pop_id)) %>%
-    select(!!var_id, pop_id, !!var_taxon, !!var_effectif) %>%
-    group_by(pop_id) %>%
-    complete(!!var_id, !!var_taxon) %>%
-    ungroup() %>%
-    left_join(y = df %>% select(!!var_id, annee) %>% distinct(),
-              by = as_name(var_id))
-}
-
-# =============================================================================
-# Jeu de données jouet — CONFORME AU CAS RÉEL :
-# chaque opération a toujours AU MOINS UNE capture (jamais 0 poisson total)
-# =============================================================================
-#
-# Station 10 : 2 opérations
-#   - ope 1 : espèce A capturée
-#   - ope 2 : espèce D capturée (mais PAS A -> A doit devenir une absence ici)
-#
-# Station 20 : 2 opérations
-#   - ope 3 : espèce B capturée
-#   - ope 4 : espèces B ET E capturées (E est nouvelle -> absence à créer pour ope 3)
-#
-# Station 30 : 1 opération
-#   - ope 5 : espèce C capturée (aucune absence à créer, une seule ope)
-
-operation <- tibble(
-  ope_id     = c(1, 2, 3, 4, 5),
-  ope_pop_id = c(10, 10, 20, 20, 30)
-)
-
-df_presences <- tibble(
-  ope_id              = c(1, 2, 3, 4, 4, 5),
-  esp_code_alternatif = c("A", "D", "B", "B", "E", "C"),
-  effectif            = c(5, 3, 8, 2, 1, 4),
-  annee               = c(2020, 2020, 2020, 2021, 2021, 2020)
-)
-
-cat("--- Données de départ ---\n")
-print(df_presences)
-
-# =============================================================================
-# Exécution
-# =============================================================================
-resultat <- mef_ajouter_abs_par_station(
-  df_presences, ope_id, esp_code_alternatif, effectif
-)
-
-cat("\n--- Résultat de mef_ajouter_abs_par_station ---\n")
-print(resultat %>% arrange(pop_id, ope_id, esp_code_alternatif))
-
-# =============================================================================
-# TESTS
-# =============================================================================
-
-test_that("Toutes les opérations d'origine sont conservées (aucune perte)", {
-  # Puisque chaque ope_id a déjà au moins une capture dans df, complete()
-  # doit conserver l'intégralité des ope_id présents au départ.
-  expect_setequal(unique(resultat$ope_id), unique(df_presences$ope_id))
-})
-
-test_that("Le nombre de lignes correspond au produit espèces x opérations, PAR STATION", {
-  # Station 10 : 2 espèces (A, D) x 2 opérations (1, 2) = 4 lignes
-  # Station 20 : 2 espèces (B, E) x 2 opérations (3, 4) = 4 lignes
-  # Station 30 : 1 espèce (C)   x 1 opération (5)       = 1 ligne
-  expect_equal(nrow(resultat), 4 + 4 + 1)
-})
-
-test_that("Aucune espèce ne fuit vers une autre station", {
-  stations_A <- resultat %>% filter(esp_code_alternatif == "A") %>% pull(pop_id) %>% unique()
-  stations_B <- resultat %>% filter(esp_code_alternatif == "B") %>% pull(pop_id) %>% unique()
-  stations_C <- resultat %>% filter(esp_code_alternatif == "C") %>% pull(pop_id) %>% unique()
-  stations_D <- resultat %>% filter(esp_code_alternatif == "D") %>% pull(pop_id) %>% unique()
-  stations_E <- resultat %>% filter(esp_code_alternatif == "E") %>% pull(pop_id) %>% unique()
-
-  expect_equal(stations_A, 10)
-  expect_equal(stations_D, 10)
-  expect_equal(stations_B, 20)
-  expect_equal(stations_E, 20)
-  expect_equal(stations_C, 30)
-})
-
-test_that("Une absence réelle est bien créée : espèce A absente (NA) à l'ope 2", {
-  # A a été capturée à l'ope 1 mais pas à l'ope 2 (où seule D a été capturée)
-  # -> une ligne (ope 2, A) doit exister avec effectif = NA
-  eff_A_ope2 <- resultat %>%
-    filter(ope_id == 2, esp_code_alternatif == "A") %>%
-    pull(effectif)
-  expect_length(eff_A_ope2, 1)
-  expect_true(is.na(eff_A_ope2))
-})
-
-test_that("Une absence réelle est bien créée : espèce D absente (NA) à l'ope 1", {
-  eff_D_ope1 <- resultat %>%
-    filter(ope_id == 1, esp_code_alternatif == "D") %>%
-    pull(effectif)
-  expect_length(eff_D_ope1, 1)
-  expect_true(is.na(eff_D_ope1))
-})
-
-test_that("Une absence réelle est bien créée : espèce E absente (NA) à l'ope 3", {
-  # E n'a été capturée qu'à l'ope 4 -> absence attendue à l'ope 3
-  eff_E_ope3 <- resultat %>%
-    filter(ope_id == 3, esp_code_alternatif == "E") %>%
-    pull(effectif)
-  expect_length(eff_E_ope3, 1)
-  expect_true(is.na(eff_E_ope3))
-})
-
-test_that("Les présences réelles gardent leur effectif d'origine (rien n'est écrasé)", {
-  eff_A_ope1 <- resultat %>% filter(ope_id == 1, esp_code_alternatif == "A") %>% pull(effectif)
-  eff_B_ope3 <- resultat %>% filter(ope_id == 3, esp_code_alternatif == "B") %>% pull(effectif)
-  eff_B_ope4 <- resultat %>% filter(ope_id == 4, esp_code_alternatif == "B") %>% pull(effectif)
-  eff_E_ope4 <- resultat %>% filter(ope_id == 4, esp_code_alternatif == "E") %>% pull(effectif)
-
-  expect_equal(eff_A_ope1, 5)
-  expect_equal(eff_B_ope3, 8)
-  expect_equal(eff_B_ope4, 2)
-  expect_equal(eff_E_ope4, 1)
-})
-
-test_that("Une station à opération unique (station 30) n'a aucune absence générée", {
-  n_lignes_30 <- resultat %>% filter(pop_id == 30) %>% nrow()
-  expect_equal(n_lignes_30, 1)
-})
-
-test_that("annee est bien récupérée pour toutes les lignes d'origine", {
-  annee_ope1 <- resultat %>% filter(ope_id == 1, esp_code_alternatif == "A") %>% pull(annee)
-  expect_equal(annee_ope1, 2020)
-})
-
-cat("\n=====================================================================\n")
-cat("Si aucun message d'échec (Failure/Error) n'apparaît ci-dessus,\n")
-cat("la fonction se comporte exactement comme attendu pour votre cas :\n")
-cat(" - pas de fuite d'espèce entre stations\n")
-cat(" - absences correctement générées uniquement pour les espèces déjà\n")
-cat("   vues sur la station, sur les opérations où elles n'ont pas été revues\n")
-cat(" - aucune perte d'opération (puisque toutes sont déjà représentées dans df)\n")
-cat("=====================================================================\n")
-
-# =============================================================================
-# Étape suivante à ne pas oublier : remplacer les NA par 0
-# =============================================================================
-resultat_final <- resultat %>%
-  mutate(effectif = tidyr::replace_na(effectif, 0))
-
-cat("\n--- Aperçu après remplacement des NA par 0 ---\n")
-print(resultat_final %>% arrange(pop_id, ope_id, esp_code_alternatif))
+# mef_ajouter_abs_par_station <- function(df, var_id, var_taxon, var_effectif)
+# {
+#   var_id <- enquo(var_id)
+#   var_taxon <- enquo(var_taxon)
+#   var_effectif <- enquo(var_effectif)
+#   
+#   df %>%
+#     droplevels() %>%
+#     left_join(operation %>%
+#                 select(ope_id, pop_id = ope_pop_id)) %>%
+#     select(!!var_id, pop_id, !!var_taxon, !!var_effectif) %>%
+#     group_by(pop_id) %>%
+#     complete(!!var_id, !!var_taxon) %>%
+#     ungroup() %>%
+#     left_join(y = df %>% select(!!var_id, annee) %>% distinct(),
+#               by = as_name(var_id))
+# }
+# 
+# # =============================================================================
+# # Jeu de données jouet — CONFORME AU CAS RÉEL :
+# # chaque opération a toujours AU MOINS UNE capture (jamais 0 poisson total)
+# # =============================================================================
+# #
+# # Station 10 : 2 opérations
+# #   - ope 1 : espèce A capturée
+# #   - ope 2 : espèce D capturée (mais PAS A -> A doit devenir une absence ici)
+# #
+# # Station 20 : 2 opérations
+# #   - ope 3 : espèce B capturée
+# #   - ope 4 : espèces B ET E capturées (E est nouvelle -> absence à créer pour ope 3)
+# #
+# # Station 30 : 1 opération
+# #   - ope 5 : espèce C capturée (aucune absence à créer, une seule ope)
+# 
+# operation <- tibble(
+#   ope_id     = c(1, 2, 3, 4, 5),
+#   ope_pop_id = c(10, 10, 20, 20, 30)
+# )
+# 
+# df_presences <- tibble(
+#   ope_id              = c(1, 2, 3, 4, 4, 5),
+#   esp_code_alternatif = c("A", "D", "B", "B", "E", "C"),
+#   effectif            = c(5, 3, 8, 2, 1, 4),
+#   annee               = c(2020, 2020, 2020, 2021, 2021, 2020)
+# )
+# 
+# cat("--- Données de départ ---\n")
+# print(df_presences)
+# 
+# # =============================================================================
+# # Exécution
+# # =============================================================================
+# resultat <- mef_ajouter_abs_par_station(
+#   df_presences, ope_id, esp_code_alternatif, effectif
+# )
+# 
+# cat("\n--- Résultat de mef_ajouter_abs_par_station ---\n")
+# print(resultat %>% arrange(pop_id, ope_id, esp_code_alternatif))
+# 
+# # =============================================================================
+# # TESTS
+# # =============================================================================
+# 
+# test_that("Toutes les opérations d'origine sont conservées (aucune perte)", {
+#   # Puisque chaque ope_id a déjà au moins une capture dans df, complete()
+#   # doit conserver l'intégralité des ope_id présents au départ.
+#   expect_setequal(unique(resultat$ope_id), unique(df_presences$ope_id))
+# })
+# 
+# test_that("Le nombre de lignes correspond au produit espèces x opérations, PAR STATION", {
+#   # Station 10 : 2 espèces (A, D) x 2 opérations (1, 2) = 4 lignes
+#   # Station 20 : 2 espèces (B, E) x 2 opérations (3, 4) = 4 lignes
+#   # Station 30 : 1 espèce (C)   x 1 opération (5)       = 1 ligne
+#   expect_equal(nrow(resultat), 4 + 4 + 1)
+# })
+# 
+# test_that("Aucune espèce ne fuit vers une autre station", {
+#   stations_A <- resultat %>% filter(esp_code_alternatif == "A") %>% pull(pop_id) %>% unique()
+#   stations_B <- resultat %>% filter(esp_code_alternatif == "B") %>% pull(pop_id) %>% unique()
+#   stations_C <- resultat %>% filter(esp_code_alternatif == "C") %>% pull(pop_id) %>% unique()
+#   stations_D <- resultat %>% filter(esp_code_alternatif == "D") %>% pull(pop_id) %>% unique()
+#   stations_E <- resultat %>% filter(esp_code_alternatif == "E") %>% pull(pop_id) %>% unique()
+# 
+#   expect_equal(stations_A, 10)
+#   expect_equal(stations_D, 10)
+#   expect_equal(stations_B, 20)
+#   expect_equal(stations_E, 20)
+#   expect_equal(stations_C, 30)
+# })
+# 
+# test_that("Une absence réelle est bien créée : espèce A absente (NA) à l'ope 2", {
+#   # A a été capturée à l'ope 1 mais pas à l'ope 2 (où seule D a été capturée)
+#   # -> une ligne (ope 2, A) doit exister avec effectif = NA
+#   eff_A_ope2 <- resultat %>%
+#     filter(ope_id == 2, esp_code_alternatif == "A") %>%
+#     pull(effectif)
+#   expect_length(eff_A_ope2, 1)
+#   expect_true(is.na(eff_A_ope2))
+# })
+# 
+# test_that("Une absence réelle est bien créée : espèce D absente (NA) à l'ope 1", {
+#   eff_D_ope1 <- resultat %>%
+#     filter(ope_id == 1, esp_code_alternatif == "D") %>%
+#     pull(effectif)
+#   expect_length(eff_D_ope1, 1)
+#   expect_true(is.na(eff_D_ope1))
+# })
+# 
+# test_that("Une absence réelle est bien créée : espèce E absente (NA) à l'ope 3", {
+#   # E n'a été capturée qu'à l'ope 4 -> absence attendue à l'ope 3
+#   eff_E_ope3 <- resultat %>%
+#     filter(ope_id == 3, esp_code_alternatif == "E") %>%
+#     pull(effectif)
+#   expect_length(eff_E_ope3, 1)
+#   expect_true(is.na(eff_E_ope3))
+# })
+# 
+# test_that("Les présences réelles gardent leur effectif d'origine (rien n'est écrasé)", {
+#   eff_A_ope1 <- resultat %>% filter(ope_id == 1, esp_code_alternatif == "A") %>% pull(effectif)
+#   eff_B_ope3 <- resultat %>% filter(ope_id == 3, esp_code_alternatif == "B") %>% pull(effectif)
+#   eff_B_ope4 <- resultat %>% filter(ope_id == 4, esp_code_alternatif == "B") %>% pull(effectif)
+#   eff_E_ope4 <- resultat %>% filter(ope_id == 4, esp_code_alternatif == "E") %>% pull(effectif)
+# 
+#   expect_equal(eff_A_ope1, 5)
+#   expect_equal(eff_B_ope3, 8)
+#   expect_equal(eff_B_ope4, 2)
+#   expect_equal(eff_E_ope4, 1)
+# })
+# 
+# test_that("Une station à opération unique (station 30) n'a aucune absence générée", {
+#   n_lignes_30 <- resultat %>% filter(pop_id == 30) %>% nrow()
+#   expect_equal(n_lignes_30, 1)
+# })
+# 
+# test_that("annee est bien récupérée pour toutes les lignes d'origine", {
+#   annee_ope1 <- resultat %>% filter(ope_id == 1, esp_code_alternatif == "A") %>% pull(annee)
+#   expect_equal(annee_ope1, 2020)
+# })
+# 
+# cat("\n=====================================================================\n")
+# cat("Si aucun message d'échec (Failure/Error) n'apparaît ci-dessus,\n")
+# cat("la fonction se comporte exactement comme attendu pour votre cas :\n")
+# cat(" - pas de fuite d'espèce entre stations\n")
+# cat(" - absences correctement générées uniquement pour les espèces déjà\n")
+# cat("   vues sur la station, sur les opérations où elles n'ont pas été revues\n")
+# cat(" - aucune perte d'opération (puisque toutes sont déjà représentées dans df)\n")
+# cat("=====================================================================\n")
+# 
+# # =============================================================================
+# # Étape suivante à ne pas oublier : remplacer les NA par 0
+# # =============================================================================
+# resultat_final <- resultat %>%
+#   mutate(effectif = tidyr::replace_na(effectif, 0))
+# 
+# cat("\n--- Aperçu après remplacement des NA par 0 ---\n")
+# print(resultat_final %>% arrange(pop_id, ope_id, esp_code_alternatif))
 ```
 
 
@@ -520,6 +524,186 @@ Nous visualisons le dataframe final *ope_indicateur* regroupant donc l'ensemble 
 ope_indicateur%>%
   DT::datatable(rownames = FALSE)
 ```
+
+# Ajout des bassins versants et des departements au df ope_indicateur
+
+## Sélection de l'aire géographique 
+
+### Ajout des bassins versants 
+
+```{r}
+bassins_versants <- sf::st_read("../raw_data/Cartographie/BV_FXX/BassinHydrographique_FXX.shp")
+```
+
+```{r}
+# bassins_versants %>% 
+#   mapview::mapview()
+```
+
+### Ajout coordonnees dans le df **ope_indicateur**
+
+```{r}
+# Ajout des coordonnées pour jointure avec df pour future analyse autocorrelation spatiale
+coord_sta_id <- point_prelevement %>%
+  filter(pop_id %in% pop_serie_tempo) %>%
+  rename(x = pop_coordonnees_x, y = pop_coordonnees_y) %>%
+  select(pop_id, x, y) %>%
+  mutate(pop_id = as.character(pop_id))
+
+ope_indicateur <- ope_indicateur %>%
+  mutate(pop_id = as.character(pop_id)) %>% 
+  left_join(coord_sta_id, by = "pop_id") %>% 
+  mutate(x = as.numeric(x), y = as.numeric(y)) 
+
+```
+
+On transfome le df en objet sf avec la fonction sf_as_sf()
+
+```{r}
+ope_indicateur <- ope_indicateur %>%
+  sf::st_as_sf(coords = c("x", "y"), crs = 2154, remove = F) # Remove = F pour gerder les coordonnées après la conversion en objet sf 
+
+```
+
+On verifie que les couches ont la même source de données (CRS), ex : Lambert 93, crs = 2154
+
+```{r}
+# st_crs(bassins_versants)
+# st_crs(ope_indicateur_coord_sf)
+```
+
+
+Pour joindre les deux couches, on utilise la jointure st_joint() : 
+
+Conflit avec le moteur s2 (géométries sphériques) :  Depuis sf 1.0+, le moteur s2 est activé par défaut et peut mal gérer certains cas en CRS projeté (Lambert-93). On le desactive temporairement pour le join :
+
+```{r}
+sf::sf_use_s2(FALSE)
+
+ope_indicateur <- sf::st_join(
+  ope_indicateur,
+  bassins_versants,
+  join = sf::st_within
+)
+
+sf::sf_use_s2(TRUE)  # remettre l'état par défaut après
+
+ope_indicateur <- ope_indicateur %>% 
+  select(
+    ope_id, 
+    esp_code_alternatif, 
+    indicateur, 
+    valeur, 
+    stade, 
+    pop_id, 
+    annee, 
+    x, 
+    y,
+    LbBH
+  ) %>% 
+    # st_drop_geometry() %>% 
+  rename(bassin_versant = LbBH)
+```
+
+On va corriger le jeu de données **ope_indicateur** pour l'ombre commun (OBR) car l'espèce n'est pas présent naturellement dans les bassins versants "Loire-Bretagne" et "Seine-Normandie", elle à été introduit.
+
+On corrige également pour le blageon (BLN), endémique du bassin du Rhône mais introduit dans les bassins Loire-Bretagne et Seine-Normandie. 
+
+Enfin, on corrige pour le Hotu (HOT) qui est endémique du bassin de la Seine-Normandie mais qui a colonisé par les canaux les bassins de Loire-Bretagne et Rhône-Méditerranée- Corse. 
+
+```{r}
+ope_indicateur <- ope_indicateur %>%
+  filter(
+    !(
+      esp_code_alternatif == "OBR" &
+        bassin_versant == "Loire-Bretagne" |
+        esp_code_alternatif == "OBR" &
+        bassin_versant == "Seine-Normandie" |
+        esp_code_alternatif == "BLN" &
+        bassin_versant == "Seine-Normandie" |
+        esp_code_alternatif == "BLN" &
+        bassin_versant == "Loire-Bretagne" |
+        esp_code_alternatif == "HOT" &
+        bassin_versant == "Loire-Bretagne" |
+        esp_code_alternatif == "HOT" &
+        bassin_versant == "Rhône-Méditerranée"
+    )
+  )
+```
+
+### Ajout des departements 
+
+```{r}
+mes_depts <- departements_metro_geo %>% 
+  filter (DEP %in% c( "21","25","39", "58", "70","71","89", "90")) # Sélection de l'aire géographique : choix des départements 
+```
+
+Pour joindre les deux couches, on utilise la jointure st_joint() : 
+
+```{r}
+sf::sf_use_s2(FALSE)
+
+ope_indicateur <- sf::st_join(
+  ope_indicateur,
+  mes_depts,
+  join = sf::st_within
+)
+
+sf::sf_use_s2(TRUE)  # remettre l'état par défaut après
+
+ope_indicateur <- ope_indicateur %>%
+  select(
+    ope_id,
+    esp_code_alternatif,
+    indicateur,
+    valeur,
+    stade,
+    pop_id,
+    annee,
+    x,
+    y,
+    bassin_versant,
+    DEP
+  ) %>%
+  rename(departements = DEP)
+```
+
+On observe des departements non rataché à la couche, on identifie les stations : 
+```{r}
+non_matchees <- ope_indicateur %>% filter(is.na(departements))  
+
+table(non_matchees$pop_id)
+```
+Après avoir iddentifié les stations, on les représente graphiquement : 
+
+```{r}
+# mapview(mes_depts,
+#         layer.name = "Bourgogne-Franche-Comté",
+#         col.regions = "#0A9F9D") + mapview (
+#           non_matchees,
+#           shape = 20,
+#           color = "darkred",
+#           lwd = 1
+#         )
+```
+
+Les stations pop_id (points de prelèvements) :
+
+- 33227 33436  86712 sont dans le 71
+- 68899 est situé dans le 25 
+
+Enfin, on assigne manuellement les departement associé au stations : 
+
+```{r}
+ope_indicateur <- ope_indicateur %>%
+  mutate(departements = case_when(
+    pop_id %in% c("33227", "33436", "86712") ~ "71",
+    pop_id == "68899" ~ "25",
+    TRUE ~ departements
+  )) %>%
+  st_drop_geometry()
+```
+
 
 # Sauvegardes
 

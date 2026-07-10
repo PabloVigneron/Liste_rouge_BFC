@@ -41,9 +41,7 @@ load(file = "../processed_data/selection_especes.rda")
 
 
 ```{r Chargement des fonctions}
-# source(file = "../R/mk_st_by_group.R") # Chargement des fonctions
 source(file = "../R/calcul_taux_evolution.R")
-# source(file = "../R/mann_kendall_sen.R")
 ```
 
 
@@ -208,7 +206,6 @@ print(reg_taux_evol_2007)
 ```
 
 Nous avons donc, à la fin de ce script, un tableau de bord d'indicateurs simples à l'échelle régionale. Nous allons pouvoir analyser les différentes tendances des indicateurs sur la période 1990-2023 dans le prochain script (?_analyse_indicateurs_regionaux). 
-
 
 # Sauvegarde
 

@@ -60,10 +60,7 @@ library(poptrend)
 ```{r Chargement des données}
 load(file = "../processed_data/selection_especes.rda")
 load(file = "../processed_data/selection_pop_ope.rda")
-load(file = "../processed_data/donnees_densite_eff_abs.rda")
-load(file = "../processed_data/assemblage_tab_par_ope.rda") # Tab ope_indicateur 
 load(file = "../processed_data/calcul_indicateurs_regionaux.rda") # Pour graphique indicateurs
-
 ```
 
 ```{r Chargement des fonctions}
@@ -95,41 +92,6 @@ L'Objectif de ce script est de réaliser une synthèse graphique des résultats 
 
 On réalise une représentation graphique des différents indicateurs calculés pour chacune des espèces à évaluer.
 
-```{r}
-# obr_data <- ope_indicateur %>%
-#   filter(esp_code_alternatif == "OBR", indicateur == "effectif_total") 
-# 
-# nb_station_negative_obr <- obr_data %>%
-#   filter(valeur == 0) %>%
-#   group_by(annee) %>%
-#   summarise(n_total = n_distinct(pop_id)) %>%
-#   ungroup()
-# 
-# nb_station_positive <- obr_data %>%
-#   filter(valeur > 0) %>%
-#   group_by(annee) %>%
-#   summarise(n_total = n_distinct(pop_id)) %>%
-#   ungroup() 
-# 
-#   
-#   
-# lot_data <- ope_indicateur %>%
-#   filter(esp_code_alternatif == "LOT", indicateur == "effectif_total") 
-# 
-# nb_station_negative <- lot_data %>%
-#   filter(valeur == 0) %>%
-#   group_by(annee) %>%
-#   summarise(n_total = n_distinct(pop_id)) %>%
-#   ungroup()
-# 
-# nb_station_positive <- lot_data %>%
-#   filter(valeur > 0) %>%
-#   group_by(annee) %>%
-#   summarise(n_total = n_distinct(pop_id)) %>%
-#   ungroup() 
-
-```
-
 ```{r indicateur labels}
 indicateur_labels <- c(
   "densite_surface" = "Densité surfacique",
@@ -139,7 +101,6 @@ indicateur_labels <- c(
   "biomasse" = "Biomasse"
 )
 ```
-
 
 
 ```{r graphique evolution indicateur régionale par annee loess, fig.height = 80, fig.width = 20}
@@ -166,7 +127,7 @@ indicateur_for_graph <- reg_indicateur %>%
   geom_point(shape = 21, size = 2) +
   geom_line(linetype = 3, linewidth = 0.5) +
   labs(title = "Indicateurs de tendances à l'échelle régionale des espèces de poissons d'eau douce de BFC", x = "Années", y = "Valeur indicateur") +
-  geom_smooth(method = "lm",
+  geom_smooth(method = "loess",
               se = F,
               color = "darkred") +
   # theme_bw()+
