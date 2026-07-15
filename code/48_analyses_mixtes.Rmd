@@ -66,6 +66,7 @@ load(file = "../processed_data/selection_especes.rda")
 load(file = "../processed_data/selection_pop_ope.rda")
 load(file = "../processed_data/donnees_densite_eff_abs.rda")
 load(file = "../processed_data/assemblage_tab_par_ope.rda")
+load(file = "../processed_data/resultats_modele.rda")
 ```
 
 ```{r Chargement des fonctions}
@@ -535,8 +536,8 @@ trf_data <- ope_effectif_glmm_abs %>%
 ```
 
 ```{r}
-zip_glmm_resultats <- zip_glmm_application_modele(data = trf_data,
-                                          liste_periodes = liste_periodes_etude)
+# zip_glmm_resultats <- zip_glmm_application_modele(data = trf_data,
+                                          # liste_periodes = liste_periodes_etude)
 ```
 
 ```{r Mise en forme sortie fonction ZIP_GLMM}
@@ -563,8 +564,8 @@ zip_glmm_resultats_annee <- zip_glmm_resultats %>%
 
 
 ```{r Exécution fonction ZIP_GLMM}
-zip_glmm_resultats <- zip_glmm_application_modele(data = ope_effectif_glmm_abs,
-                                          liste_periodes = liste_periodes_etude)
+# zip_glmm_resultats <- zip_glmm_application_modele(data = ope_effectif_glmm_abs,
+                                          # liste_periodes = liste_periodes_etude)
 ```
 
 
@@ -688,8 +689,8 @@ liste_periodes_etude <- list(c(2007, 2025)) # Liste des périodes (chaque pério
 ### Application du modèle GLMM avec les effectifs
 
 ```{r Exécution fonction GLMM}
-glmm_resultats <- glmm_application_modele(data = ope_occurence_glmm,
-                                          liste_periodes = liste_periodes_etude)
+# glmm_resultats <- glmm_application_modele(data = ope_occurence_glmm,
+                                          # liste_periodes = liste_periodes_etude)
 ```
 
 
@@ -714,6 +715,7 @@ glmm_resultats_annee <- glmm_resultats %>%
     # ,    # Ajouter le calcul de taux de changement dans la population
     # rate_change = (exp(Estimate * nb_annees) - 1) * 100
 )
+
 ```
 
 
@@ -744,7 +746,7 @@ df_glmm_resultats <- glmm_resultats_format %>%
     "Coefficient" = Estimate,
     "Significativité" = sig,
     # "Taux de changement" = rate_change,
-    "Famille de distribution" = family
+    "Fonction de lien" = family
   ) %>%
   arrange(`Code Espèce`) # Ordonner par espèce, indicateur et stade
 
@@ -775,49 +777,171 @@ tab_glmm_resultats
 ```
 
 
-
-
-
-
 ```{r}
-install.packages("VGAM")
-library(VGAM)
-```
-```{r}
-library(lme4)   # ou glmmTMB
-
-# Exemple avec glmmTMB
-mod_logit   <- glmmTMB(y ~ x + (1|groupe), family = binomial(link = "logit"),   data = df)
-mod_probit  <- glmmTMB(y ~ x + (1|groupe), family = binomial(link = "probit"),  data = df)
-mod_cauchit <- glmmTMB(y ~ x + (1|groupe), family = binomial(link = "cauchit"), data = df)
-
-# Prédiction sur l'échelle du lien
-eta <- predict(mod_probit, type = "link")
-
-# Transformation inverse -> probabilité
-p_logit   <- plogis(coef(summary(mod_logit))$cond[,"Estimate"])   # attention: à faire sur eta, pas sur beta seul si covariables multiples
-p_probit  <- pnorm(eta)
-p_cauchit <- pcauchy(eta)
-```
-```{r}
-
+trf_data <- ope_effectif_glmm_abs %>% 
+  filter( espece == "TRF" )
 ```
 
-
 ```{r}
-library(VGAM)
-
-eta <- c(-1, 0, 0.5, 1.2)
-
-logitlink(eta, inverse = TRUE)    # équivalent à plogis(eta)
-probitlink(eta, inverse = TRUE)   # équivalent à pnorm(eta)
-cauchitlink(eta, inverse = TRUE)  # équivalent à pcauchy(eta)
+mod_zi_1.1 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = poisson(link = "log"),
+  data = trf_data,
+  ziformula = ~ 1
+)
 ```
 
+### Prédiction à partir des modèles ZIPGLMM
 
+```{r}
+# Definir une valeur fixe de surface : la moyenne 
+ope_surface_calculee_mean <- mean(trf_data$ope_surface_calculee)
 
+# Créer le nouveau dataframe avec une colonne par variable explicative
 
+new_data <- expand.grid(
+  annee = c(min(trf_data$annee), max(trf_data$annee)),
+  pro_libelle = c(
+    "Pêche complète à un ou plusieurs passages",
+    "Pêche partielle par points (grand milieu)"
+  )
+) %>% mutate(ope_surface_calculee = ope_surface_calculee_mean)
 
+new_data <- new_data %>%
+  mutate(
+    # Prédiction sur la variable réponse
+    prediction = predict(
+      mod_zi_1.1,
+      newdata = new_data,
+      type = "response",
+      re.form = NA
+    )
+  )
+# Remarque : les valeurs du facteur aléatoire peuvent être données
+# ou non. Si ce n’est pas le cas, il est nécessaire d’ajouter l’argument re.form=NA à la fonction
+# predict(). Les prédictions prennent alors en compte l’effet moyen de toutes les modalités du facteur aléatoire du modèle.
+
+# Calcul du taux de changement par espèce
+
+rate_change <- new_data %>%
+  group_by(pro_libelle) %>%
+  arrange(annee) %>%
+  summarise(
+    p_first = first(prediction),
+    p_last = last(prediction),
+    rate_change = (p_last - p_first) / p_first * 100
+  )
+```
+
+```{r}
+library(marginaleffects)
+predictions(
+  mod_zi_1.1, 
+  newdata = new_data, 
+  re.form = NA
+  )
+```
+
+```{r}
+library(glmmTMB)
+library(dplyr)
+
+# Fonction qui calcule votre rate_change à partir d'un modèle ajusté
+calc_rate_change <- function(model) {
+  surface_ref <- mean(trf_data$ope_surface_calculee)
+  
+  nd <- expand.grid(
+    annee = c(min(trf_data$annee), max(trf_data$annee)),
+    pro_libelle = c(
+      "Pêche complète à un ou plusieurs passages",
+      "Pêche partielle par points (grand milieu)"
+    )
+  ) %>% mutate(ope_surface_calculee = surface_ref)
+  
+  nd$prediction <- predict(model, newdata = nd, type = "response", re.form = NA)
+  
+  out <- nd %>%
+    group_by(pro_libelle) %>%
+    arrange(annee) %>%
+    summarise(
+      rate_change = (last(prediction) - first(prediction)) / first(prediction) * 100,
+      .groups = "drop"
+    )
+  
+  # bootMer exige un vecteur nommé en sortie
+  setNames(out$rate_change, out$pro_libelle)
+}
+
+# Bootstrap paramétrique (500-1000 réplicats recommandé)
+set.seed(123)
+boot_res <- lme4::bootMer(
+  mod_zi_1.1,
+  FUN = calc_rate_change,
+  nsim = 500,
+  use.u = FALSE,      # FALSE = simulation marginale (nouveaux effets aléatoires tirés)
+  type = "parametric"
+)
+
+# Intervalles de confiance percentiles à 95%
+library(boot)
+ci_complete <- boot.ci(boot_res, type = "perc", index = 1)
+ci_partielle <- boot.ci(boot_res, type = "perc", index = 2)
+
+ci_complete
+ci_partielle
+```
+
+### Prediction pour données binaire
+
+```{r}
+trf_data <- ope_occurence_glmm %>% 
+  filter( espece == "TRF" )
+```
+
+```{r}
+mod_zi_1.1 <- glmer(
+  valeur ~ annee + pro_libelle + (1 | sta_id) ,
+  family =  binomial(link = "logit"),
+  data = trf_data
+)
+```
+
+### Prédiction à partir des modèles ZIPGLMM
+
+```{r}
+# Créer le nouveau dataframe avec une colonne par variable explicative
+
+new_data <- expand.grid(
+  annee = c(min(trf_data$annee), max(trf_data$annee)),
+  pro_libelle = c(
+    "Pêche complète à un ou plusieurs passages",
+    "Pêche partielle par points (grand milieu)"
+  )
+) %>% 
+  mutate(
+    # Prédiction sur la variable réponse
+    prediction = predict(
+      mod_zi_1.1,
+      newdata = new_data,
+      type = "response",
+      re.form = NA
+    )
+  )
+# Remarque : les valeurs du facteur aléatoire peuvent être données
+# ou non. Si ce n’est pas le cas, il est nécessaire d’ajouter l’argument re.form=NA à la fonction
+# predict(). Les prédictions prennent alors en compte l’effet moyen de toutes les modalités du facteur aléatoire du modèle.
+
+# Calcul du taux de changement par espèce
+
+rate_change <- new_data %>%
+  group_by(pro_libelle) %>%
+  arrange(annee) %>%
+  summarise(
+    p_first = first(prediction),
+    p_last = last(prediction),
+    rate_change = (p_first - p_last) / p_first * 100
+  )
+```
 
 
 
