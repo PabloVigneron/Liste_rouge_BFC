@@ -94,7 +94,7 @@ ope_selection <- ope_selection %>%
 
 # prepéarer la table pour jointure 
 esp_ope_selection_join <- esp_ope_selection %>% 
-  select(ope_id, ope_surface_calculee) %>% 
+  dplyr::select(ope_id, ope_surface_calculee) %>% 
   distinct(ope_id, .keep_all = TRUE)
 
 ope_effectif_glmm_abs <- ope_indicateur %>%
@@ -267,17 +267,200 @@ liste_periodes_etude <- list(c(2007, 2025)) # Liste des périodes (chaque pério
 
 # Application du modèle GLMM avec les effectifs
 
+```{r}
+data_esp <- ope_effectif_glmm_abs %>% 
+  filter(espece == "VAN")
+```
+
+
+```{r}
+mod <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  data = data_esp,
+  family = nb(link = "log"),
+  method = "REML", 
+  select = T
+)
+```
+
+```{r}
+gam.check(mod)
+```
+```{r}
+appraise(mod, method = "simulate")
+```
+
+```{r}
+draw(mod, select = "s(annee)", residuals = T)
+```
+
+```{r}
+summary(mod)
+```
+
+
+```{r}
+trend <- poptrend::ptrend(
+  valeur ~ trend(annee, tempRE = F, type = "smooth") + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  data = data_esp,
+  family = nb(link = "log"),
+  bootType = "hessian",
+  gamModel = TRUE,
+  engine = "gam"
+)
+
+
+plot(trend, main = "TRF", plotLines = T, secDeriv = T)
+```
+```{r}
+ggplot_trend(
+  trend,
+  alpha = 0.05,
+  ylab = "Abundance index",
+  xlab = "Annee",
+  trendCol = "black",
+  shadeCol = "grey60",
+  secDeriv = TRUE,
+  plotLines = T,
+  lineCol = "grey30",
+  lineAlpha = 0.05
+) +
+  theme_gray()+
+  ggtitle("VAN")
+```
+```{r}
+poptrend::change(trend, start = 2007, end = 2025, alpha = 0.05)
+```
+
+PREDICTION GAM TEST 
+```{r, fig.height= 30, fig.width=30}
+# combos <- unique(data_esp[, c("sta_id", "pro_libelle")])
+# new_data <- merge(new_data, combos)  # inner join implicite avec merge par défaut
+
+# 1. Récupérer les stations uniques avec leurs coordonnées x, y
+stations <- unique(data_esp[, c("sta_id", "x", "y")])
+
+# 2. Construire la grille de prédiction : année x protocole x station
+new_data <- expand.grid(
+  annee = seq(min(data_esp$annee), max(data_esp$annee), length = 19),
+  pro_libelle = c(
+    "Pêche complète à un ou plusieurs passages",
+    "Pêche partielle par points (grand milieu)"),
+  sta_id = stations$sta_id
+)
+new_data$ope_surface_calculee <- 1
+
+# 3. Rattacher à chaque sta_id ses propres coordonnées x, y
+new_data <- merge(new_data, stations, by = "sta_id")
+
+# 4. S'assurer que les types correspondent à ceux utilisés dans le modèle
+new_data$sta_id      <- factor(new_data$sta_id, levels = levels(data_esp$sta_id))
+new_data$pro_libelle <- factor(new_data$pro_libelle, levels = levels(data_esp$pro_libelle))
+
+# 5. Prédiction
+fit <- data.frame(predict(mod, newdata = new_data, type = "response", se.fit = TRUE))
+fit <- transform(fit, upper = fit + 2*se.fit, lower = fit - 2*se.fit)
+pred <- cbind(new_data, fit)
+
+# 6. Graphique
+plot <- ggplot(pred, aes(x = annee, y = fit, group = pro_libelle, color = pro_libelle)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper, fill = pro_libelle), alpha = 0.3, color = NA) +
+  geom_line() +
+  facet_wrap(~ sta_id, scales = 'free_y')
+plot
+```
+
+```{r}
+
+new_data <- expand.grid(
+  annee = seq(min(data_esp$annee), max(data_esp$annee), length = 19),
+  pro_libelle = c(
+    "Pêche complète à un ou plusieurs passages",
+    "Pêche partielle par points (grand milieu)"), 
+    ope_surface_calculee = 1,
+  x = 862578, 
+  y = 6688467, 
+  sta_id = c(3243,   3298   ,3799   )
+  )
+
+fit <- data.frame(predict(
+  mod,
+  newdata = new_data,
+  type = "response",
+  se.fit = T
+))
+
+fit <- transform(fit, upper = fit + (2*se.fit), lower = fit -(2*se.fit))
+
+pred <- cbind(new_data, fit)
+
+plot <- ggplot(pred, aes(x = annee), y = fit, group = factor(sta_id)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), fill = 'grey', alpha = 0.5)+
+  geom_line()+ facet_wrap(~ sta_id, scales = 'free_y') 
+
+plot
+```
+
+```{r}
+head(data_esp
+     )
+summary(data_esp)
+```
+
+
+
+
+```{r}
+draw(gratia::derivatives(mod, select = "s(annee)", interval = "confidence")) +
+  geom_hline(
+    yintercept = 0,
+    color = "firebrick",
+    linetype = "dashed",
+    linewidth = 0.5
+  ) +
+  labs(
+    subtitle = "TRF"
+  )
+```
+
+
+```{r}
+anova.gam(mod)
+```
+
+
+
+
+
+
+
+
+
+
+## Gamm poptrend 
+
+```{r}
+liste_periodes_etude <- list(c(2007, 2025)) # Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin) 
+```
 
 ```{r}
 source(file = "../R/gamm_poptrend.R")
 source(file = "../R/gamm_poptrend_application.R")
+source(file = "../R/ggplot_trend.R")
 
 data_esp <- ope_effectif_glmm_abs %>% 
   filter(espece == c("TRF"))
 
 
-gamm_poptrend_application(data = ope_effectif_glmm_abs, liste_periodes = liste_periodes_etude)
+gamm_poptrend_application(data = data_esp, liste_periodes = liste_periodes_etude)
 
+gamm_poptrend (data = data_esp, mon_espece = "TRF")
+```
+
+
+
+```{r}
+head(ope_effectif_glmm_abs)
 ```
 
 
@@ -297,6 +480,8 @@ source(file = "../R/gamm_poptrend.R")
 
  gamm_poptrend(data = data_esp, mon_espec = "TRF")
   
+ 
+ 
 trend <- poptrend::ptrend(
   valeur ~ trend(annee, tempRE = F, type = "smooth") + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
   data = data_esp,
@@ -310,212 +495,6 @@ appraise(trend$gam)+labs(caption = mon_espece)
 
 plot(trend, main = "TRF")
 ```
-
-```{r}
-trend <- poptrend::ptrend(
-  valeur ~ trend(annee, tempRE = F, type = "smooth") + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
-  data = data_esp,
-  family = nb(link = "log"),
-  bootType = "hessian",
-  gamModel = TRUE,
-  engine = "gam"
-)
-library(mgcv)
-library(ggplot2)
-
-mod <- trend$gam  # le gam sous-jacent
-
-# séquence d'années sur laquelle prédire
-newdat <- data.frame(
-  annee = seq(min(data_esp$annee), max(data_esp$annee), length.out = 200),
-  ope_surface_calculee = 1,          # offset neutralisé (log(1) = 0)
-  pro_libelle = levels(data_esp$pro_libelle)[1],  # niveau de référence
-  x = mean(data_esp$x),
-  y = mean(data_esp$y),
-  sta_id = data_esp$sta_id[1]        # niveau arbitraire, exclu ensuite
-)
-
-pred <- predict(mod, newdata = newdat, type = "terms", se.fit = TRUE,
-                 exclude = c("s(x,y)", "s(sta_id)"))  # adapte les noms de smooth
-
-# récupérer uniquement le terme lié à l'année (le nom exact dépend du modèle,
-# vérifie avec : colnames(pred$fit))
-term_name <- grep("annee", colnames(pred$fit), value = TRUE)
-
-df_plot <- data.frame(
-  annee = newdat$annee,
-  fit   = pred$fit[, term_name],
-  se    = pred$se.fit[, term_name]
-)
-
-df_plot$lower <- exp(df_plot$fit - 1.96 * df_plot$se)
-df_plot$upper <- exp(df_plot$fit + 1.96 * df_plot$se)
-df_plot$index <- exp(df_plot$fit)
-
-ggplot(df_plot, aes(x = annee, y = index)) +
-  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2, fill = "darkorange") +
-  geom_line(color = "darkorange", linewidth = 1) +
-  labs(x = "Année", y = "Indice relatif", title = "Tendance estimée (GAM)") +
-  theme_minimal()
-
-str(trend, max.level = 1)
-names(trend)
-class(trend)
-
-head(trend$trendFrame)
-str(trend$trendFrame)
-colnames(trend$trendFrame)
-
-library(ggplot2)
-library(dplyr)
-
-# 1. Isoler les points de la grille de prédiction (courbe lisse)
-grid_idx <- which(trend$trendFrame$isGridP)
-
-df_grid <- trend$trendFrame[grid_idx, c("annee", "trend")] %>%
-  arrange(annee)
-
-# 2. Intervalle de confiance à partir des réplicats bootstrap alignés
-boot_grid <- trend$bootTrend[grid_idx, ]
-
-ci <- t(apply(boot_grid, 1, quantile, probs = c(0.025, 0.975), na.rm = TRUE))
-df_grid$lower <- ci[, 1]
-df_grid$upper <- ci[, 2]
-
-# 3. Graphique ggplot2
-ggplot(df_grid, aes(x = annee, y = trend)) +
-  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2, fill = "steelblue") +
-  geom_line(color = "steelblue", linewidth = 1) +
-  labs(
-    x = "Année",
-    y = "Indice de tendance",
-    title = "Tendance de population estimée"
-  ) +
-  theme_minimal()
-
-plot(trend)
-
-library(ggplot2)
-library(dplyr)
-
-# 1. Isoler les points de la grille de prédiction (courbe lisse)
-grid_idx <- which(trend$trendFrame$isGridP)
-
-df_grid <- trend$trendFrame[grid_idx, c("annee", "trend")] %>%
-  arrange(annee)
-
-# 2. IC à partir des réplicats bootstrap alignés
-boot_grid <- trend$bootTrend[grid_idx, ]
-ci <- t(apply(boot_grid, 1, quantile, probs = c(0.025, 0.975), na.rm = TRUE))
-df_grid$lower <- ci[, 1]
-df_grid$upper <- ci[, 2]
-
-# 3. Catégoriser la significativité par rapport à la référence (indice = 1)
-df_grid <- df_grid %>%
-  mutate(
-    signif = case_when(
-      lower > 1 ~ "Augmentation significative",
-      upper < 1 ~ "Diminution significative",
-      TRUE      ~ "Non significatif"
-    )
-  )
-
-# 4. Pour colorer un TRAIT CONTINU par segments (et non des points isolés),
-#    on découpe la courbe en segments consécutifs entre chaque paire de points
-df_seg <- df_grid %>%
-  mutate(
-    xend = lead(annee),
-    yend = lead(trend),
-    signif_seg = signif  # on garde la catégorie du point de départ du segment
-  ) %>%
-  filter(!is.na(xend))
-
-# 5. Graphique
-ggplot() +
-  geom_ribbon(data = df_grid, aes(x = annee, ymin = lower, ymax = upper),
-              alpha = 0.15, fill = "grey50") +
-  geom_segment(data = df_seg,
-               aes(x = annee, y = trend, xend = xend, yend = yend, color = signif_seg),
-               linewidth = 1.2) +
-  geom_hline(yintercept = 1, linetype = "dashed", color = "grey40") +
-  scale_color_manual(
-    name = "Tendance",
-    values = c(
-      "Augmentation significative" = "forestgreen",
-      "Diminution significative"   = "darkorange",
-      "Non significatif"           = "grey30"
-    )
-  ) +
-  labs(
-    x = "Année",
-    y = "Indice de tendance",
-    title = "Tendance de population estimée"
-  ) +
-  theme_minimal() +
-  theme(legend.position = "bottom")
-
-range(df_grid$trend)
-summary(trend$trendFrame$trend[trend$trendFrame$isGridP])
-library(ggplot2)
-library(dplyr)
-
-# 1. Isoler les points de la grille de prédiction (courbe lisse)
-grid_idx <- which(trend$trendFrame$isGridP)
-
-df_grid <- trend$trendFrame[grid_idx, c("annee", "trend")] %>%
-  arrange(annee)
-
-# 2. IC à partir des réplicats bootstrap alignés
-boot_grid <- trend$bootTrend[grid_idx, ]
-ci <- t(apply(boot_grid, 1, quantile, probs = c(0.025, 0.975), na.rm = TRUE))
-df_grid$lower <- ci[, 1]
-df_grid$upper <- ci[, 2]
-
-# 3. Catégoriser la significativité par rapport à la référence (indice = 1)
-df_grid <- df_grid %>%
-  mutate(
-    signif = case_when(
-      lower > 1 ~ "Augmentation significative",
-      upper < 1 ~ "Diminution significative",
-      TRUE      ~ "Non significatif"
-    )
-  )
-
-# 4. Découper la courbe en segments consécutifs pour pouvoir la colorer par tronçons
-df_seg <- df_grid %>%
-  mutate(
-    xend = lead(annee),
-    yend = lead(trend),
-    signif_seg = signif
-  ) %>%
-  filter(!is.na(xend))
-
-# 5. Graphique final
-ggplot() +
-  geom_ribbon(data = df_grid, aes(x = annee, ymin = lower, ymax = upper),
-              alpha = 0.15, fill = "grey50") +
-  geom_segment(data = df_seg,
-               aes(x = annee, y = trend, xend = xend, yend = yend, color = signif_seg),
-               linewidth = 1.2) +
-  geom_hline(yintercept = 1, linetype = "dashed", color = "grey40") +
-  scale_color_manual(
-    name = "Tendance",
-    values = c(
-      "Augmentation significative" = "forestgreen",
-      "Diminution significative"   = "darkorange",
-      "Non significatif"           = "grey30"
-    )
-  ) +
-  labs(
-    x = "Année",
-    y = "Indice de tendance",
-    title = "Tendance de population estimée"
-  ) +
-  theme_minimal() +
-  theme(legend.position = "bottom")
-```
-
-
 
 
 
@@ -604,7 +583,7 @@ Construction d'un tableau récapitulatif des résultats du modèle GLMM :
 
 ```{r}
 df_zip_glmm_resultats <- zip_glmm_resultats_format %>%
-  select(esp_code_alternatif, periode, trend, sig, rate_change, family) %>%
+  dplyr::select(esp_code_alternatif, periode, trend, sig, rate_change, family) %>%
   mutate(
     # Estimate = round(Estimate, digits = 2), 
     rate_change = round(rate_change, 2)) %>%
@@ -689,8 +668,8 @@ liste_periodes_etude <- list(c(2007, 2025)) # Liste des périodes (chaque pério
 ### Application du modèle GLMM avec les effectifs
 
 ```{r Exécution fonction GLMM}
-# glmm_resultats <- glmm_application_modele(data = ope_occurence_glmm,
-                                          # liste_periodes = liste_periodes_etude)
+glmm_resultats <- glmm_application_modele(data = ope_occurence_glmm,
+liste_periodes = liste_periodes_etude)
 ```
 
 
@@ -705,15 +684,13 @@ glmm_resultats_annee <- glmm_resultats %>%
     annee_fin   = as.numeric(annee_fin),
     nb_annees   = annee_fin - annee_debut
   ) %>% 
-  select(periode, esp_code_alternatif, p_value, Estimate, sig, family, nb_annees) %>% 
+  select(periode, esp_code_alternatif, p_value, Estimate, sig, family, nb_annees, rate_change) %>% 
   mutate(
     trend = case_when(
       Estimate > 0 ~ "\U2197",
       Estimate < 0 ~ "\U2198",
       TRUE ~ "."
     )
-    # ,    # Ajouter le calcul de taux de changement dans la population
-    # rate_change = (exp(Estimate * nb_annees) - 1) * 100
 )
 
 ```
@@ -730,13 +707,13 @@ glmm_resultats_format <- glmm_resultats_annee %>%
 Construction d'un tableau récapitulatif des résultats du modèle GLMM :
 
 ```{r}
-df_glmm_resultats <- glmm_resultats_format %>%
+df_glmm_resultats_v2 <- glmm_resultats_format %>%
   select(esp_code_alternatif, periode, trend, sig,
-         # rate_change,
+         rate_change,
          family, 
          Estimate) %>%
   mutate(
-    # rate_change = round(rate_change, 2)
+    rate_change = round(rate_change, 2),
     Estimate = round(Estimate, digits = 2),
     ) %>%
   rename(
@@ -745,7 +722,7 @@ df_glmm_resultats <- glmm_resultats_format %>%
     "Tendance" = trend,
     "Coefficient" = Estimate,
     "Significativité" = sig,
-    # "Taux de changement" = rate_change,
+    "Taux de changement" = rate_change,
     "Fonction de lien" = family
   ) %>%
   arrange(`Code Espèce`) # Ordonner par espèce, indicateur et stade
@@ -779,7 +756,7 @@ tab_glmm_resultats
 
 ```{r}
 trf_data <- ope_effectif_glmm_abs %>% 
-  filter( espece == "TRF" )
+  filter( espece == "ABL" )
 ```
 
 ```{r}
@@ -790,6 +767,7 @@ mod_zi_1.1 <- glmmTMB(
   ziformula = ~ 1
 )
 ```
+
 
 ### Prédiction à partir des modèles ZIPGLMM
 
@@ -895,13 +873,13 @@ ci_partielle
 
 ```{r}
 trf_data <- ope_occurence_glmm %>% 
-  filter( espece == "TRF" )
+  filter( espece == "ABL" )
 ```
 
 ```{r}
 mod_zi_1.1 <- glmer(
   valeur ~ annee + pro_libelle + (1 | sta_id) ,
-  family =  binomial(link = "logit"),
+  family =  binomial(link = "cauchit"),
   data = trf_data
 )
 ```
@@ -917,16 +895,13 @@ new_data <- expand.grid(
     "Pêche complète à un ou plusieurs passages",
     "Pêche partielle par points (grand milieu)"
   )
-) %>% 
-  mutate(
+)
     # Prédiction sur la variable réponse
-    prediction = predict(
-      mod_zi_1.1,
-      newdata = new_data,
-      type = "response",
-      re.form = NA
-    )
-  )
+prediction <-  predict(mod_zi_1.1,
+                     newdata = new_data,
+                     type = "response",
+                     re.form = NA)
+
 # Remarque : les valeurs du facteur aléatoire peuvent être données
 # ou non. Si ce n’est pas le cas, il est nécessaire d’ajouter l’argument re.form=NA à la fonction
 # predict(). Les prédictions prennent alors en compte l’effet moyen de toutes les modalités du facteur aléatoire du modèle.
@@ -939,11 +914,9 @@ rate_change <- new_data %>%
   summarise(
     p_first = first(prediction),
     p_last = last(prediction),
-    rate_change = (p_first - p_last) / p_first * 100
+    rate_change = (p_last - p_first) / p_first * 100
   )
 ```
-
-
 
 # Sauvergarde
 

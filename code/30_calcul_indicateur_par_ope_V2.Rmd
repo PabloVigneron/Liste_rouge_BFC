@@ -704,6 +704,10 @@ ope_indicateur <- ope_indicateur %>%
   st_drop_geometry()
 ```
 
+```{r}
+write_csv(ope_indicateur, "../processed_data/stations_peches_carto.csv")
+```
+
 
 # Sauvegardes
 

@@ -6,12 +6,12 @@
 #' @export 
 #' 
 #' @importClassesFrom dplyr; mutate filter rename ;lme4, glmer; base summary  nrow rename length unique ; glmmTMB
-#'
+#' @importClassesFrom ggplot
+#' 
 #' @examples
 #' \dontrun{
 #' mod <- gamm_poptrend (data = esp_ope_selection, mon_espece == "BOU")
 #' }
-
 gamm_poptrend_application <- function(data, liste_periodes) {
   results_list <- map(liste_periodes, function(period) {
     mon_annee_depart <- period[1]

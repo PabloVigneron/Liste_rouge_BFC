@@ -37,8 +37,21 @@ gamm_poptrend <- function(data, mon_espece) {
   
   if (inherits(model, "try-error"))
     return(NULL)
-  
-  graph <- plot(model, main = mon_espece) 
+  graph <- ggplot_trend(
+    model,
+    alpha = 0.05,
+    ylab = "Abundance index",
+    xlab = "Annee",
+    trendCol = "black",
+    shadeCol = "grey60",
+    secDeriv = TRUE,
+    plotLines = T,
+    lineCol = "grey30",
+    lineAlpha = 0.05
+  ) +
+    theme_gray() +
+    ggtitle(mon_espece)
+  # graph <- plot(model, main = mon_espece) 
   # check <- appraise(model$gam) +
   #   labs(caption = mon_espece)
 
