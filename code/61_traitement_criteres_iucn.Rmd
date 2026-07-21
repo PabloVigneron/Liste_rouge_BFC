@@ -1,0 +1,667 @@
+---
+title: "LRR des poissons d'eau douce de BFC"
+subtitle: "61_traitement_criteres_iucn"
+author: "Pablo Vignerone"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Objectif : Dynamique de population des poissons d'eau douce de Bretagne - 
+"30_application_criteres_lrr_uicn"
+# Objectif : Dynamique de population des poissons d'eau douce de Bretagne - 
+
+# Chargement des packages
+
+```{r Chargement des packages}
+library(aspe)
+library(tidyverse)
+library(readxl)
+library(ggh4x)
+library(kableExtra)
+library(ggthemes)
+library (khroma)
+library(zoo)
+library(gt)
+library(lemon)
+library(trend)
+library(ggh4x)
+library(purrr)
+library(scales)
+```
+
+
+# Chargement des données
+
+```{r chargement des données}
+load(file = "../processed_data/assemblage_tab_par_ope.rda")
+load(file = "../processed_data/calcul_indicateurs_regionaux.rda")
+load(file = "../processed_data/resultats_modele.rda")
+```
+
+# Chargement excel "selection_taxon_lrr"
+
+```{r Chargement Excel}
+## Fichier Excel contenant les différentes espèces de la région ainsi que leurs temps de générations, leurs statuts d'endémisme à la région
+# tab_especes <- read_excel("../raw_data/selection_taxon_lrr.xlsx")
+```
+
+
+# Chargement des fonctions 
+
+## Phase de pré-évaluation 
+
+1) Réalisation d'une pré-évaluation selon la méthodologie de l'UICN (étapes 1 et 2), afin d'obtenir pour chaque espèce une proposition de catégorie. 
+
+
+Le classement des espèces dans les catégories d'espèces menacées s'opère sur la base de 5 critères d'évaluation faisant intervenir des facteurs quantitatifs tels que la taille de la population, le taux de déclin, la superficie de l'aire de répartition ou sa fragmentation. Il suffit qu'au moins un des critères A à E soit rempli pour qu'une espèce soit classée dans l'une des catégories CR, EN ou VU. 
+
+
+
+### Etape 1 : évaluation initiale
+
+La première étape consiste à appliquer les critères d'évaluation aux populations situées dans les limites de la région considérée. Cette évaluation initiale aboutit à un classement préliminaire de l'espèce. Comme l'évaluation initiale ne porte que sur la population régionale, le classement déterminé lors de cette première étape peut surestimer (ou parfois sous-estimer) le risque réel de disparition de la région. Un ajustement à la baisse ou à la hausse de la catégorie préliminaire peut donc être nécessaire. 
+
+
+Pour l'exemple de la Bretagne : Cette phase de pré-évaluation se réalise sur les 43 stations étudiées et pré-sélectionnées dans le cadre de ce travail (cf scripts précédents). En effet, les stations sélectionnées sont des stations issues de réseaux (RCS, RHP et RRP) qui se veulent représentatifs (de la biodiversité pour RCS et RRP) de la situation des poissons d'eau douce en Bretagne. Le seul point de vigiliance est à porter sur les espèces de grands cours d'eau qui ne sont ici représentés que par 2 stations (reliées à La Vilaine). Il s'agira d'un point de vigilance à prendre en compte dans l'analyse des résultats. 
+
+---
+
+Temps de génération : La durée d'une génération correspond à l'âge moyen des parents de la cohorte actuelle (c'est à dire des nouveau-nés dans la population). En conséquence, la durée d'une génération reflète le taux de renouvellement des reproducteurs dans une population. La durée d'une génération est plus grande que l'âge à la première reproduction et plus petite que l'âge du reproducteur le plus agé, sauf pour les taxons qui ne se reproduisent qu'une seule fois. Lorsque la durée de la génération varie en raison de mencaes, c'est la durée la plus naturelle, c'est à dire avant perturbation, qu'il convient de retenir (UICN, 2012).
+
+Les temps de génération à prendre en compte pour les différentes espèces sont renseignées dans le tableau de données tab_especes - dans la colonne temps_generation (3 générations ou 10 ans : la plus longue de ces deux données).
+
+---
+
+Catégorie Données Insuffisantes : Lorsque les informations disponibles sont considérées comme insuffisantes pour pouvoir évaluer une espèce, celle-ci est classée dans la catégorie Données insuffisantes (DD) dans l'attente de l'acquisition de nouvelle connaissances. De manière générale, il est souhaitable d'éviter le recours à cette catégorie, dès lors que les informations disponibles permettent d'apprécier raisonnablement la situation de l'espèce. 
+
+
+Afin de classer ou non une espèce en "DD", on observe l'occurrence de l'espèce par station ainsi que les occurrences temporelles. Si on observe que l'espèce en question apparait moins d'une fois sur quatre dans les séries, on peut supposer que les données disponibles ne sont pas suffisantes pour juger de l'état de menace de cette espèce. 
+
+
+
+##### Utilisation des critères A à E de l'UICN
+
+On réalise maintenant pour chacune des espèces évaluables l'application dU critère A2B, le plus pertinants avec nos données : 
+
+## Critère A2b : indice d'abondance adapté au taxon : densité_surface : 
+## pour la période LRR
+
+
+```{r}
+# Tableau période d'étude
+# periode_table <- data.frame(
+#   esp_code_alternatif = c("ANG", "CHE", "LPP", "BRO", "LOF", "VAR", "GAR", "VAI", "PER", "SAT", "GOU", "TRF", "CHA"),
+#   annee_depart = c(1990, 2005, 2005, 2008, 2008, 2011, 2011, 2011, 2011, 2013, 2013, 2013, 2013),
+#   annee_fin = c(2023, 2023, 2023, 2023, 2023, 2023, 2023, 2023, 2023, 2023, 2023, 2023, 2023)
+# )
+```
+
+
+```{r}
+mes_especes <- c("ABL", "ANG", "BAF", "BLN", "BRB", "BRE", "BRO", "CCO", "CHA", "CHE", "EPI", "EPT", "GAR", "GOU" ,"HOT" ,"LOF" ,"LOR", "LOT", "LPP", "OBR", "PER" ,"ROT", "SPI", "TAN", "TOX", "TRF", "VAI", "VAN")
+```
+
+
+```{r}
+# reg_indicateur %>% 
+#   ungroup ()
+# 
+# reg_indicateur_esp <- reg_indicateur %>%
+#   filter(esp_code_alternatif %in% mes_especes,
+#          stade == "ind",
+#          indicateur == "densite_surface")
+# 
+# reg_indicateur_esp_ok <- reg_indicateur_esp %>%
+#   filter((esp_code_alternatif == "ANG" & annee >= 1990) |
+#       (esp_code_alternatif %in% c("CHE", "LPP") & annee >= 2005) |
+#       (esp_code_alternatif %in% c("BRO", "LOF", "VAR") & annee >= 2008) |
+#       (esp_code_alternatif %in% c("GAR", "VAI", "PER") & annee >= 2011) |
+#       (esp_code_alternatif %in% c("SAT", "GOU", "TRF", "CHA") & annee >= 2013))
+```
+
+
+```{r}
+# Filtrage et application de la régression linéaire
+# regression_coeffs <- reg_indicateur_esp_ok %>%
+#   group_by(esp_code_alternatif, 
+#            indicateur) %>%
+#   do(regression_resultats(.)) %>%
+#   ungroup() %>%
+#   # Ajout des colonnes annee_depart et annee_fin en fonction de esp_code_alternatif
+#   left_join(periode_table, by = "esp_code_alternatif")
+```
+
+```{r}
+# regression_coeffs <- regression_coeffs %>%
+#   mutate(valeur_predite_debut = (slope * annee_depart) + intercept,
+#          valeur_predite_fin = (slope * annee_fin) + intercept)
+```
+
+```{r}
+# Calculer les pourcentages d'évolution des valeurs prédites
+# regression_coeffs <- regression_coeffs %>%
+#   mutate(pourcentage_evo = ((valeur_predite_fin - valeur_predite_debut) / valeur_predite_debut) * 100)
+```
+
+```{r}
+# Déterminer le statut des espèces
+statut_pourcentage_evo <- df_zip_glmm_resultats %>%
+  mutate(statut_espece_lrr_2025 = case_when(
+    is.nan(rate_change) ~ "NaN",
+    rate_change <= -80 ~ "CR",
+    (rate_change <= -50 & rate_change > -80) ~ "EN",
+    (rate_change <= -30 & rate_change > -50) ~ "VU",
+    (rate_change <= -20 & rate_change > -30) ~ "NT",
+    TRUE ~ "LC"  # Si aucune condition n'est satisfaite, le statut est "préoccupation mineure"
+  ))
+```
+
+```{r}
+# Sélectionner les colonnes d'intérêt
+glmm_indicateur_critere_A2b_tab <- statut_pourcentage_evo %>%
+  select(esp_code_alternatif, 
+         rate_change, 
+         statut_espece_lrr_2025) %>%
+  unique()
+```
+
+```{r}
+#Représentation graphique du tableau 
+glmm_indicateur_critere_A2b_tab %>%
+  DT::datatable(rownames = FALSE)
+
+```
+
+
+Pour mon rapport, je ne sélectionne que les résultats qui sont significatifs avec les modèles GLMM :
+
+```{r}
+glmm_indicateur_critere_A2b_tab_sig <- glmm_indicateur_critere_A2b_tab %>%
+  filter(esp_code_alternatif %in% mes_especes)
+```
+
+
+```{r}
+# Définir les couleurs pour chaque zone
+color_CR <- "#DB0101"  # C5/M100/J100/N5
+color_EN <- "#FF8C00"  # C0/M28/J100/N0
+color_VU <- "#FFFC00"  # C0/M0/J98/N0
+color_NT <- "#edebc0"
+color_Minor <- "#faf0e0"  # Préoccupation mineure, blanc
+
+# glmm_indicateur_critere_A2b_tab_sig <- glmm_indicateur_critere_A2b_tab_sig %>% 
+#    left_join(tab_especes %>% 
+#                select(esp_code_alternatif, 
+#                       statut_espece_lrr_2015), 
+#              by = "esp_code_alternatif")
+#  
+# #Ajouter une colonne pour les étiquettes combinées
+# glmm_indicateur_critere_A2b_tab_sig <- glmm_indicateur_critere_A2b_tab_sig %>%
+#    left_join(reg_espece %>%
+#                select(esp_code_alternatif,
+#                       periode_etude_lrr))
+
+```
+
+```{r}
+# Exemple de votre dataframe modifié
+# glmm_indicateur_critere_A2b_tab_sig <- glmm_indicateur_critere_A2b_tab_sig %>%
+#   mutate(label = paste0(esp_code_alternatif, " (", periode_etude_lrr, ")"))
+
+# Définir une limite pour couper les barres
+cutoff_value <- 25
+
+# Ajouter une colonne pour les valeurs plafonnées
+glmm_indicateur_critere_A2b_tab_sig <- glmm_indicateur_critere_A2b_tab_sig %>%
+  mutate(pourcentage_evo_cut = ifelse(rate_change > cutoff_value, cutoff_value, rate_change))
+
+# Ajouter une colonne pour indiquer si une valeur a été coupée
+glmm_indicateur_critere_A2b_tab_sig <- glmm_indicateur_critere_A2b_tab_sig %>%
+  mutate(is_cut = rate_change > cutoff_value)
+```
+
+
+ Les espèces non significatives : "VAI", "TOX", "OBR", "HOT", "EPI", "EPT", "CHA"
+
+```{r, fig.height = 8, fig.width = 14}
+# Définir les espèces avec contour plein
+species_full_border <- c("ABL", "ANG", "BAF", "BLN", "BRB", "BRE", "BRO", "CCO", "CHE", "GAR", "GOU", "LOF", "LOR", "LOT", "LPP", "PER", "ROT", "SPI", "TAN", "TRF", "VAN")
+
+glmm_indicateur_critere_A2b_tab_sig <- glmm_indicateur_critere_A2b_tab_sig %>%
+  mutate(
+    border_type = ifelse(esp_code_alternatif %in% species_full_border, "solid", "dotted"),
+    bar_alpha = ifelse(esp_code_alternatif %in% species_full_border, 0.85, 0.3)
+  )
+
+glmm_indicateur_critere_A2b_graph <- glmm_indicateur_critere_A2b_tab_sig %>%
+  ggplot(aes(x = reorder(esp_code_alternatif, rate_change), 
+             y = pourcentage_evo_cut, 
+             fill = factor(sign(rate_change)))) +
+  geom_rect(aes(ymin = -Inf, ymax = -80, xmin = -Inf, xmax = Inf), fill = color_CR, alpha = 0.2) +
+  geom_bar(aes(linetype = border_type), stat = "identity", color = "black", width = 0.8, alpha = glmm_indicateur_critere_A2b_tab_sig$bar_alpha) +
+  geom_text(data = NULL, aes(x = 13, y = -85, label = "CR"), vjust = 1.5, hjust = 1, size = 4, color = "black", fontface = "italic") +
+  geom_rect(aes(ymin = -80, ymax = -50, xmin = -Inf, xmax = Inf), fill = color_EN, alpha = 0.2) +
+  geom_bar(aes(linetype = border_type), stat = "identity", color = "black", width = 0.8, alpha = glmm_indicateur_critere_A2b_tab_sig$bar_alpha) +
+  geom_text(data = NULL, aes(x = 13, y = -60, label = "EN"), vjust = 1.5, hjust = 1, size = 4, color = "black", fontface = "italic") +
+  geom_rect(aes(ymin = -50, ymax = -30, xmin = -Inf, xmax = Inf), fill = color_VU, alpha = 0.2) +
+  geom_bar(aes(linetype = border_type), stat = "identity", color = "black", width = 0.8, alpha = glmm_indicateur_critere_A2b_tab_sig$bar_alpha) +
+  geom_text(data = NULL, aes(x = 13, y = -35, label = "VU"), vjust = 1.5, hjust = 1, size = 4, color = "black", fontface = "italic") +
+  geom_rect(aes(ymin = -30, ymax = -20, xmin = -Inf, xmax = Inf), fill = color_NT, alpha = 0.2) +
+  geom_bar(aes(linetype = border_type), stat = "identity", color = "black", width = 0.8, alpha = glmm_indicateur_critere_A2b_tab_sig$bar_alpha) +
+  geom_text(data = NULL, aes(x = 13, y = -22, label = "NT"), vjust = 1.5, hjust = 1, size = 4, color = "black", fontface = "italic") +
+  geom_rect(aes(ymin = -20, ymax = Inf, xmin = -Inf, xmax = Inf), fill = color_Minor, alpha = 0.2) +
+  geom_bar(aes(linetype = border_type), stat = "identity", color = "black", width = 0.8, alpha = glmm_indicateur_critere_A2b_tab_sig$bar_alpha) +
+  geom_text(data = NULL, aes(x = 13, y = -5, label = "LC"), vjust = 1.5, hjust = 1, size = 4, color = "black", fontface = "italic") +
+  labs(x = NULL, y = "Taux d'évolution de la densité surfacique") +
+  theme_bw() +
+  theme(
+    strip.background = element_rect(color = "black", fill = "#faffff"),
+    legend.position = "bottom",
+    panel.background = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1), expand = expansion(mult = c(0.05, 0.05)), breaks = c(-90, -80, -50, -30, -20, 0, 25)) +
+  scale_fill_manual(values = c("#ed0000", "#92D050"),
+                    labels = c("Diminution", "Augmentation"), 
+                    name = "Tendance temporelle") +
+  scale_linetype_manual(values = c("solid" = "solid", "dotted" = "dotted"),
+                        labels = c("solid" = "Significatif", "dotted" = "Non significatif"),
+                        name = "GLMM",
+                        guide = guide_legend(override.aes = list(linetype = c("dotted","solid"), fill = c("grey", alpha("darkgrey", 0.3))))) +
+  coord_cartesian(ylim = c(-92, 30)) +
+  geom_segment(data = glmm_indicateur_critere_A2b_tab_sig %>% 
+                 filter(is_cut),
+               aes(x = reorder(esp_code_alternatif, rate_change), 
+                   xend = reorder(esp_code_alternatif, rate_change),
+                   y = pourcentage_evo_cut, 
+                   yend = pourcentage_evo_cut + 10),
+               linetype = "dotted", color = "black", size = 1.5) +
+  geom_text(aes(label = esp_code_alternatif), color = "black", fontface = "bold",vjust = -0.4, size = 4)
+
+print(glmm_indicateur_critere_A2b_graph)
+```
+
+
+
+
+
+
+
+## Critère A2b : indice d'abondance adapté au taxon : densité_surface : 
+## pour la période GLOBALE
+
+
+```{r}
+# Tableau période d'étude
+periode_table_globale <- data.frame(
+  esp_code_alternatif = c("ANG", "CHE", "LPP", "BRO", "LOF", "VAR", "GAR", "VAI", "PER", "SAT", "GOU", "TRF", "CHA"),
+  annee_depart = c(1990, 1990, 1990, 1990, 1990, 1990, 1990, 1990, 1990, 1990, 1990, 1990, 1990),
+  annee_fin = c(2023, 2023, 2023, 2023, 2023, 2023, 2023, 2023, 2023, 2023, 2023, 2023, 2023)
+)
+```
+
+
+```{r}
+
+reg_indicateur_esp_globale <- reg_indicateur_esp %>%
+  filter((esp_code_alternatif == "ANG" & annee >= 1990) |
+      (esp_code_alternatif %in% c("CHE", "LPP") & annee >= 1990) |
+      (esp_code_alternatif %in% c("BRO", "LOF", "VAR") & annee >= 1990) |
+      (esp_code_alternatif %in% c("GAR", "VAI", "PER") & annee >= 1990) |
+      (esp_code_alternatif %in% c("SAT", "GOU", "TRF", "CHA") & annee >= 1990))
+```
+
+
+```{r}
+# Filtrage et application de la régression linéaire
+regression_coeffs_global <- reg_indicateur_esp_globale %>%
+  group_by(esp_code_alternatif, 
+           indicateur) %>%
+  do(regression_resultats(.)) %>%
+  ungroup() %>%
+  # Ajout des colonnes annee_depart et annee_fin en fonction de esp_code_alternatif
+  left_join(periode_table_globale, by = "esp_code_alternatif")
+```
+
+
+```{r}
+regression_coeffs_global <- regression_coeffs_global %>%
+  mutate(valeur_predite_debut = (slope * annee_depart) + intercept,
+         valeur_predite_fin = (slope * annee_fin) + intercept)
+```
+
+
+```{r}
+# Calculer les pourcentages d'évolution des valeurs prédites
+regression_coeffs_global <- regression_coeffs_global %>%
+  mutate(pourcentage_evo_global = ((valeur_predite_fin - valeur_predite_debut) / valeur_predite_debut) * 100)
+```
+
+
+```{r}
+# Déterminer le statut des espèces
+regression_coeffs_global <- regression_coeffs_global %>%
+  mutate(statut_espece_lrr_2023 = case_when(
+    is.nan(pourcentage_evo_global) ~ "NaN",
+    pourcentage_evo_global <= -80 ~ "CR",
+    (pourcentage_evo_global <= -50 & pourcentage_evo_global > -80) ~ "EN",
+    (pourcentage_evo_global <= -30 & pourcentage_evo_global > -50) ~ "VU",
+    (pourcentage_evo_global <= -20 & pourcentage_evo_global > -30) ~ "NT",
+    TRUE ~ "LC"  # Si aucune condition n'est satisfaite, le statut est "préoccupation mineure"
+  ))
+```
+
+```{r}
+# Sélectionner les colonnes d'intérêt
+reg_indicateur_critere_A2b_tab_global <- regression_coeffs_global %>%
+  select(esp_code_alternatif, 
+         pourcentage_evo_global, 
+         statut_espece_lrr_2023) %>%
+  unique()
+```
+
+```{r}
+#Représentation graphique du tableau 
+reg_indicateur_critere_A2b_tab_global %>%
+  DT::datatable(rownames = FALSE)
+```
+
+
+Pour mon rapport, je ne sélectionne que les résultats qui sont significatifs avec les modèles LMM :
+
+
+```{r}
+# Définir les couleurs pour chaque zone
+color_CR <- "#DB0101"  # C5/M100/J100/N5
+color_EN <- "#FF8C00"  # C0/M28/J100/N0
+color_VU <- "#FFFC00"  # C0/M0/J98/N0
+color_NT <- "#edebc0"
+color_Minor <- "#faf0e0"  # Préoccupation mineure, blanc
+
+reg_indicateur_critere_A2b_tab_global <- reg_indicateur_critere_A2b_tab_global %>% 
+   left_join(tab_especes %>% 
+               select(esp_code_alternatif, 
+                      statut_espece_lrr_2015), 
+             by = "esp_code_alternatif")
+
+reg_indicateur_critere_A2b_tab_global_sig <- reg_indicateur_critere_A2b_tab_global %>% 
+  filter(esp_code_alternatif %in% mes_especes)
+ 
+ # Ajouter une colonne pour les étiquettes combinées
+ reg_indicateur_critere_A2b_tab_global_sig <- reg_indicateur_critere_A2b_tab_global_sig %>% 
+   left_join(reg_espece %>% 
+               select(esp_code_alternatif,
+                      periode_etude_lrr))
+
+```
+
+
+
+```{r}
+# Exemple de votre dataframe modifié
+reg_indicateur_critere_A2b_tab_global_sig <- reg_indicateur_critere_A2b_tab_global_sig %>%
+  mutate(label = paste0(esp_code_alternatif, " (", periode_etude_lrr, ")"))
+
+# Définir une limite pour couper les barres
+cutoff_value <- 25
+
+# Ajouter une colonne pour les valeurs plafonnées
+reg_indicateur_critere_A2b_tab_global_sig <- reg_indicateur_critere_A2b_tab_global_sig %>%
+  mutate(pourcentage_evo_cut_g = ifelse(pourcentage_evo_global > cutoff_value, cutoff_value, pourcentage_evo_global)) %>% 
+  mutate(is_cut = pourcentage_evo_global > cutoff_value)
+```
+
+
+```{r}
+
+# Créer le graphique avec les barres coupées et les segments pointillés
+reg_indicateur_critere_A2b_graph_global <- reg_indicateur_critere_A2b_tab_global_sig %>%
+  ggplot(aes(x = reorder(esp_code_alternatif, 
+                         pourcentage_evo_global), 
+             y = pourcentage_evo_cut_g, 
+             fill = factor(sign(pourcentage_evo_global)))) +
+  geom_rect(aes(ymin = -Inf, ymax = -80, xmin = -Inf, xmax = Inf), fill = color_CR, alpha = 0.2) +
+  geom_bar(stat = "identity", color = "black", width = 0.7, alpha = 0.8) +
+  geom_text(data = NULL, aes(x = 9, y = -80, label = "CR"), vjust = 1.5, hjust = 1, size = 4, color = "black", fontface = "italic") +
+  geom_rect(aes(ymin = -80, ymax = -50, xmin = -Inf, xmax = Inf), fill = color_EN, alpha = 0.2) +
+  geom_bar(stat = "identity", color = "black", width = 0.7, alpha = 0.8) +
+  geom_text(data = NULL, aes(x = 9, y = -60, label = "EN"), vjust = 1.5, hjust = 1, size = 4, color = "black", fontface = "italic") +
+  geom_rect(aes(ymin = -50, ymax = -30, xmin = -Inf, xmax = Inf), fill = color_VU, alpha = 0.2) +
+  geom_bar(stat = "identity", color = "black", width = 0.7, alpha = 0.8) +
+  geom_text(data = NULL, aes(x = 9, y = -35, label = "VU"), vjust = 1.5, hjust = 1, size = 4, color = "black", fontface = "italic") +
+  geom_rect(aes(ymin = -30, ymax = -20, xmin = -Inf, xmax = Inf), fill = color_NT, alpha = 0.2) +
+  geom_bar(stat = "identity", color = "black", width = 0.7, alpha = 0.8) +
+  geom_text(data = NULL, aes(x = 9, y = -20, label = "NT"), vjust = 1.5, hjust = 1, size = 4, color = "black", fontface = "italic") +
+  geom_rect(aes(ymin = -20, ymax = Inf, xmin = -Inf, xmax = Inf), fill = color_Minor, alpha = 0.2) +
+  geom_bar(stat = "identity", color = "black", width = 0.7, alpha = 0.8) +
+  geom_text(data = NULL, aes(x = 9, y = -5, label = "LC"), vjust = 1.5, hjust = 1, size = 4, color = "black", fontface = "italic") +
+  geom_text(aes(label = label),
+            fontface = "bold",
+            vjust = -0.5,
+            y =0,
+            check_overlap = TRUE) +
+  labs(x = NULL, y = "Taux d'évolution de la densité surfacique") +
+  theme_bw() +
+  theme(
+    strip.background = element_rect(color = "black", fill = "#faffff"),
+    legend.position = "bottom",
+    panel.background = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1), expand = expansion(mult = c(0.05, 0.05)), breaks = c(-90, -80, -50, -30, -20, 0, 25)) +
+  scale_fill_manual(values = c("#ed0000", "#92D050"),
+                    labels = c("Diminution", "Augmentation"), 
+                    name = "Tendance temporelle") +
+  coord_cartesian(ylim = c(-92, 30)) +
+  geom_segment(data = reg_indicateur_critere_A2b_tab_global_sig %>% 
+                 filter(is_cut),
+               aes(x = reorder(esp_code_alternatif, 
+                               pourcentage_evo_global),
+                   xend = reorder(esp_code_alternatif, 
+                                  pourcentage_evo_global),
+                   y = pourcentage_evo_cut_g, 
+                   yend = pourcentage_evo_cut_g + 10),
+               linetype = "dotted", color = "black", size = 1.5)
+
+print(reg_indicateur_critere_A2b_graph_global)
+
+```
+
+
+
+
+
+
+
+
+
+
+## Critère A : Réduction de la population
+
+Pour utiliser ce critère, il est nécessaire de pouvoir justifier une réduction quantifiée du nombre d'individus matures sur 10 ans ou 3 générations, en retenant la plus longue de ces deux durées (maximum 100 ans). 
+
+
+
+## Critère A2a : Observation directe : 
+
+On réalise alors un tableau des effectifs cumulés pour toutes les stations par années : 
+
+```{r}
+# Filtrer les données pour l'indicateur 'effectif_total'
+ope_indicateur_complet_c <- ope_indicateur_complet %>%
+  group_by(esp_code_alternatif, annee) %>%
+  mutate(effectif_total_cumule = sum(valeur)) %>% 
+  dplyr::select(-indicateur,
+                -stade,
+                -valeur) %>% 
+  unique()
+
+```
+
+
+```{r}
+ope_indicateur_complet_c <- ope_indicateur_complet_c %>%
+  arrange(esp_code_alternatif,
+          annee) %>% 
+  group_by(esp_code_alternatif) %>%
+  mutate(annee_moins_generation = max(annee) - periode_etude_lrr) %>%
+  ungroup()
+```
+
+
+```{r}
+ope_indicateur_max_annee <- ope_indicateur_complet_c %>%
+  filter(annee == max(annee)) %>%
+  arrange(esp_code_alternatif, annee) %>% 
+  group_by(esp_code_alternatif) %>%
+  mutate(annee_moins_generation = max(annee) - periode_etude_lrr) %>%
+  ungroup()
+```
+
+
+```{r}
+# Sélectionner les lignes correspondant à l'année maximale moins le temps de génération
+ope_indicateur_min_annee <- ope_indicateur_complet_c %>%
+  arrange(esp_code_alternatif, annee) %>% 
+  group_by(esp_code_alternatif) %>%
+  mutate(annee_moins_generation = max(annee) - periode_etude_lrr) %>%
+  filter(annee == max(annee) - periode_etude_lrr) %>%
+  ungroup()
+```
+
+
+```{r}
+# Combiner les deux dataframes en un seul
+ope_indicateur_critere_A2a <- bind_rows(ope_indicateur_max_annee, ope_indicateur_min_annee)
+```
+
+
+On calcul maintenant le pourcentage d'évolution entre l'annnée max et l'année-temps de génération de l'espèce :
+
+```{r}
+# Calcul des pourcentages d'évolution des valeurs d'indicateurs
+ope_indicateur_critere_A2a <- ope_indicateur_critere_A2a %>%
+  group_by(esp_code_alternatif) %>% 
+  mutate(pourcentage_evo = ((first(effectif_total_cumule) - last(effectif_total_cumule))/ last(effectif_total_cumule))*100) %>%
+  ungroup() %>% 
+  select (-periode_etude_lrr,
+          -annee_moins_generation,
+          -annee,
+          -effectif_total_cumule,
+          -pop_id,
+          -ope_id) %>% 
+  unique()
+```
+
+
+```{r}
+ope_indicateur_critere_A2a <- ope_indicateur_critere_A2a %>%
+  mutate(statut_espece = case_when(
+    is.nan(pourcentage_evo) ~ "NaN",
+    pourcentage_evo <= -80 ~ "en danger critique",
+    (pourcentage_evo <= -50 & pourcentage_evo > -80) ~ "en danger",
+    (pourcentage_evo <= -30 & pourcentage_evo > -50) ~ "vulnérable",
+    TRUE ~ "préoccupation mineure"  # Si aucune condition n'est satisfaite, le statut est "préoccupation mineure"
+  )) %>% 
+  unique()
+
+#Représentation graphique du tableau 
+ope_indicateur_critere_A2a%>%
+  DT::datatable(rownames = FALSE)
+
+result_lrr <- ope_indicateur_critere_A2a %>% 
+  mutate(critere = "A2a")
+```
+
+
+```{r,fig.height = 8, fig.width = 10}
+ope_indicateur_critere_A2a_graph <- ope_indicateur_critere_A2a %>%
+  filter(!esp_code_alternatif %in% c("LPM", "BRO")) %>% # Apparaissent en Nan
+  ggplot(aes(x = pourcentage_evo, 
+             y = esp_code_alternatif, 
+             fill = factor(sign(pourcentage_evo)))) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = esp_code_alternatif),
+            fontface = "bold") +
+  labs(title = "Critère LRR A2a : Effectifs cumulés de l'ensemble des stations", y = "Espèce", x = "Pourcentage d'évolution") +
+  theme_bw() +
+  theme(strip.background = element_rect(color = "black", fill = "#faffff"),
+        legend.position = "bottom",
+        panel.background = element_rect(fill = "#faf0e0"),
+        panel.grid.major = element_line(color = "lightgrey"),
+        panel.grid.minor = element_line(color = "lightgrey")) + 
+  scale_y_discrete(labels = NULL, breaks = NULL) +
+  scale_fill_manual(values = c("#ed0000", "#92D050"), 
+                    labels = c("Diminution","Augmentation"), 
+                    name = "Taux de croissance")
+
+print(ope_indicateur_critere_A2a_graph)
+
+```
+
+```{r}
+# Définir les couleurs pour chaque zone
+color_CR <- "#DB0101"  # C5/M100/J100/N5
+color_EN <- "#FF8C00"  # C0/M28/J100/N0
+color_VU <- "#FFFC00"  # C0/M0/J98/N0
+color_Minor <- "#faf0e0"  # Préoccupation mineure, blanc
+
+
+ope_indicateur_critere_A2a <- ope_indicateur_critere_A2a %>%
+  mutate(label = paste0(esp_code_alternatif))
+
+
+# Modifier le code pour encadrer les barres avec un trait noir, formater l'axe des ordonnées en pourcentage, et ajouter des parenthèses après les noms
+ope_indicateur_critere_A2a_graph <- ope_indicateur_critere_A2a %>%
+  ggplot(aes(x = reorder(esp_code_alternatif, pourcentage_evo), y = pourcentage_evo, fill = factor(sign(pourcentage_evo)))) +
+  geom_rect(aes(ymin = -Inf, ymax = -80, xmin = -Inf, xmax = Inf), fill = color_CR, alpha = 0.2) +
+  geom_bar(stat = "identity", color = "black", width = 0.7, alpha = 0.8) +  # Diminuer l'épaisseur des barres pour la zone CR et ajouter la transparence
+  geom_text(data = NULL, aes(x = 6.5, y = -80, label = "CR"), vjust = 1.5, hjust = -7, size = 4, color = "black", fontface = "italic") +  # Grossir les étiquettes pour CR et mettre en italique
+  geom_rect(aes(ymin = -80, ymax = -50, xmin = -Inf, xmax = Inf), fill = color_EN, alpha = 0.2) +
+  geom_bar(stat = "identity", color = "black", width = 0.7, alpha = 0.8) +  # Diminuer l'épaisseur des barres pour la zone EN et ajouter la transparence
+  geom_text(data = NULL, aes(x = 6.5, y = -60, label = "EN"), vjust = 1.5, hjust = -7, size = 4, color = "black", fontface = "italic") +  # Grossir les étiquettes pour EN et mettre en italique
+  geom_rect(aes(ymin = -50, ymax = -30, xmin = -Inf, xmax = Inf), fill = color_VU, alpha = 0.2) +
+  geom_bar(stat = "identity", color = "black", width = 0.7, alpha = 0.8) +  # Diminuer l'épaisseur des barres pour la zone VU et ajouter la transparence
+  geom_text(data = NULL, aes(x = 6.5, y = -35, label = "VU"), vjust = 1.5, hjust = -7, size = 4, color = "black", fontface = "italic") +  # Grossir les étiquettes pour VU et mettre en italique
+  geom_rect(aes(ymin = -30, ymax = Inf, xmin = -Inf, xmax = Inf), fill = color_Minor, alpha = 0.2) +
+  geom_bar(stat = "identity", color = "black", width = 0.7, alpha = 0.8) +  # Diminuer l'épaisseur des barres pour la zone Minor et ajouter la transparence
+  geom_text(data = NULL, aes(x = 6.5, y = -12, label = "LC"), vjust = 1.5, hjust = -7, size = 4, color = "black", fontface = "italic") +  # Grossir les étiquettes pour LC et mettre en italique
+  geom_text(aes(label = label), fontface = "bold", vjust = -0.3) +  # Utiliser la nouvelle colonne pour les étiquettes des barres et remonter légèrement les étiquettes
+  labs(x = NULL, y = "Taux d'évolution de la densité surfacique") +
+  labs(title = "Critère LRR A2a : Effectifs cumulés de l'ensemble des stations", y = "Espèce", x = "Pourcentage d'évolution") +
+  theme_bw() +
+  theme(
+    strip.background = element_rect(color = "black", fill = "#faffff"),
+    legend.position = "bottom",
+    panel.background = element_blank(),  # Enlever le fond
+    panel.grid.major = element_blank(),  # Enlever le quadrillage majeur
+    panel.grid.minor = element_blank(),  # Enlever le quadrillage mineur
+    axis.text.x = element_blank(),  # Supprimer les étiquettes de l'axe x
+    axis.title.x = element_blank(),  # Supprimer le titre de l'axe x
+    axis.ticks.x = element_blank()  # Enlever les ticks de l'axe x
+  ) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1), expand = expansion(mult = c(0.05, 0.05)), breaks = c(-90, -80, -50, -30, 0, 50, 100)) +  # Formater l'axe des ordonnées en pourcentage et ajouter un tic à -90
+  scale_fill_manual(values = c("#ed0000", "#92D050"),
+                    labels = c("Diminution", "Augmentation"), 
+                    name = "Tendance temporelle")
+
+# Afficher le graphique
+print(ope_indicateur_critere_A2a_graph)
+```
+
+
+
+

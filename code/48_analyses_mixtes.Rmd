@@ -511,7 +511,7 @@ liste_periodes_etude <- list(c(2007, 2025)) # Liste des périodes (chaque pério
 
 ```{r}
 trf_data <- ope_effectif_glmm_abs %>% 
-  filter( espece == "TRF" & departements == c("25", "39"))
+  filter( espece == "BLN" & departements == c("25", "39"))
 ```
 
 ```{r}
@@ -519,32 +519,10 @@ trf_data <- ope_effectif_glmm_abs %>%
                                           # liste_periodes = liste_periodes_etude)
 ```
 
-```{r Mise en forme sortie fonction ZIP_GLMM}
-zip_glmm_resultats_annee <- zip_glmm_resultats %>% 
-  filter(row_name == "annee") %>% 
-  separate_wider_delim(periode, delim = "-", 
-                        names = c("annee_debut", "annee_fin"), 
-                        cols_remove = FALSE) %>%  # garde la colonne periode originale
-  mutate(
-    annee_debut = as.numeric(annee_debut),
-    annee_fin   = as.numeric(annee_fin),
-    nb_annees   = annee_fin - annee_debut
-  ) %>% 
-  select(periode, esp_code_alternatif, p_value, Estimate, sig, family, nb_annees) %>% 
-  mutate(
-    trend = case_when(
-      Estimate > 0 ~ "\U2197",
-      Estimate < 0 ~ "\U2198",
-      TRUE ~ "."
-    ),    # Ajouter le calcul de taux de changement dans la population
-    rate_change = (exp(Estimate * nb_annees) - 1) * 100
-)
-```
-
 
 ```{r Exécution fonction ZIP_GLMM}
-# zip_glmm_resultats <- zip_glmm_application_modele(data = ope_effectif_glmm_abs,
-                                          # liste_periodes = liste_periodes_etude)
+zip_glmm_resultats <- zip_glmm_application_modele(data = ope_effectif_glmm_abs,
+liste_periodes = liste_periodes_etude)
 ```
 
 
@@ -918,12 +896,18 @@ rate_change <- new_data %>%
   )
 ```
 
+```{r}
+nb_tan <- ope_effectif_glmm_abs %>% 
+  filter(espece == "TAN")
+```
+
+
 # Sauvergarde
 
 ```{r Sauvegarde}
 save(
   df_zip_glmm_resultats,
-  df_glmm_resultats,
+  # df_glmm_resultats,
   file = "../processed_data/resultats_modele.rda"
 )
 ```

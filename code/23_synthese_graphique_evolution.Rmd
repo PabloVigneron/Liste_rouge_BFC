@@ -102,6 +102,65 @@ indicateur_labels <- c(
 )
 ```
 
+## Graphique pour les 4 espèces pour le rapport de stage
+
+```{r}
+mes_especes_rapport <- reg_indicateur %>%
+  filter(
+    esp_code_alternatif == "BRO" |
+      esp_code_alternatif == "ANG" |
+      esp_code_alternatif == "SPI" |
+      esp_code_alternatif == "TRF"
+  )
+```
+
+```{r graphique evolution indicateur régionale par annee loess, fig.height = 8, fig.width = 10}
+
+indicateur_for_graph <- mes_especes_rapport %>%
+  filter(stade == "ind",indicateur %in% c(
+      # "biomasse",
+      "densite_surface",
+      # "effectif_total",
+      "pourcentage_juveniles", 
+      "taux_occurrence"
+  )) %>%
+  rename(espece = esp_code_alternatif) %>%
+  ggplot(aes(x = annee, y = valeur)) +
+  facet_grid2(
+    espece ~ indicateur,
+    scales = "free",
+    independent = "y",
+    axes = "all",
+    labeller = labeller(indicateur = indicateur_labels)
+  ) +
+  # facet_wrap2(
+  #   espece ~ indicateur,
+  #   ncol = 3,
+  #   scales = "free_y",
+  #   axes = "all",
+  #   trim_blank = T, 
+  #   strip.position = "top",
+  #   labeller = labeller(indicateur = indicateur_labels)
+  # ) +
+  geom_point(shape = 21, size = 2) +
+  geom_line(linetype = 3, linewidth = 0.5) +
+  labs(title = "Indicateurs de tendances à l'échelle régionale des espèces de poissons d'eau douce de BFC", x = "Années", y = "Valeur indicateur") +
+  geom_smooth(method = "loess",
+              se = F,
+              color = "darkred") +
+  # theme_bw()+
+  theme(strip.background = element_rect(color = "black", fill = "#faffff"),
+        legend.position = "bottom",
+        panel.background = element_rect(fill = "grey95"),
+        panel.grid.major = element_line(color = "lightgrey", size = 0.1),
+        panel.grid.minor = element_line(color = "lightgrey"),
+        axis.text.x = element_text(angle = 45)
+  ) 
+
+print(indicateur_for_graph)
+```
+
+## Graphique Pour toutes les espèces de la LRR
 
 ```{r graphique evolution indicateur régionale par annee loess, fig.height = 80, fig.width = 20}
 
