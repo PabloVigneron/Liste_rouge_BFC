@@ -12,8 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 # Objectif : Dynamique de population des poissons d'eau douce de Bretagne - 
-"30_application_criteres_lrr_uicn"
-# Objectif : Dynamique de population des poissons d'eau douce de Bretagne - 
+Script : 30_application_criteres_lrr_uicn
 
 # Chargement des packages
 
@@ -177,8 +176,76 @@ glmm_indicateur_critere_A2b_tab %>%
 
 ```
 
+## Liste rouge préliminaire 
 
-Pour mon rapport, je ne sélectionne que les résultats qui sont significatifs avec les modèles GLMM :
+```{r}
+load(file = "../processed_data/liste_especes_lrr.rda")
+
+```
+
+
+```{r}
+liste_rouge_prelim <- table_liste_bfc_sp_cor %>% 
+  rename(esp_code_alternatif =`Code espèce`) %>% 
+  left_join(glmm_indicateur_critere_A2b_tab, by = "esp_code_alternatif") %>% 
+  mutate(statut_espece_lrr_2025 = if_else(Statut == "allochtone", " ", statut_espece_lrr_2025), 
+    statut_espece_lrr_2025 = if_else(is.na(statut_espece_lrr_2025), "NA",statut_espece_lrr_2025), 
+    statut_espece_lrr_2025 = factor(statut_espece_lrr_2025, levels = c("CR", "EN", "VU","NT", "LC", "DD", "NA", " "))) %>% 
+  arrange(statut_espece_lrr_2025)
+   
+# Définir les couleurs pour chaque zone
+color_EX <- "#000000" # R 0 / V 0 / B 0
+color_EW <- "#3D1951" # R 61 / V 25 / B 81
+color_RE <- "#5A1A63" # R 90 / V 26 / B 99
+color_CR <- "#D3001B" # R 211 / V 0 / B 27
+color_EN <- "#FBBF00" # R 251 / V 191 / B 0
+color_VU <- "#FFED00" # R 255 / V 237 / B 0
+color_NT <- "#FBF2CA" # R 251 / V 242 / B 202
+color_LC <- "#78B74A" # R 120 / V 183 / B 74
+color_DD <- "#D3D4D5" # R 211 / V 212 / B 213
+color_NA <- "#D3D4D5" # R 211 / V 212 / B 213
+
+liste_rouge_prelim_brouillon <- liste_rouge_prelim %>%
+  rename(
+    'Ordre' = ordre,
+    'Nom vernaculaire' = nom_commun,
+    'Code espèce' = esp_code_alternatif,
+    "Taux d'évolution" = rate_change,
+    'LRR BFC 2026' = statut_espece_lrr_2025
+  ) %>% 
+flextable::flextable() %>%
+  flextable::autofit() %>%
+  flextable::colformat_int(j = c(1, 3), big.mark = " ") %>%
+  flextable::theme_booktabs() %>%
+  flextable::font(fontname = "calibri") %>%
+  flextable::fontsize(size = 13) %>%
+  flextable::bg(part = "all", bg = "white") %>%
+  flextable::bg(i = which(liste_rouge_prelim$statut_espece_lrr_2025 == "CR"),
+                bg = color_CR) %>%
+  flextable::bg(i = which(liste_rouge_prelim$statut_espece_lrr_2025 == "EN"),
+                bg = color_EN) %>%
+  flextable::bg(i = which(liste_rouge_prelim$statut_espece_lrr_2025 == "VU"),
+                bg = color_VU) %>%
+  flextable::bg(i = which(liste_rouge_prelim$statut_espece_lrr_2025 == "NT"),
+                bg = color_NT) %>%
+  flextable::bg(i = which(liste_rouge_prelim$statut_espece_lrr_2025 == "LC"),
+                bg = color_LC) %>%
+  flextable::bg(i = which(liste_rouge_prelim$statut_espece_lrr_2025 == "DD"),
+                bg = color_DD) %>%
+  flextable::bg(i = which(liste_rouge_prelim$statut_espece_lrr_2025 == "NA"),
+                bg = color_NA) %>%
+  flextable::align(align = "center") %>%
+  flextable::set_caption("Liste rouge régionale des populations de poissons d'eau douce de BFC")
+
+liste_rouge_prelim_brouillon
+```
+
+```{r}
+liste_rouge_prelim_brouillon <- flextable::save_as_image(liste_rouge_prelim_brouillon, "../output/liste_rouge_prelim.png")
+```
+
+
+## Pour mon rapport, je ne sélectionne que les résultats qui sont significatifs avec les modèles GLMM :
 
 ```{r}
 glmm_indicateur_critere_A2b_tab_sig <- glmm_indicateur_critere_A2b_tab %>%

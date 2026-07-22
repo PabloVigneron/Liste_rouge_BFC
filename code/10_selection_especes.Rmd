@@ -463,7 +463,7 @@ table_liste_bfc_sp_cor <- liste_bfc_sp_cor %>%
     "Statut" = autochtonie_new,
     "LRR France 2019" = categorie_lr_france_2019
   ) %>%
-  arrange(desc(Statut)) %>%
+  arrange(desc(Statut)) %>% 
   flextable::flextable() %>%
   flextable::autofit() %>%
   flextable::colformat_int(j = c(1, 3), big.mark = " ") %>% 
@@ -720,6 +720,10 @@ save(
 )
 ```
 
+```{r}
+save(table_liste_bfc_sp_cor, 
+     file = "../processed_data/liste_especes_lrr.rda")
+```
 
 # Références bibliographiques 
 

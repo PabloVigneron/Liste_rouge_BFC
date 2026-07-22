@@ -94,7 +94,7 @@ On réalise une représentation graphique des différents indicateurs calculés 
 
 ```{r indicateur labels}
 indicateur_labels <- c(
-  "densite_surface" = "Densité surfacique",
+  "densite_surface" = "Densité surfacique ( )",
   "effectif_total" = "Effectif total",
   "pourcentage_juveniles" = "Pourcentage de juvéniles",
   "taux_occurrence" = "Taux d'occurrence",
@@ -108,7 +108,7 @@ indicateur_labels <- c(
 mes_especes_rapport <- reg_indicateur %>%
   filter(
     esp_code_alternatif == "BRO" |
-      esp_code_alternatif == "ANG" |
+      esp_code_alternatif == "LOT" |
       esp_code_alternatif == "SPI" |
       esp_code_alternatif == "TRF"
   )

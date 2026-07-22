@@ -312,6 +312,7 @@ trend <- poptrend::ptrend(
 
 plot(trend, main = "TRF", plotLines = T, secDeriv = T)
 ```
+
 ```{r}
 ggplot_trend(
   trend,
@@ -401,14 +402,6 @@ plot <- ggplot(pred, aes(x = annee), y = fit, group = factor(sta_id)) +
 plot
 ```
 
-```{r}
-head(data_esp
-     )
-summary(data_esp)
-```
-
-
-
 
 ```{r}
 draw(gratia::derivatives(mod, select = "s(annee)", interval = "confidence")) +
@@ -448,22 +441,110 @@ source(file = "../R/gamm_poptrend.R")
 source(file = "../R/gamm_poptrend_application.R")
 source(file = "../R/ggplot_trend.R")
 
-data_esp <- ope_effectif_glmm_abs %>% 
-  filter(espece == c("TRF"))
+data_esp <- ope_effectif_glmm_abs 
 
 
-gamm_poptrend_application(data = data_esp, liste_periodes = liste_periodes_etude)
+# gamm_poptrend_application(data = data_esp, liste_periodes = liste_periodes_etude)
 
-gamm_poptrend (data = data_esp, mon_espece = "TRF")
+gamm_trf <- gamm_poptrend (data = data_esp, mon_espece = "TRF")
+gamm_bro <- gamm_poptrend (data = data_esp, mon_espece = "BRO")
+# gamm_poptrend (data = data_esp, mon_espece = "LOT")
+gamm_spi <- gamm_poptrend (data = data_esp, mon_espece = "SPI")
+
 ```
 
+```{r, fig.height = 4, fig.width = 14}
+ggarrange(
+  gamm_trf,
+  gamm_bro,
+  gamm_spi,
+  ncol = 3,
+  nrow = 1,
+  # labels = c(),
+  font.label = list(
+    size = 13,
+    color = "darkred",
+    face = "bold",
+    family = NULL
+  ),
+  hjust = -0.1,
+  vjust = 1.6,
+  align = c("none", "h", "v", "hv")
+)
+```
 
 
 ```{r}
-head(ope_effectif_glmm_abs)
+res <- gamm_poptrend_change(ope_effectif_glmm_abs, liste_periodes = list(c(2007, 2025)))
+
+
 ```
 
 
+```{r}
+df_res <- df_zip_glmm_resultats %>%
+  rename(espece = esp_code_alternatif) %>%
+  left_join(res, by = c("periode", "espece")) %>%
+  select(espece,
+         periode,
+         trend,
+         sig,
+         family,
+         rate_change,
+         rate_change_gamm,
+         IC_inf,
+         IC_sup) %>%
+  mutate (rate_change_gamm = round(rate_change_gamm, 2)) %>% 
+    filter(espece == "TRF" |espece == "BRO" |espece == "SPI" | espece == "LOT")
+
+df_res <- df_res %>%
+  rename(
+    "Code Espèce" = espece,
+    "Periode" = periode,
+    "Tendance temporelle" = trend,
+    "Significativité" = sig,
+    "Taux de changement GLMM" = rate_change,
+    "Distribution" = family,
+    "Taux de changement GAMM" = rate_change_gamm, 
+    "IC inf" = IC_inf, 
+    "IC sup" = IC_sup
+  ) 
+
+# Lignes positives et significatives
+i_vert  <- which(
+  df_res$'Tendance temporelle' == "\U2197" &
+    df_res$Significativité %in% c("*", "**", "***")
+)
+# Lignes négatives et significatives
+i_rouge <- which(
+  df_res$'Tendance temporelle'== "\U2198" &
+    df_res$Significativité %in% c("*", "**", "***")
+)
+
+
+tab_model_resultats <- df_res %>%
+flextable::flextable() %>%
+  flextable::autofit() %>%
+  flextable::colformat_int(j = c(1, 3), big.mark = " ") %>%
+  flextable::theme_booktabs() %>%
+  flextable::font(fontname = "calibri") %>%
+  flextable::fontsize(size = 13) %>%
+  flextable::bg(part = "all", bg = "white") %>%
+  # flextable::bg(i = i_vert, bg = "darkolivegreen3") %>%   # vert clair
+  # flextable::bg(i = i_rouge, bg = "coral3") %>%   # rouge clair
+  flextable::align(align = "center") %>%
+  flextable::set_caption("Synthèse des tendances des populations de poissons d'eau douce de BFC")
+
+tab_model_resultats <- flextable::save_as_image(tab_model_resultats, "../output/tab_model_resultats.png")
+
+```
+
+```{r}
+tab_model_resultats <- flextable::save_as_image(tab_model_resultats, "../output/tab_model_resultats.png")
+```
+
+
+`
 ## Modèles Linéaires Généralisé Mixtes (ZIGLMM) de zéro enflées
 ```{r}
 data_esp <- ope_effectif_glmm_abs %>% 

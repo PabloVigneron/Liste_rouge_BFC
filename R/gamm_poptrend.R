@@ -13,6 +13,7 @@
 #' }
 
 
+
 gamm_poptrend <- function(data, mon_espece) {
   # --- Filtrage et vérifications préalables ---
   filtered_data <- data %>%
