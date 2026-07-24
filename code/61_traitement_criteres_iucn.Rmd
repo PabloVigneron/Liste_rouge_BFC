@@ -87,8 +87,44 @@ Afin de classer ou non une espèce en "DD", on observe l'occurrence de l'espèce
 
 On réalise maintenant pour chacune des espèces évaluables l'application dU critère A2B, le plus pertinants avec nos données : 
 
+
+
+```{r}
+temps_generation_lrr_2014 <- readxl::read_xls("../raw_data/temps_generation_lrr_2014_BFC.xls", sheet = 3) %>% 
+  janitor::clean_names()
+
+temps_generation_lrr_2014 <- temps_generation_lrr_2014 %>% 
+  select(
+    esp_code_alternatif, 
+    maturite_sexuelle_males, 
+    maturite_sexuelle_femelles, 
+    longevite_males,
+    longevite_femelles,
+    x3_generations, 
+    x1_generation
+  )
+```
+
+```{r}
+temps_generation_lrr_bzh <- readxl::read_xlsx("../processed_data/temps_de_generation_pro.xlsx")
+
+```
+
+
+```{r}
+temps_genaration <- temps_generation_lrr_bzh %>% 
+  left_join(temps_generation_lrr_2014 , by = "esp_code_alternatif") %>% 
+  select(
+    esp_code_alternatif, 
+    periode_lrr,  
+    x3_generations
+  )
+```
+
+
 ## Critère A2b : indice d'abondance adapté au taxon : densité_surface : 
 ## pour la période LRR
+
 
 
 ```{r}

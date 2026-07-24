@@ -94,7 +94,7 @@ On réalise une représentation graphique des différents indicateurs calculés 
 
 ```{r indicateur labels}
 indicateur_labels <- c(
-  "densite_surface" = "Densité surfacique ( )",
+  "densite_surface" = "Densité surfacique",
   "effectif_total" = "Effectif total",
   "pourcentage_juveniles" = "Pourcentage de juvéniles",
   "taux_occurrence" = "Taux d'occurrence",
@@ -145,7 +145,7 @@ indicateur_for_graph <- mes_especes_rapport %>%
   geom_point(shape = 21, size = 2) +
   geom_line(linetype = 3, linewidth = 0.5) +
   labs(title = "Indicateurs de tendances à l'échelle régionale des espèces de poissons d'eau douce de BFC", x = "Années", y = "Valeur indicateur") +
-  geom_smooth(method = "loess",
+  geom_smooth(method = "lm",
               se = F,
               color = "darkred") +
   # theme_bw()+
