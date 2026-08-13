@@ -516,6 +516,55 @@ AIC(mod_0,
 
 ```
 
+#Test GAM zero inflatted
+
+```{r}
+filtered_data <- ope_effectif_glmm_abs %>% 
+  filter(espece=="TRF")
+```
+
+
+```{r}
+#ziP for zero inflated Poisson data, when the zero inflation rate depends simply on the Poisson mean.
+mod_zip <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle  + s(sta_id, bs = "re"),
+  data = filtered_data,
+  family = ziP(),
+  method = "REML"
+)
+
+#ziplss a `two-stage' zero inflated Poisson model, in which 'potential-presence' is modelled with one linear predictor, and Poisson mean abundance given potential presence is modelled with a second linear predictor.
+mod_ziplss <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle  + s(sta_id, bs = "re"),
+  data = filtered_data,
+  family = ziplss(),
+  method = "REML"
+)
+#nb for negative binomial data when the theta parameter is to be estimated.
+mod_nb <- gam(
+  valeur ~ s(annee) + offset(log(ope_surface_calculee)) + pro_libelle  + s(sta_id, bs = "re"),
+  data = filtered_data,
+  family = nb(link = "log"),
+  method = "REML"
+)
+```
+
+```{r}
+appraise(mod_zip)
+# appraise(mod_ziplss)
+appraise(mod_nb)
+
+```
+
+```{r}
+draw(mod_gamm, residuals = T, scales = "free", shade = T, select = "s(annee)")
+
+draw(mod_zip, residuals = T, scales = "free", shade = T, select = "s(annee)")
+draw(mod_ziplss, residuals = T, scales = "fixed", shade = T,  select = "s(annee)")
+draw(mod_nb, residuals = T, scales = "fixed", shade = T, select = "s(annee)")
+
+```
+
 
 # Test GAMM negative binomial
 
@@ -646,6 +695,7 @@ mod <- gam(
 ```{r}
 gam.check(mod)
 ```
+
 ```{r}
 appraise(mod, method = "simulate")
 ```
@@ -658,10 +708,14 @@ draw(mod, select = "s(annee)", residuals = T)
 summary(mod)
 ```
 
+```{r}
+data_esp <- ope_effectif_glmm_abs %>% 
+  filter(espece == "SPI")
+```
 
 ```{r}
 trend <- poptrend::ptrend(
-  valeur ~ trend(annee, tempRE = F, type = "smooth") + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  valeur ~ trend(annee, tempRE = T, type = "smooth") + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
   data = data_esp,
   family = nb(link = "log"),
   bootType = "hessian",
@@ -672,6 +726,32 @@ trend <- poptrend::ptrend(
 
 plot(trend, main = "TRF", plotLines = T, secDeriv = T)
 ```
+```{r}
+trend <- poptrend::ptrend(
+  valeur ~ trend(annee, tempRE = T, type = "smooth") + offset(log(ope_surface_calculee)) + pro_libelle + s(x, y) + s(sta_id, bs = "re"),
+  data = data_esp,
+  family = nb(link = "log"),
+  bootType = "hessian",
+  gamModel = TRUE,
+  engine = "gam"
+)
+
+
+plot(trend, main = "SPI", plotLines = T, secDeriv = T)
+```
+```{r}
+poptrend::change(trend, start = 2007, end = 2025, alpha = 0.05)
+
+```
+
+```{r}
+gam.check(trend$gam)
+```
+
+```{r}
+appraise(trend$gam)
+```
+
 
 ```{r}
 ggplot_trend(
@@ -689,6 +769,8 @@ ggplot_trend(
   theme_gray()+
   ggtitle("VAN")
 ```
+
+
 ```{r}
 poptrend::change(trend, start = 2007, end = 2025, alpha = 0.05)
 ```
@@ -791,6 +873,9 @@ robustesse_modele
 ```
 
 
+```{r}
+mgcv::gam()
+```
 
 
 
@@ -842,7 +927,6 @@ ggarrange(
 
 ```{r}
 res <- gamm_poptrend_change(ope_effectif_glmm_abs, liste_periodes = list(c(2007, 2025)))
-
 
 ```
 
@@ -1358,3 +1442,17 @@ save(
   file = "../processed_data/resultats_modele.rda"
 )
 ```
+
+# Citation des packages utilisé dans le projet 
+
+```{r}
+library(utils)
+citation(package = "stats")
+```
+
+
+library(mgcv) # modele GAMMs
+library(gstat)#semi_variogramme
+library(DHARMa) # Ajusting of the model 
+
+

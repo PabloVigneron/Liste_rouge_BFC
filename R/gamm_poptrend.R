@@ -41,7 +41,7 @@ gamm_poptrend <- function(data, mon_espece) {
   graph <- ggplot_trend(
     model,
     alpha = 0.05,
-    ylab = "Abundance index",
+    ylab = "Tendance",
     xlab = "Annee",
     trendCol = "black",
     shadeCol = "grey60",

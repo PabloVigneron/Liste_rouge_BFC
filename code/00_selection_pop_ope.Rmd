@@ -587,25 +587,106 @@ sta_id_ope_selection <- sta_id_ope_selection %>%
   filter(ope_id %in% ope_selection$ope_id)
 ```
 
+### Synthèse des corrections 
+
+Dans ce travail sur l’ ichtyofaune : **points de prélèvements = stations**.
+Certains points de prélèvement/stations du jeu de données ont été retirés de l’analyse, principalement à cause de problèmes de changement de lieu de prélèvement,de manque de d’année de suivi ou de présence en dehors des limites régionales administratives.
+
+La station du **“Doubs à Mouthe - Le petit Sarrageois”**, avait son point de prélèvement en amont d'une scierie. Le point de prélèvement macro invertébré aquatique étant situé en aval, il a donc été changé et placé en aval à partir de 2014.
+
+La station **“Acolin à Saint-Germain-Chassenay”** pour des problèmes d'accès au point de prélèvement sur un terrain privé et une perte d'autorisation d'aller sur site, la décision à été prise de changer la localisation du point de prélèvement. 
+
+La station **“Loue à Mouthier Haute Pierre”** a été retirée car la série était constituée de seulement 3 années de suivis.
+
+La station **“Amance à Pisseloup”**,**“Oignin à Samognat”**, **“La Loire à Lère”** et **“La Loire à Sury-Pres-Lere”** ont été comprises dans le buffer d'1km, cependant elles ne font pas partie de la région Bourgogne-Franche-Comté.
+
+Certaines stations ont été concernées par une erreur de protocole de suivis certaines années, les erreurs ont été supprimées (**La Rivière De Druyes à Andryes**, **L'Ouanne à Saint-Martin-Sur-Ouanne**, **Savoureuse à Vieux-Charmont**, **Doubs à Colombier-Fontaine**).
+
+### Graphique final stations 
+
+```{r Représentation finale séries temporelles, fig.height = 48, fig.width = 32}
+ope_selection %>% # Représentation graphique des stations sélectionnées et des types de pêche associées
+  ggplot(
+    aes(
+      x = as.character(pop_libelle),
+      y = annee,
+      fill = pro_libelle
+    ),
+    legend.background = element_rect(fill = "#ffffff")
+  ) +
+  scale_fill_manual(values = pal) +
+  geom_tile() +
+  labs(
+    title = "Les points de prélèvements sélectionnés et les types de pêches associées",
+    subtitle = "Région Bourgogne-Franche-Comté",
+    x = "",
+    y = "Années",
+    fill = "Type de pêche"
+  ) +
+  theme_light(base_size = 18) +
+  theme(
+    panel.grid.major = element_line(color = "#ffffff", size = 0.1),
+    panel.grid.minor = element_line(color = "#ffffff"),
+    panel.background = element_rect(fill = "#faf0e6"),
+    legend.position = "bottom",
+    legend.text = element_text(size = 18),
+    # taille labels pro_libelle
+    legend.title = element_text(size = 15),
+    # taille titre légende
+    axis.text.y = element_text(size = 16) # taille noms stations
+  ) +
+  coord_flip() +
+  scale_y_continuous(breaks = seq(min(ope_selection$annee), max(ope_selection$annee), by = 3))
+```
+
+```{r tableau recapitulatif final du nb ope et nb de stations selectionne}
+summary_tab_ope <- ope_selection %>%
+  group_by(pro_libelle) %>%
+  summarise(
+    total_sta = n_distinct(sta_id),
+    total_ope = n_distinct(ope_id),
+    .groups = "drop"
+  ) %>%
+  select(pro_libelle, total_sta, total_ope)
+
+total_row <- summary_tab_ope %>%
+  summarise(
+    pro_libelle = "TOTAL",
+    total_sta = sum(total_sta, na.rm = TRUE),
+    total_ope = sum(total_ope, na.rm = TRUE)
+  )
+
+summary_ope <- bind_rows(summary_tab_ope, total_row)
+
+final_summary_ope <- flextable(summary_ope) %>%
+  set_header_labels(pro_libelle = "Protocole",
+                    total_sta = "Nombre de stations",
+                    total_ope = "Nombre d'opérations") %>%
+  bold(i = ~ pro_libelle == "TOTAL", bold = TRUE) %>%
+  autofit()
+
+final_summary_ope
+```
+
 # Sauvegarde 
 
 Sauvegarde pour le script suivant (sélection des espèces) : script 10_Selection_especes.
 
 ```{r Sauvegarde}
-save(pop_serie_tempo,
-     ope_selection,
-     sta_id_ope_selection,
-     passerelle,
-     file = "../processed_data/selection_pop_ope.rda")
+# save(pop_serie_tempo,
+#      ope_selection,
+#      sta_id_ope_selection,
+#      passerelle,
+#      file = "../processed_data/selection_pop_ope.rda")
 ```
 
 Sauvegarde pour la création de la carte de situation : script 02_production_carte_selection_station.
 
 ```{r Sauvegarde 2}
-save(sta_id_ope_selection,
-     buffer,
-     mes_depts,
-     file = "../processed_data/selection_pop_ope_carte.rda")
+# save(sta_id_ope_selection,
+#      buffer,
+#      mes_depts,
+#      file = "../processed_data/selection_pop_ope_carte.rda")
 ```
 
 ```{r exporter pour cartographie QGIS}
