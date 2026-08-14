@@ -115,6 +115,179 @@ ope_effectif_glmm_abs <- ope_indicateur %>%
   filter(stade == "ind")
 ```
 
+## Truite bassin versants RMC
+
+
+```{r}
+truite_data <- ope_effectif_glmm_abs %>% 
+  filter(espece == "TRF") 
+```
+
+
+```{r}
+truite_rmc <- truite_data %>%
+  filter(bassin_versant == "Rhône-Méditerranée")
+```
+
+```{r}
+truite_loire_bzh <- truite_data %>%
+  filter(bassin_versant == "Loire-Bretagne")
+```
+
+```{r}
+truite_seine_normandie <- truite_data %>%
+  filter(bassin_versant == "Seine-Normandie")
+```
+
+
+```{r}
+trf_data <- ope_effectif_glmm_abs %>% 
+  filter( espece == "BLN" & departements == c("25", "39"))
+```
+
+```{r}
+source(file = "../R/zip_glmm_calcul_modele.R")
+source(file = "../R/zip_glmm_application_modele.R")
+```
+
+```{r}
+liste_periodes_etude <- list(c(2007, 2025)) # Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin) 
+```
+
+
+```{r Exécution fonction ZIP_GLMM}
+zip_glmm_resultats <- zip_glmm_application_modele(data = truite_seine_normandie,
+liste_periodes = liste_periodes_etude)
+```
+
+
+```{r Mise en forme sortie fonction ZIP_GLMM}
+zip_glmm_resultats_annee <- zip_glmm_resultats %>% 
+  filter(row_name == "annee") %>% 
+  separate_wider_delim(periode, delim = "-", 
+                        names = c("annee_debut", "annee_fin"), 
+                        cols_remove = FALSE) %>%  # garde la colonne periode originale
+  mutate(
+    annee_debut = as.numeric(annee_debut),
+    annee_fin   = as.numeric(annee_fin),
+    nb_annees   = annee_fin - annee_debut
+  ) %>% 
+  select(periode, esp_code_alternatif, p_value, Estimate, sig, family, nb_annees) %>% 
+  mutate(
+    trend = case_when(
+      Estimate > 0 ~ "\U2197",
+      Estimate < 0 ~ "\U2198",
+      TRUE ~ "."
+    ),    # Ajouter le calcul de taux de changement dans la population
+    rate_change = (exp(Estimate * nb_annees) - 1) * 100
+)
+```
+
+
+```{r Sélection des données résultats ZIP_GLMM}
+# Filtrer les données selon les critères spécifiés
+zip_glmm_resultats_format <- zip_glmm_resultats_annee %>%
+  filter((esp_code_alternatif == "ANG" & periode == "2007-2025") |
+    (esp_code_alternatif %in% c(c("ABL","BAF","BLN","BRB", "BRE","BRO","CCO","CHA","CHE", "EPI", "EPT", "GAR", "GOU","HOT","LOF",   "LOR", "LOT","LPM" ,"LPP", "OBR", "PER", "ROT", "SAT", "SPI", "TAN", "TOX", "TRF","VAI","VAN","VAR")) & periode == "2007-2025"))
+
+```
+
+Construction d'un tableau récapitulatif des résultats du modèle GLMM :
+
+```{r}
+df_zip_glmm_resultats <- zip_glmm_resultats_format %>%
+  dplyr::select(esp_code_alternatif, periode, trend, sig, rate_change, family) %>%
+  mutate(
+    # Estimate = round(Estimate, digits = 2), 
+    rate_change = round(rate_change, 2)) %>%
+  rename(
+    "Code Espèce" = esp_code_alternatif,
+    "Periode" = periode,
+    "Tendance" = trend,
+    # "Coefficient" = Estimate,
+    "Significativité" = sig,
+    "Taux de changement" = rate_change,
+    "Famille de distribution" = family
+  ) %>%
+  arrange(`Code Espèce`) # Ordonner par espèce, indicateur et stade
+
+# Lignes positives et significatives
+i_vert  <- which(
+  df_zip_glmm_resultats$Tendance == "\U2197" &
+    df_zip_glmm_resultats$Significativité %in% c("*", "**", "***")
+)
+# Lignes négatives et significatives
+i_rouge <- which(
+  df_zip_glmm_resultats$Tendance == "\U2198" &
+    df_zip_glmm_resultats$Significativité %in% c("*", "**", "***")
+)
+
+tab_zip_glmm_resultats <- df_zip_glmm_resultats %>%
+  flextable::flextable() %>%
+  flextable::autofit() %>%
+  flextable::colformat_int(j = c(1, 3), big.mark = " ") %>%
+  flextable::theme_vanilla() %>%
+  flextable::font(fontname = "calibri") %>%
+  flextable::fontsize(size = 13) %>%
+  flextable::bg(i = i_vert, bg = "darkolivegreen3") %>%   # vert clair
+  flextable::bg(i = i_rouge, bg = "coral3") %>%   # rouge clair
+  flextable::align(align = "center") %>%
+  flextable::set_caption("Synthèse des tendances des effectifs des populations de poissons d'eau douce de BFC")
+
+tab_zip_glmm_resultats
+```
+
+## Mise en forme du tableau de résultats de la truite par bassin versants
+
+```{r}
+res_trf_bv <- readxl::read_xlsx("../processed_data/resultat_bv_trf_glmm.xlsx", sheet = 2) %>% 
+  janitor::clean_names() %>% 
+  mutate(distribution_glmm = as)
+```
+
+```{r}
+df_res_trf <- res_trf_bv %>%
+  mutate(
+    distribution_glmm = case_when(
+      distribution_glmm == "ZI_Poisson"              ~ "Zero inflated - Poisson",
+      distribution_glmm == "ZI_Negative_Binomial"    ~ "Zero inflated - Negative binomiale",
+      distribution_glmm == "Hurdle_Poisson"          ~ "Hurdle Poisson",
+      distribution_glmm == "Hurdle_Negative_Binomial" ~ "Hurdle Negative binomiale",
+      TRUE ~ distribution_glmm  # garde la valeur d'origine si aucune correspondance
+    )
+  )  %>%
+  rename(
+    "Code Espèce" = code_espece,
+    "Periode" = periode,
+    "Bassins versants" = bassin_versants,
+    "Tendance temporelle" = tendance_temporelle,
+    "Significativité" = sig,
+    "Taux de changement GLMM" = taux_de_changement_glmm,
+    "Distribution GLMM" = distribution_glmm,
+  )
+
+
+tab_model_resultats <- df_res_trf %>%
+flextable::flextable() %>%
+  flextable::autofit() %>%
+  flextable::colformat_int(j = c(1, 3), big.mark = " ") %>%
+  flextable::theme_booktabs() %>%
+  flextable::font(fontname = "calibri", part = "header") %>%
+  flextable::font(fontname = "calibri", part = "body") %>%
+  flextable::fontsize(size = 17, part = "header") %>%
+  flextable::fontsize(size = 17, part = "body") %>%
+  flextable::padding(padding = 10, part = "all") %>% 
+  flextable::bg(part = "all", bg = "white") %>%
+  flextable::align(align = "center", part = "all") 
+  # flextable::set_caption("Synthèse des tendances des populations de poissons d'eau douce de BFC")
+  # flextable::italic(italic = T, part = "header")
+tab_model_resultats
+tab_model_resultats <- flextable::save_as_image(tab_model_resultats, "../output/tab_model_TRF_resultats.png")
+
+```
+
+
+
 ## Autocorrelation spatial TRF 
 
 ```{r}
@@ -864,7 +1037,7 @@ anova.gam(mod)
 ```
 
 
-
+# Robustesse des modèles 
 ```{r}
 mes_especes <- c("ABL","ANG","BAF","BLN","BRB", "BRE","BRO","CCO","CHA","CHE", "EPI", "EPT", "GAR", "GOU","HOT","LOF","LOR", "LOT","LPM" ,"LPP", "OBR", "PER", "ROT", "SAT", "SPI", "TAN", "TOX", "TRF","VAI","VAN","VAR")
 
@@ -872,16 +1045,7 @@ robustesse_modele <- adequate_data_for_model(ope_effectif_glmm_abs, esp = mes_es
 robustesse_modele
 ```
 
-
-```{r}
-mgcv::gam()
-```
-
-
-
-
-
-## Gamm poptrend 
+## Gamm poptrend - resultats BRO - SPI - TRF
 
 ```{r}
 liste_periodes_etude <- list(c(2007, 2025)) # Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin) 
@@ -890,6 +1054,7 @@ liste_periodes_etude <- list(c(2007, 2025)) # Liste des périodes (chaque pério
 ```{r}
 source(file = "../R/gamm_poptrend.R")
 source(file = "../R/gamm_poptrend_application.R")
+source(file = "../R/gamm_poptrend_change.R")
 source(file = "../R/ggplot_trend.R")
 
 data_esp <- ope_effectif_glmm_abs 
@@ -929,12 +1094,23 @@ ggarrange(
 res <- gamm_poptrend_change(ope_effectif_glmm_abs, liste_periodes = list(c(2007, 2025)))
 
 ```
+```{r}
+res_test <- res %>% 
+  mutate(`IC 95%` = paste0("[", IC_inf,"%", " ; ", IC_sup,"%","]"))
+```
 
 
 ```{r}
 df_res <- df_zip_glmm_resultats %>%
   rename(espece = esp_code_alternatif) %>%
-  left_join(res, by = c("periode", "espece")) %>%
+  mutate(family = case_when(
+    family == "ZI_Poisson"              ~ "Zero inflated - Poisson",
+    family == "ZI_Negative_Binomial"    ~ "Zero inflated - Negative binomiale",
+    family == "Hurdle_Poisson"          ~ "Hurdle Poisson",
+    family == "Hurdle_Negative_Binomial" ~ "Hurdle Negative binomiale",
+    TRUE ~ family  # garde la valeur d'origine si aucune correspondance
+  )) %>% 
+  left_join(res_test, by = c("periode", "espece")) %>%
   select(espece,
          periode,
          trend,
@@ -942,10 +1118,10 @@ df_res <- df_zip_glmm_resultats %>%
          family,
          rate_change,
          rate_change_gamm,
-         IC_inf,
-         IC_sup) %>%
-  mutate (rate_change_gamm = round(rate_change_gamm, 2)) %>% 
-    filter(espece == "TRF" |espece == "BRO" |espece == "SPI" | espece == "LOT")
+         `IC 95%`) %>%
+  mutate (rate_change_gamm = round(rate_change_gamm, 2)) %>%
+  filter(espece == "TRF" |
+           espece == "BRO" | espece == "SPI" | espece == "LOT")
 
 df_res <- df_res %>%
   rename(
@@ -954,22 +1130,21 @@ df_res <- df_res %>%
     "Tendance temporelle" = trend,
     "Significativité" = sig,
     "Taux de changement GLMM" = rate_change,
-    "Distribution" = family,
+    "Distribution GLMM" = family,
     "Taux de changement GAMM" = rate_change_gamm, 
-    "IC inf" = IC_inf, 
-    "IC sup" = IC_sup
+    "IC 95% GAMM" = `IC 95%`
   ) 
 
 # Lignes positives et significatives
-i_vert  <- which(
-  df_res$'Tendance temporelle' == "\U2197" &
-    df_res$Significativité %in% c("*", "**", "***")
-)
-# Lignes négatives et significatives
-i_rouge <- which(
-  df_res$'Tendance temporelle'== "\U2198" &
-    df_res$Significativité %in% c("*", "**", "***")
-)
+# i_vert  <- which(
+#   df_res$'Tendance temporelle' == "\U2197" &
+#     df_res$Significativité %in% c("*", "**", "***")
+# )
+# # Lignes négatives et significatives
+# i_rouge <- which(
+#   df_res$'Tendance temporelle'== "\U2198" &
+#     df_res$Significativité %in% c("*", "**", "***")
+# )
 
 
 tab_model_resultats <- df_res %>%
@@ -977,17 +1152,21 @@ flextable::flextable() %>%
   flextable::autofit() %>%
   flextable::colformat_int(j = c(1, 3), big.mark = " ") %>%
   flextable::theme_booktabs() %>%
-  flextable::font(fontname = "calibri") %>%
-  flextable::fontsize(size = 13) %>%
+  flextable::font(fontname = "calibri", part = "header") %>%
+  flextable::font(fontname = "calibri", part = "body") %>%
+  flextable::fontsize(size = 17, part = "header") %>%
+  flextable::fontsize(size = 17, part = "body") %>%
+  flextable::padding(padding = 10, part = "all") %>% 
   flextable::bg(part = "all", bg = "white") %>%
-  # flextable::bg(i = i_vert, bg = "darkolivegreen3") %>%   # vert clair
-  # flextable::bg(i = i_rouge, bg = "coral3") %>%   # rouge clair
-  flextable::align(align = "center") %>%
-  flextable::set_caption("Synthèse des tendances des populations de poissons d'eau douce de BFC")
-
+  flextable::align(align = "center", part = "all") %>% 
+  flextable::width(j = "IC 95% GAMM", width = 2.5) 
+  # flextable::set_caption("Synthèse des tendances des populations de poissons d'eau douce de BFC")
+  # flextable::italic(italic = T, part = "header")
+tab_model_resultats
 tab_model_resultats <- flextable::save_as_image(tab_model_resultats, "../output/tab_model_resultats.png")
 
 ```
+
 
 ```{r}
 tab_model_resultats <- flextable::save_as_image(tab_model_resultats, "../output/tab_model_resultats.png")

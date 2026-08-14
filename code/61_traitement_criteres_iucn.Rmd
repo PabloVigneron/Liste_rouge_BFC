@@ -138,7 +138,7 @@ temps_genaration <- temps_generation_lrr_bzh %>%
 
 
 ```{r}
-mes_especes <- c("ABL", "ANG", "BAF", "BLN", "BRB", "BRE", "BRO", "CCO", "CHA", "CHE", "EPI", "EPT", "GAR", "GOU" ,"HOT" ,"LOF" ,"LOR", "LOT", "LPP", "OBR", "PER" ,"ROT", "SPI", "TAN", "TOX", "TRF", "VAI", "VAN")
+mes_especes <- c("ABL", "ANG", "BAF", "BLN", "BRB", "BRE", "BRO", "CCO", "CHA", "CHE", "EPI", "GAR", "GOU" , "LOF" ,"LOR", "LOT", "LPP", "OBR", "PER" ,"ROT", "SPI", "TAN", "TRF", "VAI", "VAN")
 ```
 
 
