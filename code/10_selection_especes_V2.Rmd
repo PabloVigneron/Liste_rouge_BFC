@@ -514,6 +514,7 @@ gg_base <- ggplot(tab_densite_occurrence,
 
 gg_texte_usuel <- gg_base + geom_label_repel() # afin d'éviter les chevauchements entre les différentes étiquettes
 gg_texte_usuel
+
 ```
 ```{r}
 tab_densite_occurrence$esp_code_alternatif
@@ -639,16 +640,16 @@ liste_bio_join <- liste_bio %>%
 Sauvegarde pour le script suivant : script 20_pre_traitements_donnees_ope_especes.
 
 ```{r Sauvegarde}
-save(
-  passerelle,
-  especes_lrr_2014,
-  mes_especes,
-  esp_ope_selection,
-  ope_esp_densite_cal,
-  tab_occurrence_esp,
-  liste_bfc_sp_cor,
-  file = "../processed_data/selection_especes.rda"
-)
+# save(
+#   passerelle,
+#   especes_lrr_2014,
+#   mes_especes,
+#   esp_ope_selection,
+#   ope_esp_densite_cal,
+#   tab_occurrence_esp,
+#   liste_bfc_sp_cor,
+#   file = "../processed_data/selection_especes.rda"
+# )
 ```
 
 
