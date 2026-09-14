@@ -108,13 +108,13 @@ indicateur_labels <- c(
 mes_especes_rapport <- reg_indicateur %>%
   filter(
     esp_code_alternatif == "BRO" |
-      esp_code_alternatif == "LOT" |
-      esp_code_alternatif == "SPI" |
+      # esp_code_alternatif == "LOT" |
+      # esp_code_alternatif == "SPI" |
       esp_code_alternatif == "TRF"
   )
 ```
 
-```{r graphique evolution indicateur régionale par annee loess, fig.height = 8, fig.width = 10}
+```{r graphique evolution indicateur régionale par annee loess}
 
 indicateur_for_graph <- mes_especes_rapport %>%
   filter(stade == "ind",indicateur %in% c(
@@ -144,16 +144,18 @@ indicateur_for_graph <- mes_especes_rapport %>%
   # ) +
   geom_point(shape = 21, size = 2) +
   geom_line(linetype = 3, linewidth = 0.5) +
-  labs(title = "Indicateurs de tendances à l'échelle régionale des espèces de poissons d'eau douce de BFC", x = "Années", y = "Valeur indicateur") +
-  geom_smooth(method = "lm",
+  labs(
+    # title = "Indicateurs de tendances à l'échelle régionale des espèces de poissons d'eau douce de BFC",
+    x = "Années", y = "Valeur indicateur") +
+  geom_smooth(method = "loess",
               se = F,
               color = "darkred") +
   # theme_bw()+
   theme(strip.background = element_rect(color = "black", fill = "#faffff"),
         legend.position = "bottom",
         panel.background = element_rect(fill = "grey95"),
-        panel.grid.major = element_line(color = "lightgrey", size = 0.1),
-        panel.grid.minor = element_line(color = "lightgrey"),
+        panel.grid.major = element_line(color = "white", size = 0.1),
+        panel.grid.minor = element_line(color = "white"),
         axis.text.x = element_text(angle = 45)
   ) 
 
