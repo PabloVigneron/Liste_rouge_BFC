@@ -1,0 +1,225 @@
+---
+title: "LRR des poissons d'eau douce de BFC"
+subtitle: "43_production_carte_occurence"
+author: "PabloVigneron"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  bookdown::html_document2:
+   fig_caption: yes
+   tab_caption: yes
+   number_sections: yes
+   global_numbering: yes
+   toc: yes
+   toc_float:
+         toc_collapsed: yes
+         toc_depth: 2
+   code_folding: hide
+   css: "style.css"
+#bibliography: .bib
+#link-citations: true
+#cls: apa.cls
+#editor_options: 
+#  markdown: 
+#    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+Script : 43_production_carte_occurence
+# Installation 
+
+Chargement des packages, fonctions et des données 
+
+```{r Chargement des packages}
+library(aspe)
+library(tidyverse)
+library(aspe)
+library(sjstats)
+library(gt)
+library(ggh4x)
+library(patchwork)
+library(ggplotify)
+library(ggpubr)
+library(sf)
+library(mapview)
+```
+
+```{r Chargement des données}
+load(file = "../processed_data/selection_especes.rda")
+load(file = "../processed_data/selection_pop_ope.rda")
+load(file = "../processed_data/calcul_indicateurs_regionaux.rda")
+load(file = "../processed_data/selection_pop_ope_carte.rda") # Pour graphique indicateurs
+```
+
+
+```{r Chargement des tables de données}
+rdata_tables <- misc_nom_dernier_fichier(
+  repertoire = "../../../../Liste_rouge_BFC/raw_data",
+  pattern = "^tables")
+load(rdata_tables) # Chargement des données 
+```
+
+
+L'Objectif de ce script est de réaliser une des cartes d'évolution entre 2 périodes de 10 ans à partir  des résultats obtenue du taux d'occurence des différentes espèces de poissons d'eau douce de la région Bourgogne-Franche-Comte (BFC). 
+
+
+# Préparation du Df
+```{r}
+# preparer la table pour jointure
+ope_selection <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id) %>% 
+  mutate(pop_id = as.factor(pop_id))
+
+# prepéarer la table pour jointure
+esp_ope_selection_join <- esp_ope_selection %>%
+  select(ope_id, ope_surface_calculee) %>%
+  distinct(ope_id, .keep_all = TRUE)
+
+
+ope_occurence_glmm <- ope_indicateur %>%
+  filter(indicateur == "occurence") %>%
+  mef_ajouter_type_protocole() %>%
+  left_join(y = ope_selection, by = c("ope_id", "pop_id", "annee")) %>%
+  inner_join(esp_ope_selection_join, by = "ope_id") %>%
+  mutate(
+    valeur = as.numeric(valeur) ,
+    annee = as.numeric(annee),
+    ope_surface_calculee = as.numeric(ope_surface_calculee),
+    pro_libelle = as.factor(pro_libelle),
+    pop_id = as.factor(pop_id),
+    sta_id = as.factor(sta_id),
+    stade = as.factor(stade)
+  ) %>%
+  rename(espece = esp_code_alternatif) %>%
+  filter(stade == "ind")
+```
+
+
+## Definition des périodes d'analyses
+
+```{r}
+list_first_decade <- list(c(2007, 2016)) # Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin) 
+```
+
+```{r}
+list_second_decade <- list(c(2016, 2025)) # Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin) 
+```
+
+
+Preparation Df pour occurence par decennie : 
+
+```{r}
+ope_occurence_decade <- ope_occurence_glmm %>% 
+  mutate(decade = if_else(annee <= 2016, "first", "second"))
+```
+
+
+```{r}
+occur <- ope_occurence_decade %>% 
+  # filter(stade == "ind",                    # Filtre les lignes où le stade = "ind"
+  #        indicateur == "effectif_total",    # Filtre les lignes où l'indicateur = "effectif_total"
+  #        valeur > 0) %>%                   # Filtre les lignes où la valeur est supérieure à 0
+  group_by(decade, 
+           espece, 
+           sta_id, 
+           x, 
+           y, 
+           bassin_versant, 
+           departements) %>%         # Groupe par année et code alternatif de l'espèce
+  summarise(n_occur = n_distinct(ope_id))   # Compte le nombre d'ope_id et l'assigne à n_occur
+
+```
+
+
+```{r}
+occur <- occur %>%
+  sf::st_as_sf(coords = c("x", "y"), crs = 2154, remove = F) # Remove = F pour garder les coordonnées après la conversion en objet sf 
+
+```
+
+
+```{r}
+mapview(list(occur, bassins_versants, mes_depts),
+        layer.name = c("Taux d'occurence par station", "Bassins versants", "Bourgogne-Franche-Comté"), 
+        col.regions = list( "purple","darkseagreen3", "cadetblue1"))
+```
+
+```{r Visualisation effort pêche}
+mapview(
+  list(buffer, mes_depts),
+  # Visualisation de l'effort de pêche
+  layer.name = c("Buffer_1_km", "Bourgogne-Franche-Comté"),
+  col.regions = list("darkseagreen4", "darkseagreen1")
+) +
+  mapview(
+    sta_id_ope_selection,
+    layer.name = "Nombre operation par station",
+    # size_var = "nb_ope_par_sta",
+    # cex = "sta_id",
+    cex = "nb_ope_par_sta",
+    lwd = 0.2,
+    zcol = "nb_ope_par_sta",
+   # col.regions = "#D693E0",
+    alpha = 0.8,
+    legend = TRUE,
+    labels = list(text = sta_id_ope_selection$nb_ope_par_sta, cex = 1.5)
+  )
+```
+
+
+
+
+
+# Effort de pêche
+
+  Nous souhaitons visualiser les différents efforts de pêche par points de prélèvements sélectionnés. Il s'agit d'observer si un déséquilibre se dessine entre les stations sélectionnées et l'ensemble du territoire couvert par l'étude.
+
+```{r Préparation visualisation effort pêche}
+ope_selection_sta <- ope_selection %>%
+  group_by(sta_id) %>% 
+  mutate(nb_ope_par_sta = n_distinct(ope_id)) %>% # Calcul du nombre distinct d'opérations
+  select(sta_id, ope_id, pop_id, nb_ope_par_sta) %>%
+  left_join(point_prelevement) %>% 
+  sf::st_as_sf(coords = c("pop_coordonnees_x", 
+                           "pop_coordonnees_y"),
+                crs = 2154) %>% 
+  aspe::geo_attribuer(buffer)
+```
+
+```{r Préparation visualisation effort pêche échantillon}
+sta_id_ope_selection <- ope_selection_sta %>%
+  group_by(sta_id) %>%
+  sample_n(1) %>%
+  ungroup() %>% 
+  select(sta_id, ope_id, pop_id, nb_ope_par_sta, pop_code_sandre, geometry, DEP, AREA)#%>% # Pour la visualisation graphique je n'ai besoin que d'un seul exemple d'ope_id par station
+
+```
+
+
+```{r Visualisation effort pêche}
+mapview(
+  list(buffer, mes_depts),
+  # Visualisation de l'effort de pêche
+  layer.name = c("Buffer_1_km", "Bourgogne-Franche-Comté"),
+  col.regions = list("darkseagreen4", "darkseagreen1")
+) +
+  mapview(
+    sta_id_ope_selection,
+    layer.name = "Nombre operation par station",
+    # size_var = "nb_ope_par_sta",
+    # cex = "sta_id",
+    cex = "nb_ope_par_sta",
+    lwd = 0.2,
+    zcol = "nb_ope_par_sta",
+   # col.regions = "#D693E0",
+    alpha = 0.8,
+    legend = TRUE,
+    labels = list(text = sta_id_ope_selection$nb_ope_par_sta, cex = 1.5)
+  )
+```
+
+

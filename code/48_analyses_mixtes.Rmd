@@ -115,60 +115,6 @@ ope_effectif_glmm_abs <- ope_indicateur %>%
   filter(stade == "ind")
 ```
 
-# TEST EFFET PROTOCOLE POUR ORAL
-```{r}
-data_esp <- ope_effectif_glmm_abs %>%
-  filter(espece == "BRO")
-
-
-mod_zi_1.1 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 |
-                                                                        sta_id) ,
-  family = nbinom2(link = "log"),
-  data = data_esp,
-  ziformula = ~ 1
-)
-```
-
-```{r}
-mod_zi_1.0 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) +pro_libelle + (1 |
-                                                           sta_id) ,
-  data = data_esp,
-  family = poisson(link = "log"),
-  ziformula = ~ 1
-)
-mod_zi_1.1 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
-  family = nbinom2(link = "log"),
-  data = data_esp,
-  ziformula = ~ 1
-)
-mod_zi_1.2 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
-  family = truncated_poisson(link = "log"),
-  data = data_esp,
-  ziformula = ~ 1
-)
-mod_zi_1.3 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
-  family = truncated_nbinom2(link = "log"),
-  data = data_esp,
-  ziformula = ~ 1
-)
-```
-
-
-```{r}
-summary(mod_zi_1.1)
-```
-```{r}
-Anova(mod_zi_1.1)
-```
-```{r}
-boxplot(data_esp$valeur~data_esp$pro_libelle)
-```
-
 
 
 ## Mise en forme tableau synthèse taille de maturité 
