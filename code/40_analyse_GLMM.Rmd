@@ -31,7 +31,7 @@ knitr::opts_chunk$set(echo = TRUE,
 
 Script : 40_analyse_GLMM
 
-  Ce script a pour objectif d'évaluer l'impact des différents réseaux sur les tendances des indicateurs régionaux. Il a également l'objectif de regarder l'impact des changements de protocoles sur les stations au cours des années d'études grâce aux zero inflated poisson GLMM. 
+  Ce script a pour objectif d'estimer les tendances de la densité, la biomasse et l'occurence des populations des différentes espèces des cours d'eau de Bourgogne Franche-comté à partir de modèle zero inflated et Hurdle GLMM. 
 
 
 # Installation 
@@ -117,8 +117,86 @@ ope_effectif_glmm_abs <- ope_indicateur %>%
 
 
 
+```{r}
+data_esp <- ope_effectif_glmm_abs %>% 
+  filter(espece == "LOT")
+```
+
+###a. **Modèles Linéaires Généralisé Mixtes (GLMM)**
+
+Construire les modèles :
+
+```{r}
+mod_zi_1.0 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) +pro_libelle + (1 |
+                                                           sta_id) ,
+  data = data_esp,
+  family = poisson(link = "log"),
+  ziformula = ~ 1
+)
+mod_zi_1.1 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = nbinom2(link = "log"),
+  data = data_esp,
+  ziformula = ~ 1
+)
+mod_zi_1.2 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = truncated_poisson(link = "log"),
+  data = data_esp,
+  ziformula = ~ 1
+)
+mod_zi_1.3 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
+  family = truncated_nbinom2(link = "log"),
+  data = data_esp,
+  ziformula = ~ 1
+)
+mod_zi_1.4 <- glmmTMB(
+  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + sta_id +(1 | sta_id) ,
+  family = poisson(link = "log"),
+  data = data_esp
+)
+```
 
 
+```{r}
+summary(mod_zi_1.4)
+```
+
+
+On selectionne à l'aide du critère AIC le meilleur modèle c'est à dire le modèle avec le plus petit AIC. 
+
+```{r}
+AIC(mod_zi_1.0, mod_zi_1.1, mod_zi_1.2, mod_zi_1.3)
+```
+
+Verification de l'ajustement des modèles au données : 
+```{r, fig.height = 10, fig.width = 20}
+res_mod_zi_1.0 <- as.ggplot(~ plotresid(mod_zi_1.0))
+res_mod_zi_1.1 <- as.ggplot(~ plotresid(mod_zi_1.1))
+res_mod_zi_1.2 <- as.ggplot(~ plotresid(mod_zi_1.2))
+res_mod_zi_1.3 <- as.ggplot(~ plotresid(mod_zi_1.3))
+
+ggarrange(
+  res_mod_zi_1.0,
+  res_mod_zi_1.1,
+  res_mod_zi_1.2,
+  res_mod_zi_1.3,
+  ncol = 2,
+  nrow = 2,
+  labels = c("poisson", "nbinom2", "truncated_poisson", "truncated_nbinom2"),
+  font.label = list(
+    size = 13,
+    color = "darkred",
+    face = "bold",
+    family = NULL
+  ),
+  hjust = -0.1,
+  vjust = 1.6,
+  align = c("none", "h", "v", "hv")
+)
+```
 
 
 
@@ -262,5 +340,10 @@ tab_glmm_resultats
 
 tab_glmm_resultats <- flextable::save_as_image(tab_glmm_resultats, "../output/tab_glmm_occu_resultats_esp_complete_V2.png")
 ```
+
+
+# Biomasse en fonction des annees
+
+
 
 

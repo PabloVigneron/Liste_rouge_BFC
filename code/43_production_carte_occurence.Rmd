@@ -46,6 +46,11 @@ library(ggplotify)
 library(ggpubr)
 library(sf)
 library(mapview)
+library(maptiles)
+library(tidyterra)
+library(ggnewscale)
+library(janitor)
+library(ggspatial)
 ```
 
 ```{r Chargement des données}
@@ -53,6 +58,7 @@ load(file = "../processed_data/selection_especes.rda")
 load(file = "../processed_data/selection_pop_ope.rda")
 load(file = "../processed_data/calcul_indicateurs_regionaux.rda")
 load(file = "../processed_data/selection_pop_ope_carte.rda") # Pour graphique indicateurs
+load(file = "../processed_data/couches_sig_carte_repartition.rda") # Couche sig pour carto
 ```
 
 
@@ -63,6 +69,27 @@ rdata_tables <- misc_nom_dernier_fichier(
 load(rdata_tables) # Chargement des données 
 ```
 
+```{r chargement et enregistrement des couches sig}
+#chargement des couches sig en lambert 93
+# cours_eau_bfc <- sf::st_read("../raw_data/Cartographie/strahler/cours_deau_strahler_bfc.shp") %>% clean_names() 
+# st_transform(cours_eau_bfc, 2154)
+# 
+# bassins_versants_bfc <- sf::st_read("../raw_data/Cartographie/bassins_versants_bfc.shp") %>%
+#   clean_names() %>% 
+#   mutate (lb_bh = as.factor(lb_bh))
+# st_transform(bassins_versants_bfc, 2154)
+
+#Enregistrement des couches sig en fichier rdata pour pouvoir les charger plus rapidement
+# save(
+#   cours_eau_bfc, 
+#   bassins_versants_bfc,
+#   file = "../processed_data/couches_sig_carte_repartition.rda"
+# )
+```
+
+```{r Chargement des fonctions}
+source(file = "../R/map_decade_sp.R")
+```
 
 L'Objectif de ce script est de réaliser une des cartes d'évolution entre 2 périodes de 10 ans à partir  des résultats obtenue du taux d'occurence des différentes espèces de poissons d'eau douce de la région Bourgogne-Franche-Comte (BFC). 
 
@@ -101,125 +128,158 @@ ope_occurence_glmm <- ope_indicateur %>%
 
 ## Definition des périodes d'analyses
 
-```{r}
-list_first_decade <- list(c(2007, 2016)) # Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin) 
-```
-
-```{r}
-list_second_decade <- list(c(2016, 2025)) # Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin) 
-```
-
-
-Preparation Df pour occurence par decennie : 
+Ajout d'une colonne **decade** correspondant à la période de 2007-2016 et 2017-2025.
 
 ```{r}
 ope_occurence_decade <- ope_occurence_glmm %>% 
   mutate(decade = if_else(annee <= 2016, "first", "second"))
 ```
 
+# Creation de carte d'evolution selon 2 période 
 
 ```{r}
 occur <- ope_occurence_decade %>% 
-  # filter(stade == "ind",                    # Filtre les lignes où le stade = "ind"
-  #        indicateur == "effectif_total",    # Filtre les lignes où l'indicateur = "effectif_total"
-  #        valeur > 0) %>%                   # Filtre les lignes où la valeur est supérieure à 0
+  filter(stade == "ind",                    # Filtre les lignes où le stade = "ind"
+         indicateur == "occurence"    # Filtre les lignes où l'indicateur = "occurence"
+         ) %>%                  
   group_by(decade, 
            espece, 
            sta_id, 
-           x, 
-           y, 
-           bassin_versant, 
-           departements) %>%         # Groupe par année et code alternatif de l'espèce
-  summarise(n_occur = n_distinct(ope_id))   # Compte le nombre d'ope_id et l'assigne à n_occur
-
+           x,
+           y,
+           bassin_versant,
+           departements
+           ) %>%        
+  summarise(n_occur = ((sum(valeur) / n_distinct(ope_id))*100))  %>% # Compte le nombre d'ope_id ou l'espèce est présente / le nombre d'opération réalisée.
+  mutate(n_occur = round(n_occur, digits = 0), # Arrondi le pourcentage
+         n_occur = as.numeric(n_occur), 
+         sta_id = as.numeric(sta_id)) %>% 
+  ungroup()
 ```
 
-
+L'objet "occur" est convertit en objet sf (lambert 93) pour pouvoir travailler avec des couches SIG(bassins_versants et cours_d'eau).
 ```{r}
 occur <- occur %>%
   sf::st_as_sf(coords = c("x", "y"), crs = 2154, remove = F) # Remove = F pour garder les coordonnées après la conversion en objet sf 
+# crs correpond à la source de données (ici lambert 93 : 2154)
+```
 
+
+## Chargement de la fonction map_decade_sp pour tracer les cartes de répartition
+
+```{r, fig.height = 10, fig.width = 20}
+map_decade_sp(data = occur, mon_espece = "BRO")
+```
+
+
+```{r, fig.height = 10, fig.width = 20}
+map_decade_sp(data = occur, mon_espece = "ANG")
+```
+
+
+
+## Contruction carte de repartition
+
+```{r, fig.height = 10, fig.width = 20}
+basemap <- get_tiles(bassins_versants_bfc, provider = "OpenStreetMap.France", crop = T, zoom = 12)
+
+ggplot() +
+  geom_spatraster_rgb(data = basemap) +
+  # Ajouter la couche SIG Bassins versants avec la limite régionale
+  geom_sf(data = bassins_versants_bfc,
+          mapping = aes(fill = lb_bh),
+          show.legend = F) +
+  scale_fill_manual(
+    values = c(
+      "Seine-Normandie" = "darkseagreen1",
+      "Loire-Bretagne" = "cadetblue1",
+      "Rhône-Méditerranée" = "darkseagreen3"
+    )
+  ) +
+  new_scale_fill() +
+  # Ajouter la couche SIG des cours d'eau de la région
+  geom_sf(
+    data = cours_eau_bfc,
+    aes(linewidth = strahler),
+    color = "cyan4",
+    show.legend = F
+  ) +                      scale_linewidth(range = c(1, 3))  +                                             # Ajouter les données espèces d'occurence
+  geom_sf(
+    data = occur_lot,
+    aes(fill = n_occur),
+    shape = 21,
+    size = 4,
+    color = "grey35"
+  ) +
+  # scale_fill_discrete()+
+  scale_fill_gradient(low = "red",
+                      high = "green",
+                      name = "Pourcentage d'occurence") +
+  # scale_size_area(max_size = 5, name = "Pourcentage d'occurence")+
+  facet_wrap(
+    ~ decade,
+    ncol = 2,
+    nrow = 1,
+    labeller = labeller(
+      decade = c(first = "Période 2007 - 2016", second = "Période 2017 - 2025")
+    )
+  ) +
+  # labs(title = "Carte de répartition du pourcentage d'occurence de la Truite commune entre deux décennies sur la région Bourgogne-Franche-Comté") +
+  coord_sf(crs = 2154) +
+  theme (
+    plot.title = element_text(
+      hjust = 0,
+      vjust = 1,
+      face = "bold",
+      size = 20
+    ),
+    legend.background = element_rect(fill = "grey97", color = "grey35"),
+    strip.background = element_rect(color = "grey35", fill = "grey88"),
+    panel.background = element_rect(fill = "grey97"),
+    panel.border = element_rect(color = "grey35"),
+    panel.grid.major = element_line(color = "#faffff", size = 0.1),
+    panel.grid.minor = element_line(color = "#faffff"),
+    strip.text = element_text(size = 14, face = "bold")
+  ) +
+  annotation_scale(location = "br", line_width = .5) +
+  annotation_north_arrow(
+    location = "bl",
+    height = unit(0.7, "cm"),
+    width = unit(0.7, "cm")
+  )
+```
+
+
+# Creation de carte d'evolution tout les 2 ans 
+
+```{r}
+# Pour creer la colonne periode : on renseigne le début de période souhaiter : ici 2007
+# annee_debut_periode <- 2007
+# 
+# ope_occurence_bi <- ope_occurence_glmm %>% 
+#   mutate(bi_year = {
+#     debut <- floor((annee - annee_debut_periode) /2) * 2 + annee_debut_periode
+#     paste0(debut)
+#   })
 ```
 
 
 ```{r}
-mapview(list(occur, bassins_versants, mes_depts),
-        layer.name = c("Taux d'occurence par station", "Bassins versants", "Bourgogne-Franche-Comté"), 
-        col.regions = list( "purple","darkseagreen3", "cadetblue1"))
+# occur <- ope_occurence_bi %>% 
+#   group_by(bi_year, 
+#            espece, 
+#            sta_id, 
+#            x, 
+#            y, 
+#            bassin_versant, 
+#            departements) %>%         # Groupe par année et code alternatif de l'espèce
+#   summarise(n_occur = n_distinct(ope_id))  %>% # Compte le nombre d'ope_id et l'assigne à n_occur
+#   ungroup()
 ```
 
-```{r Visualisation effort pêche}
-mapview(
-  list(buffer, mes_depts),
-  # Visualisation de l'effort de pêche
-  layer.name = c("Buffer_1_km", "Bourgogne-Franche-Comté"),
-  col.regions = list("darkseagreen4", "darkseagreen1")
-) +
-  mapview(
-    sta_id_ope_selection,
-    layer.name = "Nombre operation par station",
-    # size_var = "nb_ope_par_sta",
-    # cex = "sta_id",
-    cex = "nb_ope_par_sta",
-    lwd = 0.2,
-    zcol = "nb_ope_par_sta",
-   # col.regions = "#D693E0",
-    alpha = 0.8,
-    legend = TRUE,
-    labels = list(text = sta_id_ope_selection$nb_ope_par_sta, cex = 1.5)
-  )
-```
-
-
-
-
-
-# Effort de pêche
-
-  Nous souhaitons visualiser les différents efforts de pêche par points de prélèvements sélectionnés. Il s'agit d'observer si un déséquilibre se dessine entre les stations sélectionnées et l'ensemble du territoire couvert par l'étude.
-
-```{r Préparation visualisation effort pêche}
-ope_selection_sta <- ope_selection %>%
-  group_by(sta_id) %>% 
-  mutate(nb_ope_par_sta = n_distinct(ope_id)) %>% # Calcul du nombre distinct d'opérations
-  select(sta_id, ope_id, pop_id, nb_ope_par_sta) %>%
-  left_join(point_prelevement) %>% 
-  sf::st_as_sf(coords = c("pop_coordonnees_x", 
-                           "pop_coordonnees_y"),
-                crs = 2154) %>% 
-  aspe::geo_attribuer(buffer)
-```
-
-```{r Préparation visualisation effort pêche échantillon}
-sta_id_ope_selection <- ope_selection_sta %>%
-  group_by(sta_id) %>%
-  sample_n(1) %>%
-  ungroup() %>% 
-  select(sta_id, ope_id, pop_id, nb_ope_par_sta, pop_code_sandre, geometry, DEP, AREA)#%>% # Pour la visualisation graphique je n'ai besoin que d'un seul exemple d'ope_id par station
+```{r}
+# occur <- occur %>%
+#   sf::st_as_sf(coords = c("x", "y"), crs = 2154, remove = F) # Remove = F pour garder les coordonnées après la conversion en objet sf 
 
 ```
-
-
-```{r Visualisation effort pêche}
-mapview(
-  list(buffer, mes_depts),
-  # Visualisation de l'effort de pêche
-  layer.name = c("Buffer_1_km", "Bourgogne-Franche-Comté"),
-  col.regions = list("darkseagreen4", "darkseagreen1")
-) +
-  mapview(
-    sta_id_ope_selection,
-    layer.name = "Nombre operation par station",
-    # size_var = "nb_ope_par_sta",
-    # cex = "sta_id",
-    cex = "nb_ope_par_sta",
-    lwd = 0.2,
-    zcol = "nb_ope_par_sta",
-   # col.regions = "#D693E0",
-    alpha = 0.8,
-    legend = TRUE,
-    labels = list(text = sta_id_ope_selection$nb_ope_par_sta, cex = 1.5)
-  )
-```
-
 
