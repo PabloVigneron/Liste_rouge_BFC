@@ -1156,7 +1156,7 @@ robustesse_modele <- adequate_data_for_model(ope_effectif_glmm_abs, esp = mes_es
 robustesse_modele
 ```
 
-## Gamm poptrend - resultats BRO - SPI - TRF
+# Gamm poptrend - resultats BRO - SPI - TRF
 
 ```{r}
 liste_periodes_etude <- list(c(2007, 2025)) # Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin) 

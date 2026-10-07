@@ -88,7 +88,7 @@ load(rdata_tables) # Chargement des données
 ```
 
 ```{r Chargement des fonctions}
-source(file = "../R/map_decade_sp.R")
+source(file = "../R/distribution_maps_sp.R")
 ```
 
 L'Objectif de ce script est de réaliser une des cartes d'évolution entre 2 périodes de 10 ans à partir  des résultats obtenue du taux d'occurence des différentes espèces de poissons d'eau douce de la région Bourgogne-Franche-Comte (BFC). 
@@ -164,21 +164,36 @@ occur <- occur %>%
 # crs correpond à la source de données (ici lambert 93 : 2154)
 ```
 
-
-## Chargement de la fonction map_decade_sp pour tracer les cartes de répartition
-
-```{r, fig.height = 10, fig.width = 20}
-map_decade_sp(data = occur, mon_espece = "BRO")
+Chargement du fond de carte : 
+```{r}
+basemap <- get_tiles(bassins_versants_bfc, provider = "OpenStreetMap.France", crop = T, zoom = 12)
 ```
 
 
+## Chargement de la fonction distribution_maps_sp pour tracer les cartes de répartition
+
 ```{r, fig.height = 10, fig.width = 20}
-map_decade_sp(data = occur, mon_espece = "ANG")
+
+mes_especes <- c("ABL", "ANG", "BAF", "BLN", "BRB", "BRE", "BRO", "CCO", "CHA", "CHE", "EPI", "GAR", "GOU" , "LOF" ,"LOR", "LOT", "LPP", "OBR", "PER" ,"ROT", "SPI", "TAN", "TRF", "VAI", "VAN")
+
+graphs <- distribution_maps_sp(data = occur, 
+                     mes_especes = "TRF", 
+                     basemap = basemap, 
+                     bassins_versants = bassins_versants_bfc, 
+                     cours_eau = cours_eau_bfc)
+walk(graphs, print)
+
+# Enregistrements de l'ensemble des graphiques 
+iwalk(graphs, ~ ggsave(paste0("carte_repartition_", .y, ".png"), .x, width = 20, height = 10, dpi = 300, path = "../output/CARTE_REPARTITION"))
+
 ```
-
-
 
 ## Contruction carte de repartition
+
+```{r}
+occur_lot <- occur %>% 
+  filter(espece == "TRF")
+```
 
 ```{r, fig.height = 10, fig.width = 20}
 basemap <- get_tiles(bassins_versants_bfc, provider = "OpenStreetMap.France", crop = T, zoom = 12)
@@ -233,6 +248,8 @@ ggplot() +
       face = "bold",
       size = 20
     ),
+    legend.direction = "horizontal", 
+    legend.position = "bottom",
     legend.background = element_rect(fill = "grey97", color = "grey35"),
     strip.background = element_rect(color = "grey35", fill = "grey88"),
     panel.background = element_rect(fill = "grey97"),

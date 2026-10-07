@@ -1,0 +1,243 @@
+---
+title: "LRR des poissons d'eau douce de BFC"
+subtitle: "41_analyse_GAMM"
+author: "PabloVigneron"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  bookdown::html_document2:
+   fig_caption: yes
+   tab_caption: yes
+   number_sections: yes
+   global_numbering: yes
+   toc: yes
+   toc_float:
+         toc_collapsed: yes
+         toc_depth: 2
+   code_folding: hide
+   css: "style.css"
+#bibliography: .bib
+#link-citations: true
+#cls: apa.cls
+#editor_options: 
+#  markdown: 
+#    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+Script : 41_analyse_GAMM
+
+  Ce script a pour objectif d'estimer les tendances des populations des différentes espèces de poissons des cours d'eau de Bourgogne-Franche-Comté par une analyse statistique de Modèles Additifs Généralisé Mixtes (GAMMs).
+  Les modèles ont été construits avec la fonction ptrend du package poptrend qui se base 
+sur les algorithmes du package mgcv (Knape, 2016; Wood, 2025).  Selon les recommandations, le 
+choix du nombre de fonctions de base k, déterminant le degré de sinuosité d’une courbe de 
+lissage à été laissé à l’algorithme maximum de vraisemblance restreint (REML) pour éviter un 
+surajustement du modèle aux données (Zuur et al., 2009).   
+
+
+# Installation 
+
+## Chargement des packages, fonctions et des données 
+
+```{r Chargement des packages}
+library(lme4)
+library(aspe)
+library(tidyverse)
+library(aspe)
+library(sjstats)
+library(gt)
+library(ggh4x)
+library(mgcv) # modele GAMMs
+library(gratia)
+library(patchwork)
+library(car) # fonction Anova()
+library(gstat)#semi_variogramme
+library(DHARMa) # Ajusting of the model 
+library(ggplotify)
+library(ggpubr)
+```
+
+```{r Chargement des données}
+load(file = "../processed_data/selection_especes.rda")
+load(file = "../processed_data/selection_pop_ope.rda")
+load(file = "../processed_data/donnees_densite_eff_abs.rda")
+load(file = "../processed_data/assemblage_tab_par_ope.rda")
+load(file = "../processed_data/resultats_modele.rda")
+```
+
+```{r Chargement des fonctions}
+source(file = "../R/gamm_poptrend_application.R")
+source(file = "../R/gamm_poptrend_change.R")
+```
+
+```{r Chargement des tables de données}
+rdata_tables <- misc_nom_dernier_fichier(
+  repertoire = "../../../../Liste_rouge_BFC/raw_data",
+  pattern = "^tables")
+load(rdata_tables) # Chargement des données 
+```
+
+# Preparation du df 
+
+```{r}
+# preparer la table pour jointure
+ope_selection <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id) %>% 
+  mutate(pop_id = as.factor(pop_id))
+
+# prepéarer la table pour jointure 
+esp_ope_selection_join <- esp_ope_selection %>% 
+  dplyr::select(ope_id, ope_surface_calculee) %>% 
+  distinct(ope_id, .keep_all = TRUE)
+
+ope_effectif_glmm_abs <- ope_indicateur %>%
+  filter(indicateur == "effectif_total") %>% 
+  mef_ajouter_type_protocole() %>% 
+  left_join( y= ope_selection, by = c("ope_id", "pop_id", "annee")) %>% 
+  inner_join(esp_ope_selection_join, by = "ope_id") %>% 
+  mutate(
+    valeur = as.numeric(valeur) ,
+    annee = as.numeric(annee),
+    ope_surface_calculee = as.numeric(ope_surface_calculee),
+    pro_libelle = as.factor(pro_libelle),
+    pop_id = as.factor(pop_id),
+    sta_id = as.factor(sta_id),
+    stade = as.factor(stade)
+  ) %>% 
+  rename(espece = esp_code_alternatif) %>% 
+  filter(stade == "ind")
+```
+
+
+# Graphique résultats modèles Gamm poptrend avec la fonction **gamm_poptrend_application()** 
+
+A partir du package poptrend, on execute les modèles gamm et on trace un graphique représentant la tendance par espèces. Les modèles ont été construits avec une distribution négative binomiale 
+pour corriger la surdispersion des résidus observés et améliorer l’ajustement du modèle aux 
+données.
+
+```{r}
+liste_periodes_etude <- list(c(2007, 2025)) # Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin) 
+```
+
+```{r, width = 8, height = 10}
+# Définition des espèces cible pour tracer les graphiques
+mes_especes <- c("ABL", "ANG", "BAF", "BLN", "BRB", "BRE", "BRO", "CCO", "CHA", "CHE", "EPI", "GAR", "GOU" , "LOF" ,"LOR", "LOT", "LPP", "OBR", "PER" ,"ROT", "SPI", "TAN", "TRF", "VAI", "VAN")
+
+# Tracer les graphique avec la fonction : 
+graphs <- gamm_poptrend_application(data = ope_effectif_glmm_abs,
+                          # liste_periodes = liste_periodes_etude, 
+                          mes_especes = mes_especes)
+
+# Afficher l'ensemble des graphiques : 
+walk(graphs, print)
+
+# Enregistrements de l'ensemble des graphiques 
+iwalk(graphs, ~ ggsave(paste0("graphique_gamm_", .y, ".png"), .x,
+                       width = 6, height = 4,
+                       dpi = 300, path = "../output/graph_poptrend_gamm"))
+
+
+```
+
+# Taux d'évolution des tendances GAMM
+
+La fonction change du package poptrend a été utilisée pour calculer la variation en 
+pourcentage (taux d’évolution) de la taille de la population entre 2007 et 2025. Les tendances ont 
+été considérées significatives lorsque l’intervalle de confiance (IC) à 95 % calculé à partir 
+d’échantillons de bootstrap, de la variation estimée qui n'inclut pas zéro, ce qui indiquait une 
+augmentation significative ou une diminution significative  (Knape, 2016).  
+```{r}
+df_res_gamm_tx_evolution <- gamm_poptrend_change(ope_effectif_glmm_abs, liste_periodes = list(c(2007, 2025)))
+
+```
+
+```{r}
+res_test <- df_res_gamm_tx_evolution %>% 
+  mutate(`IC 95%` = paste0("[", IC_inf,"%", " ; ", IC_sup,"%","]"))
+```
+
+
+```{r}
+df_res <- df_zip_glmm_resultats %>%
+  rename(espece = esp_code_alternatif) %>%
+  mutate(family = case_when(
+    family == "ZI_Poisson"              ~ "Zero inflated - Poisson",
+    family == "ZI_Negative_Binomial"    ~ "Zero inflated - Negative binomiale",
+    family == "Hurdle_Poisson"          ~ "Hurdle Poisson",
+    family == "Hurdle_Negative_Binomial" ~ "Hurdle Negative binomiale",
+    TRUE ~ family  # garde la valeur d'origine si aucune correspondance
+  )) %>% 
+  left_join(res_test, by = c("periode", "espece")) %>%
+  select(espece,
+         periode,
+         trend,
+         sig,
+         family,
+         rate_change,
+         rate_change_gamm,
+         `IC 95%`) %>%
+  mutate (rate_change_gamm = round(rate_change_gamm, 2)) 
+# %>%
+#   filter(espece == "TRF" |
+#            espece == "BRO" | espece == "SPI" | espece == "LOT")
+
+df_res <- df_res %>%
+  rename(
+    "Code Espèce" = espece,
+    "Periode" = periode,
+    "Tendance temporelle" = trend,
+    "Significativité" = sig,
+    "Taux de changement GLMM" = rate_change,
+    "Distribution GLMM" = family,
+    "Taux de changement GAMM" = rate_change_gamm, 
+    "IC 95% GAMM" = `IC 95%`
+  ) 
+
+# Lignes positives et significatives
+i_vert  <- which(
+  df_res$'Tendance temporelle' == "\U2197" &
+    df_res$Significativité %in% c("*", "**", "***")
+)
+# Lignes négatives et significatives
+i_rouge <- which(
+  df_res$'Tendance temporelle'== "\U2198" &
+    df_res$Significativité %in% c("*", "**", "***")
+)
+
+
+tab_model_resultats <- df_res %>%
+flextable::flextable() %>%
+  flextable::autofit() %>%
+  flextable::colformat_int(j = c(1, 3), big.mark = " ") %>%
+  flextable::theme_booktabs() %>%
+  flextable::font(fontname = "calibri", part = "header") %>%
+  flextable::font(fontname = "calibri", part = "body") %>%
+  flextable::fontsize(size = 17, part = "header") %>%
+  flextable::fontsize(size = 17, part = "body") %>%
+  flextable::padding(padding = 10, part = "all") %>% 
+  flextable::bg(part = "all", bg = "white") %>%
+  flextable::align(align = "center", part = "all") %>% 
+  flextable::width(j = "IC 95% GAMM", width = 2.5) %>% 
+  # flextable::bg(i = i_vert, bg = "lightgreen") %>%   # vert clair
+  # flextable::bg(i = i_rouge, bg = "lightcoral")   # rouge clair
+  # flextable::set_caption("Synthèse des tendances des populations de poissons d'eau douce de BFC")
+  # flextable::italic(italic = T, part = "header")
+tab_model_resultats
+tab_model_resultats <- flextable::save_as_image(tab_model_resultats, "../output/tab_model_resultats_esp_complete_V2.png")
+
+```
+
+
+```{r}
+tab_model_resultats <- flextable::save_as_image(tab_model_resultats, "../output/tab_model_resultats.png")
+```
+
+
+
+
+
+
