@@ -65,14 +65,13 @@ load(file = "../processed_data/selection_especes.rda")
 load(file = "../processed_data/selection_pop_ope.rda")
 load(file = "../processed_data/donnees_densite_eff_abs.rda")
 load(file = "../processed_data/assemblage_tab_par_ope.rda")
-load(file = "../processed_data/resultats_modele.rda")
+load(file = "../processed_data/resultats_modele_glmm.rda")
+load(file = "../processed_data/resultats_modele_gamm.rda")
 ```
 
 ```{r Chargement des fonctions}
-source(file = "../R/zip_glmm_calcul_modele.R")
 source(file = "../R/zip_glmm_application_modele.R")
-source(file = "../R/gamm_calcul_modele.R")
-source(file = "../R/gamm_application_modele.R")
+source(file = "../R/glmm_application_modele.R")
 source(file = "../R/adequate_data_for_model.R")
 ```
 
@@ -84,7 +83,7 @@ load(rdata_tables) # Chargement des données
 ```
 
 
-## Preparation du df 
+# Preparation du dataframe pour la densité surfacique
 
 ```{r}
 # preparer la table pour jointure
@@ -116,86 +115,181 @@ ope_effectif_glmm_abs <- ope_indicateur %>%
 ```
 
 
+## Coût des paramètres des modèles / Robustesse
+
+  Pour les modèles GLMM utilisés dans le cadre de cette étude, on calcule préalablement le nombre de données nécessaire pour construire des modèles robustes avec la fonction **adequate_data_for_model ()**. Pour résumer, 
+1 paramètre du modèle nécessite 10 données (i.e. 10 lignes) minimum pour avoir un résultat robuste.
+
+  La fonction renvoie un dataframe avec le nombre de données nécessaire au modèle par espèce. Lorsqu'il y a un écart jugé trop grand entre le nombre de données théorique nécessaire et le nombre de données réelles, le modèle n'est pas testé. 
 
 ```{r}
-data_esp <- ope_effectif_glmm_abs %>% 
-  filter(espece == "LOT")
+mes_especes <- c("ABL","ANG","BAF","BLN","BRB", "BRE","BRO","CCO","CHA","CHE", "EPI", "EPT", "GAR", "GOU","LOF","LOR", "LOT","LPM" ,"LPP", "OBR", "PER", "ROT", "SAT", "SPI", "TAN", "TOX", "TRF","VAI","VAN","VAR")
+
+robustesse_modele <- adequate_data_for_model(ope_effectif_glmm_abs, esp = mes_especes)
+robustesse_modele
 ```
 
-###a. **Modèles Linéaires Généralisé Mixtes (GLMM)**
 
-Construire les modèles :
+# Application du modèle **Modèles Linéaires Généralisé Mixtes (GLMM)** avec la densité
+
+Définition de la période d'étude : 
 
 ```{r}
-mod_zi_1.0 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) +pro_libelle + (1 |
-                                                           sta_id) ,
-  data = data_esp,
-  family = poisson(link = "log"),
-  ziformula = ~ 1
+liste_periodes_etude <- list(c(2007, 2025)) # Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin) 
+```
+
+```{r Exécution fonction ZIP_GLMM}
+zip_glmm_resultats <- zip_glmm_application_modele(data = ope_effectif_glmm_abs,
+liste_periodes = liste_periodes_etude)
+```
+
+
+```{r Mise en forme sortie fonction ZIP_GLMM}
+zip_glmm_resultats_annee <- zip_glmm_resultats %>% 
+  filter(row_name == "annee") %>% 
+  separate_wider_delim(periode, delim = "-", 
+                        names = c("annee_debut", "annee_fin"), 
+                        cols_remove = FALSE) %>%  # garde la colonne periode originale
+  mutate(
+    annee_debut = as.numeric(annee_debut),
+    annee_fin   = as.numeric(annee_fin),
+    nb_annees   = annee_fin - annee_debut
+  ) %>% 
+  select(periode, esp_code_alternatif, p_value, Estimate, sig, family, nb_annees) %>% 
+  mutate(
+    trend = case_when(
+      Estimate > 0 ~ "\U2197",
+      Estimate < 0 ~ "\U2198",
+      TRUE ~ "."
+    ),    # Ajouter le calcul de taux de changement dans la population
+    rate_change = (exp(Estimate * nb_annees) - 1) * 100
 )
-mod_zi_1.1 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
-  family = nbinom2(link = "log"),
-  data = data_esp,
-  ziformula = ~ 1
-)
-mod_zi_1.2 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
-  family = truncated_poisson(link = "log"),
-  data = data_esp,
-  ziformula = ~ 1
-)
-mod_zi_1.3 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + (1 | sta_id) ,
-  family = truncated_nbinom2(link = "log"),
-  data = data_esp,
-  ziformula = ~ 1
-)
-mod_zi_1.4 <- glmmTMB(
-  valeur ~ annee + offset(log(ope_surface_calculee)) + pro_libelle + sta_id +(1 | sta_id) ,
-  family = poisson(link = "log"),
-  data = data_esp
-)
+```
+
+
+```{r Sélection des données résultats ZIP_GLMM}
+# Filtrer les données selon les critères spécifiés
+zip_glmm_resultats_format <- zip_glmm_resultats_annee %>%
+  filter((esp_code_alternatif == "ANG" & periode == "2007-2025") |
+    (esp_code_alternatif %in% c(c("ABL","BAF","BLN","BRB", "BRE","BRO","CCO","CHA","CHE", "EPI", "EPT", "GAR", "GOU","HOT","LOF",   "LOR", "LOT","LPM" ,"LPP", "OBR", "PER", "ROT", "SAT", "SPI", "TAN", "TOX", "TRF","VAI","VAN","VAR")) & periode == "2007-2025"))
+
 ```
 
 
 ```{r}
-summary(mod_zi_1.4)
+df_zip_glmm_resultats <- zip_glmm_resultats_format %>%
+  dplyr::select(esp_code_alternatif,
+                periode,
+                trend,
+                sig,
+                rate_change,
+                family,
+                Estimate) %>%
+  mutate(
+    Estimate = round(Estimate, digits = 2),
+    rate_change = round(rate_change, 2),
+    indicateur = "Densité"
+  ) %>%
+  rename(
+    "Code Espèce" = esp_code_alternatif,
+    "Periode" = periode,
+    "Indicateur" = indicateur,
+    "Tendance" = trend,
+    "Coefficient" = Estimate,
+    "Significativité" = sig,
+    "Taux de changement" = rate_change,
+    "Modèle" = family
+  ) %>%
+  arrange(`Code Espèce`) %>% # Ordonner par espèce, indicateur et stade
+  mutate(
+    `Modèle` = case_when(
+      `Modèle` == "ZI_Poisson"              ~ "GLMM - Zero inflated - Poisson",
+      `Modèle` == "ZI_Negative_Binomial"    ~ "GLMM - Zero inflated - Negative binomiale",
+      `Modèle` == "Hurdle_Poisson"          ~ "GLMM - Hurdle Poisson",
+      `Modèle` == "Hurdle_Negative_Binomial" ~ "GLMM - Hurdle Negative binomiale",
+      TRUE ~ `Modèle`  # garde la valeur d'origine si aucune correspondance
+    )
+  ) 
 ```
 
-
-On selectionne à l'aide du critère AIC le meilleur modèle c'est à dire le modèle avec le plus petit AIC. 
-
+## Graphique pour glmm et gamm
 ```{r}
-AIC(mod_zi_1.0, mod_zi_1.1, mod_zi_1.2, mod_zi_1.3)
-```
+df_res <- df_zip_glmm_resultats %>%
+  rename(
+    espece = `Code Espèce`, 
+          periode = Periode) %>% 
+  mutate(`Famille de distribution` = case_when(
+   `Famille de distribution` == "ZI_Poisson"              ~ "Zero inflated - Poisson",
+    `Famille de distribution` == "ZI_Negative_Binomial"    ~ "Zero inflated - Negative binomiale",
+    `Famille de distribution` == "Hurdle_Poisson"          ~ "Hurdle Poisson",
+   `Famille de distribution` == "Hurdle_Negative_Binomial" ~ "Hurdle Negative binomiale",
+    TRUE ~ `Famille de distribution`  # garde la valeur d'origine si aucune correspondance
+  )) %>% 
+  left_join(res_test, by = c("periode", "espece")) %>%
+  select(
+    espece,
+    periode,
+    Tendance,
+    Significativité,
+    `Famille de distribution`,
+    `Taux de changement`,
+    rate_change_gamm,
+    `IC 95%`
+    ) %>% 
+  mutate (rate_change_gamm = round(rate_change_gamm, 2))
+# %>%
+#   filter(espece == "TRF" |
+#            espece == "BRO" | espece == "SPI" | espece == "LOT")
 
-Verification de l'ajustement des modèles au données : 
-```{r, fig.height = 10, fig.width = 20}
-res_mod_zi_1.0 <- as.ggplot(~ plotresid(mod_zi_1.0))
-res_mod_zi_1.1 <- as.ggplot(~ plotresid(mod_zi_1.1))
-res_mod_zi_1.2 <- as.ggplot(~ plotresid(mod_zi_1.2))
-res_mod_zi_1.3 <- as.ggplot(~ plotresid(mod_zi_1.3))
+df_res <- df_res %>%
+  rename(
+    "Code Espèce" = espece,
+    "Periode" = periode,
+    "Tendance temporelle" = Tendance,
+    # "Significativité" = sig,
+    "Taux de changement GLMM" = `Taux de changement`,
+    "Famille de distribution GLMM" = `Famille de distribution`,
+    "Taux de changement GAMM" = rate_change_gamm,
+    "IC 95% GAMM" = `IC 95%`
+  ) 
 
-ggarrange(
-  res_mod_zi_1.0,
-  res_mod_zi_1.1,
-  res_mod_zi_1.2,
-  res_mod_zi_1.3,
-  ncol = 2,
-  nrow = 2,
-  labels = c("poisson", "nbinom2", "truncated_poisson", "truncated_nbinom2"),
-  font.label = list(
-    size = 13,
-    color = "darkred",
-    face = "bold",
-    family = NULL
-  ),
-  hjust = -0.1,
-  vjust = 1.6,
-  align = c("none", "h", "v", "hv")
+# Lignes positives et significatives
+i_vert  <- which(
+  df_res$'Tendance temporelle' == "\U2197" &
+    df_res$Significativité %in% c("*", "**", "***")
 )
+# Lignes négatives et significatives
+i_rouge <- which(
+  df_res$'Tendance temporelle'== "\U2198" &
+    df_res$Significativité %in% c("*", "**", "***")
+)
+
+
+tab_glmm_resultats <- df_res %>%
+  flextable::flextable() %>%
+  flextable::autofit() %>%
+  # flextable::colformat_int(j = c(1, 3), big.mark = " ") %>%
+  flextable::theme_booktabs() %>%
+  flextable::font(fontname = "Calibri", part = "all") %>%
+  flextable::fontsize(size = 16, part = "all") %>%
+  flextable::padding(padding = 10, part = "header") %>%
+  flextable::align(align = "center", part = "all") %>% 
+  flextable::hline(border = officer::fp_border(width = 2.5, color="grey80"), part = "header") %>% 
+  flextable::hline_bottom(border = officer::fp_border(width = 2.5, color="grey80")) %>% 
+  flextable::hline_top(border = officer::fp_border(width = 2.5, color="grey80")) %>% 
+  flextable::border_inner_h(border = officer::fp_border(width = 1.8, color="grey80")) %>% 
+  flextable::border_outer(border = officer::fp_border(width = 2.5, color="grey70")) %>% 
+  flextable::vline_right(border = officer::fp_border(color="white")) %>% 
+  flextable::vline_left(border = officer::fp_border(color="white")) %>% 
+  # flextable::italic(j = "Package", italic = TRUE, part = "body")
+  flextable::bg(i = i_vert, bg = "lightgreen") %>%   # vert clair
+  flextable::bg(i = i_rouge, bg = "lightcoral")   # rouge clair
+  # flextable::set_caption("Synthèse des tendances des populations de poissons d'eau douce de BFC")
+  # flextable::italic(italic = T, part = "header")
+
+# tab_glmm_resultats
+# tab_glmm_resultats <- flextable::save_as_image(tab_glmm_resultats, "../output/tab_zip_glmm_resultats_all.png")
+
 ```
 
 
@@ -204,10 +298,8 @@ ggarrange(
 
 
 
+# Preparation du dataframe pour les Occurences
 
-
-
-# Occurence en fonction des annees
 ```{r}
 # preparer la table pour jointure
 ope_selection <- ope_selection %>%
@@ -238,16 +330,13 @@ ope_occurence_glmm <- ope_indicateur %>%
   filter(stade == "ind")
 ```
 
-```{r}
-source(file = "../R/glmm_calcul_modele.R")
-source(file = "../R/glmm_application_modele.R")
-```
+# Application du modèle **Modèles Linéaires Généralisé Mixtes (GLMM)** avec les occurences
+
+Définition de la période d'étude : 
 
 ```{r}
 liste_periodes_etude <- list(c(2007, 2025)) # Liste des périodes (chaque période est un vecteur avec l'année de début et l'année de fin) 
 ```
-
-### Application du modèle GLMM avec les occurences
 
 ```{r Exécution fonction GLMM}
 glmm_resultats <- glmm_application_modele(data = ope_occurence_glmm,
@@ -297,15 +386,28 @@ df_glmm_occu_resultats <- glmm_resultats_format %>%
   mutate(
     rate_change = round(rate_change, 2),
     Estimate = round(Estimate, digits = 2),
-    ) %>%
+    family = case_when(
+      family == "Cloglog" ~ "GLMM - Binomiale - Cloglog",
+      family == "Cauchit" ~ "GLMM - Binomiale - Poisson",  
+      family == "Probit"  ~ "GLMM - Binomiale - Probit",
+      family == "Logit"   ~ "GLMM - Binomiale - Logit",
+      TRUE ~ family  # garde la valeur d'origine si aucune correspondance
+    ), 
+    indicateur = "Occurence", 
+    modele = "GLMM") %>% 
+  select(esp_code_alternatif, indicateur, periode, trend, sig,
+         rate_change,
+         family, 
+         Estimate) %>% 
   rename(
     "Code Espèce" = esp_code_alternatif,
     "Periode" = periode,
+    "Indicateur" = indicateur,
     "Tendance" = trend,
     "Coefficient" = Estimate,
     "Significativité" = sig,
     "Taux de changement" = rate_change,
-    "Fonction de lien" = family
+    "Modèle" = family
   ) %>%
   arrange(`Code Espèce`) # Ordonner par espèce, indicateur et stade
 
@@ -338,12 +440,281 @@ flextable::flextable() %>%
   # flextable::italic(italic = T, part = "header")
 tab_glmm_resultats
 
-tab_glmm_resultats <- flextable::save_as_image(tab_glmm_resultats, "../output/tab_glmm_occu_resultats_esp_complete_V2.png")
+# tab_glmm_resultats <- flextable::save_as_image(tab_glmm_resultats, "../output/tab_glmm_occu_resultats_esp_complete_V2.png")
 ```
 
 
 # Biomasse en fonction des annees
 
 
+Va quantitative continue : lmer () du package lme4
+
+
+```{r}
+# preparer la table pour jointure
+ope_selection <- ope_selection %>%
+  dplyr::select(ope_id, pop_id, sta_id) %>% 
+  mutate(pop_id = as.factor(pop_id))
+
+# prepéarer la table pour jointure 
+esp_ope_selection_join <- esp_ope_selection %>% 
+  dplyr::select(ope_id, ope_surface_calculee) %>% 
+  distinct(ope_id, .keep_all = TRUE)
+
+ope_biomasse_glmm <- ope_indicateur %>%
+  filter(indicateur == "biomasse") %>% 
+  mef_ajouter_type_protocole() %>% 
+  left_join( y= ope_selection, by = c("ope_id", "pop_id", "annee")) %>% 
+  inner_join(esp_ope_selection_join, by = "ope_id") %>% 
+  mutate(
+    valeur = as.numeric(valeur) ,
+    annee = as.numeric(annee),
+    ope_surface_calculee = as.numeric(ope_surface_calculee),
+    pro_libelle = as.factor(pro_libelle),
+    pop_id = as.factor(pop_id),
+    sta_id = as.factor(sta_id),
+    stade = as.factor(stade)
+  ) %>% 
+  rename(espece = esp_code_alternatif) %>% 
+  filter(stade == "ind")
+```
+
+
+```{r}
+data_esp <- ope_biomasse_glmm %>%
+  filter(espece == "BRO") %>% 
+  filter(valeur > 0)
+# %>% 
+#   mutate(annee = as.factor(annee))
+```
+
+
+```{r}
+# mod_1 <- lmer(valeur ~ annee  + pro_libelle + (1 | sta_id), data = data_esp)
+
+model <- glmer(
+  valeur ~ annee  + pro_libelle + (1 |
+                                     sta_id),
+  data = data_esp,
+  family = gaussian(link = "identity")
+)
+
+disp <- overdisp.glmer(model)
+
+```
+
+
+```{r}
+mon_espece <- "BRO"
+link = "log"
+family = "gaussian"
+plot <- as.ggplot( ~ plot(simulateResiduals(fittedModel = model, n = 1000), quantreg = T)) +
+  labs (title = mon_espece, subtitle = family) +
+  theme(
+    plot.title = element_text(
+      hjust = 0,
+      vjust = 1,
+      face = "bold",
+      size = 15
+    ),
+    plot.subtitle = element_text(
+      hjust = 0,
+      vjust = 1,
+      face = "bold.italic",
+      size = 12
+    )
+  )
+
+plot 
+
+#test de la fonction 
+res <- check_glmm_model (
+  data = data_esp,
+  mon_espece = "BRO",
+  indicateur = "biomasse", 
+  family = "gaussian", 
+  link = "identity"  )
+
+
+
+res <- check_glmm_model(
+  data = data_esp, 
+  mon_espece = "BRO", 
+  family = "nbinom2", 
+  link = "log")
+res
+```
+
+```{r}
+ggplot(data = data_esp, aes(x = annee, y = valeur))+
+   geom_point(shape = 21, size = 2) +
+  geom_smooth(method = "lm",
+                se = F,
+                color = "darkred")+
+  scale_y_continuous(limits = c(0,1000))
+
+```
+
+```{r}
+summary(mod_1
+        )
+```
+```{r}
+Anova(mod_1)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Gamm densité 
+
+```{r Mise en forme sortie fonction GLMM}
+df_gamm_resultats <- df_gamm_tx_evolution %>%
+  mutate(
+    trend = case_when(
+      rate_change_gamm > 0 ~ "\U2197",
+      rate_change_gamm < 0 ~ "\U2198",
+      TRUE ~ "."
+    ),
+    family = "GAMM - Negative binomiale - log", 
+    indicateur = "Densité",
+  ) %>%
+  select(espece, periode, indicateur,  trend, rate_change_gamm, family, `IC 95%`) %>%
+  rename(
+    "Code Espèce" = espece,
+    "Indicateur" = indicateur, 
+    "Periode" = periode,
+    "Tendance" = trend,
+    "Taux de changement" = rate_change_gamm,
+    "Modèle" = family
+  )
+```
+
+# Graphique pour fiche espèces 
+
+
+```{r}
+res_glmm_gamm <- bind_rows(df_zip_glmm_resultats,
+                           df_glmm_occu_resultats,
+                           df_gamm_resultats) %>%
+  arrange(`Code Espèce`) %>% # Ordonner les espèce par ordre alphabétique
+  filter(!`Code Espèce` == "HOT") %>%
+  select(
+    "Code Espèce",
+    "Periode",
+    "Indicateur",
+    "Modèle",
+    "Tendance",
+    "Significativité",
+    "Taux de changement",
+    "IC 95%"
+  ) %>%
+  mutate(`Taux de changement` = round(`Taux de changement`, 2))
+```
+
+```{r}
+# Lignes positives et significatives
+i_vert  <- which(
+  res_glmm_gamm$Tendance == "\U2197" &
+    res_glmm_gamm$Significativité %in% c("*", "**", "***")
+)
+# Lignes négatives et significatives
+i_rouge <- which(
+  res_glmm_gamm$Tendance == "\U2198" &
+    res_glmm_gamm$Significativité %in% c("*", "**", "***")
+)
+tab_res_glmm_gamm <- res_glmm_gamm %>% 
+  flextable::flextable() %>%
+  flextable::autofit() %>%
+  # flextable::colformat_int(j = c(1, 3), big.mark = " ") %>%
+  flextable::theme_booktabs() %>%
+  flextable::font(fontname = "Calibri", part = "header") %>%
+  flextable::font(fontname = "Calibri", part = "body") %>%
+  flextable::fontsize(size = 17, part = "all") %>%
+  flextable::padding(padding = 10, part = "header") %>%
+  flextable::align(align = "center", part = "all") %>% 
+  # flextable::merge_at(i = 1:4, j= 1) %>% 
+  # flextable::merge_at(i = 1:4, j= 2) %>%
+  # flextable::merge_at(i = 1:4, j= 3) %>%
+  # flextable::merge_at(i = 1:4, j= 5) %>% 
+  flextable::hline(border = officer::fp_border(width = 2.5, color="grey80"), part = "header") %>% 
+  flextable::hline_bottom(border = officer::fp_border(width = 2.5, color="grey80")) %>% 
+  flextable::hline_top(border = officer::fp_border(width = 2.5, color="grey80")) %>% 
+  flextable::border_inner_h(border = officer::fp_border(width = 1.8, color="grey80")) %>% 
+  flextable::border_outer(border = officer::fp_border(width = 2.5, color="grey70")) %>% 
+  flextable::vline_right(border = officer::fp_border(color="white")) %>% 
+  flextable::vline_left(border = officer::fp_border(color="white"))  %>% 
+  flextable::bg(i = i_vert, bg = "lightgreen") %>%   # vert clair
+  flextable::bg(i = i_rouge, bg = "lightcoral")   # rouge clair
+tab_res_glmm_gamm
+# tab_res_glmm_gamm <- flextable::save_as_image(tab_res_glmm_gamm, "../output/tab_res_glmm_gamm.png")
+```
+
+# Graphique synthèse resultats modèle par espèce
+```{r}
+res_glmm_gamm_esp <- res_glmm_gamm %>% 
+  filter(`Code Espèce` == "BRO") 
+
+# Lignes positives et significatives
+i_vert  <- which(
+  res_glmm_gamm_esp$Tendance == "\U2197" &
+    res_glmm_gamm_esp$Significativité %in% c("*", "**", "***")
+)
+# Lignes négatives et significatives
+i_rouge <- which(
+  res_glmm_gamm_esp$Tendance == "\U2198" &
+    res_glmm_gamm_esp$Significativité %in% c("*", "**", "***")
+)
+tab_res_glmm_gamm_esp <- res_glmm_gamm_esp %>% 
+  flextable::flextable() %>%
+  flextable::autofit() %>%
+  # flextable::colformat_int(j = c(1, 3), big.mark = " ") %>%
+  flextable::theme_booktabs() %>%
+  flextable::font(fontname = "Calibri", part = "header") %>%
+  flextable::font(fontname = "Calibri", part = "body") %>%
+  flextable::fontsize(size = 17, part = "all") %>%
+  flextable::padding(padding = 10, part = "header") %>%
+  flextable::align(align = "center", part = "all") %>% 
+  # flextable::merge_at(i = 1:4, j= 1) %>% 
+  # flextable::merge_at(i = 1:4, j= 2) %>%
+  # flextable::merge_at(i = 1:4, j= 3) %>%
+  # flextable::merge_at(i = 1:4, j= 5) %>% 
+  flextable::hline(border = officer::fp_border(width = 2.5, color="grey80"), part = "header") %>% 
+  flextable::hline_bottom(border = officer::fp_border(width = 2.5, color="grey80")) %>% 
+  flextable::hline_top(border = officer::fp_border(width = 2.5, color="grey80")) %>% 
+  flextable::border_inner_h(border = officer::fp_border(width = 1.8, color="grey80")) %>% 
+  flextable::border_outer(border = officer::fp_border(width = 2.5, color="grey70")) %>% 
+  flextable::vline_right(border = officer::fp_border(color="white")) %>% 
+  flextable::vline_left(border = officer::fp_border(color="white")) 
+  # flextable::bg(i = i_vert, bg = "lightgreen") %>%   # vert clair
+  # flextable::bg(i = i_rouge, bg = "lightcoral")   # rouge clair
+tab_res_glmm_gamm_esp
+tab_res_glmm_gamm_esp <- flextable::save_as_image(tab_res_glmm_gamm_esp, "../output/tab_result_models/tab_res_glmm_gamm_BRO.png")
+```
+
+# Sauvergarde
+
+```{r Sauvegarde}
+# save(
+#   res_glmm_gamm,
+#   zip_glmm_resultats,
+#   df_zip_glmm_resultats,
+#   glmm_resultats,
+#   df_glmm_occu_resultats,
+#   file = "../processed_data/resultats_modele_glmm.rda"
+# )
+```
 
 

@@ -152,7 +152,7 @@ ope_biomasse <- mei_ope_selection %>% # Calcul de la biomasse par opération san
   group_by(ope_id,
            esp_code_alternatif,
            stade) %>%
-  summarise(valeur=sum(poids_tp, na.rm = TRUE)) %>% 
+  summarise(valeur=sum(mei_poids, na.rm = TRUE)) %>% #On travail sur le poids mesuré et pas su rle poids estimé poids_tp
   mutate(indicateur= "biomasse") %>% 
   dplyr::select(ope_id,
          esp_code_alternatif,

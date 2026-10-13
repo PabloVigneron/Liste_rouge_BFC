@@ -150,13 +150,14 @@ pourcentage (taux d’évolution) de la taille de la population entre 2007 et 20
 été considérées significatives lorsque l’intervalle de confiance (IC) à 95 % calculé à partir 
 d’échantillons de bootstrap, de la variation estimée qui n'inclut pas zéro, ce qui indiquait une 
 augmentation significative ou une diminution significative  (Knape, 2016).  
+
 ```{r}
-df_res_gamm_tx_evolution <- gamm_poptrend_change(ope_effectif_glmm_abs, liste_periodes = list(c(2007, 2025)))
+df_gamm_tx_evolution <- gamm_poptrend_change(ope_effectif_glmm_abs, liste_periodes = list(c(2007, 2025)))
 
 ```
 
 ```{r}
-res_test <- df_res_gamm_tx_evolution %>% 
+df_gamm_tx_evolution <- df_gamm_tx_evolution %>% 
   mutate(`IC 95%` = paste0("[", IC_inf,"%", " ; ", IC_sup,"%","]"))
 ```
 
@@ -237,7 +238,13 @@ tab_model_resultats <- flextable::save_as_image(tab_model_resultats, "../output/
 ```
 
 
+# Sauvergarde
 
-
+```{r Sauvegarde}
+save(
+  df_gamm_tx_evolution,
+  file = "../processed_data/resultats_modele_gamm.rda"
+)
+```
 
 
