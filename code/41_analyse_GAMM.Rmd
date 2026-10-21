@@ -155,10 +155,29 @@ augmentation significative ou une diminution significative  (Knape, 2016).
 df_gamm_tx_evolution <- gamm_poptrend_change(ope_effectif_glmm_abs, liste_periodes = list(c(2007, 2025)))
 
 ```
+Après avoir executé la fonction **gamm_poptrend_change()**, on crée plusieurs colonnes dans le df : 
+ 
+ - Une colonne `IC 95%` avec l'intervalle de confiance à 95% boostraps 
+ - Une colonne `sig` qui correspond à la significativité des modèles gamm
+ 
+Le taux de changement dans la population d'un modèle gamm est significatifs d'après (knape et at., 2016), à partir du moment où l'intervalle de confiance est strictement supérieur à 0 ou strictement inférieur à 0.
 
 ```{r}
-df_gamm_tx_evolution <- df_gamm_tx_evolution %>% 
-  mutate(`IC 95%` = paste0("[", IC_inf,"%", " ; ", IC_sup,"%","]"))
+# Ajouter une colonne avec l'intervalle de confiance à 95% boostraps 
+
+df_gamm_tx_evolution <- df_gamm_tx_evolution %>%
+  mutate(
+    `IC 95%` = paste0("[", IC_inf, "%", " ; ", IC_sup, "%", "]"),
+    sig = if_else(
+      str_detect(IC_inf, "-") == TRUE &
+        str_detect(IC_sup, "-") == TRUE | (
+          str_starts(IC_inf, "[:digit:]") == TRUE &
+            str_starts(IC_sup, "[:digit:]") == TRUE
+        ),
+      "S",
+      "NS"
+    )
+  )
 ```
 
 

@@ -57,7 +57,8 @@ library(gstat)# semi_variogramme
 library(DHARMa) # Ajustement des modèles
 library(ggplotify)
 library(ggpubr)
-
+library(flextable) # pour faire des tableaux
+library(wesanderson) # Palette de couleur
 ```
 
 ```{r Chargement des données}
@@ -112,6 +113,61 @@ ope_effectif_glmm_abs <- ope_indicateur %>%
   ) %>% 
   rename(espece = esp_code_alternatif) %>% 
   filter(stade == "ind")
+```
+
+## Creation d'une fonction qui compte le nombre de stations et opérations de pêche
+
+```{r}
+pal <- wes_palette("AsteroidCity1", 2) # Chargement des palettes de couleur
+```
+
+```{r tableau recapitulatif du nb ope et nb de stations selectionne}
+summary_tab_ope <- ope_effectif_glmm_abs %>%
+  filter(espece == "LOT") %>%
+  group_by(pro_libelle) %>%
+  summarise(
+    total_sta = n_distinct(sta_id),
+    total_ope = n_distinct(ope_id),
+    .groups = "drop"
+  ) %>%
+  select(pro_libelle, total_sta, total_ope)
+
+total_row <- summary_tab_ope %>%
+  summarise(
+    pro_libelle = "TOTAL",
+    total_sta = sum(total_sta, na.rm = TRUE),
+    total_ope = sum(total_ope, na.rm = TRUE)
+  )
+
+summary_ope <- bind_rows(summary_tab_ope, total_row)
+
+final_summary_ope <- flextable(summary_ope) %>%
+  set_header_labels(pro_libelle = "Protocole",
+                    total_sta = "Nombre de stations",
+                    total_ope = "Nombre d'opérations") %>%
+  
+  flextable::autofit() %>%
+  flextable::theme_booktabs() %>%
+  flextable::font(fontname = "Calibri", part = "header") %>%
+  flextable::font(fontname = "Calibri", part = "body") %>%
+  flextable::fontsize(size = 17, part = "all") %>%
+  flextable::padding(padding = 10, part = "all") %>%
+  flextable::align(align = "center", part = "all") %>%
+    bold(i = ~ pro_libelle == "TOTAL", bold = TRUE) %>%
+  flextable::hline(border = officer::fp_border(width = 2.5, color="grey80"), part = "header") %>% 
+  flextable::hline_bottom(border = officer::fp_border(width = 2.5, color="grey80")) %>% 
+  flextable::hline_top(border = officer::fp_border(width = 2.5, color="grey80")) %>% 
+  flextable::border_inner_h(border = officer::fp_border(width = 1.8, color="grey80")) %>% 
+  flextable::border_outer(border = officer::fp_border(width = 2.5, color="grey70")) %>% 
+  flextable::vline_right(border = officer::fp_border(color="white")) %>% 
+  flextable::vline_left(border = officer::fp_border(color="white")) %>% 
+  flextable::bg(bg = "white", part = "all") %>%
+  flextable::bg(i = 1:2, bg = pal) 
+  flextable::bg(i = 1:2, bg = "aquamarine4") 
+
+final_summary_ope
+# final_summary_ope <- flextable::save_as_image(final_summary_ope, "../output/tab_n_sta_ope/final_summary_ope_BRO.png")
+
 ```
 
 
@@ -214,78 +270,78 @@ df_zip_glmm_resultats <- zip_glmm_resultats_format %>%
 
 ## Graphique pour glmm et gamm
 ```{r}
-df_res <- df_zip_glmm_resultats %>%
-  rename(
-    espece = `Code Espèce`, 
-          periode = Periode) %>% 
-  mutate(`Famille de distribution` = case_when(
-   `Famille de distribution` == "ZI_Poisson"              ~ "Zero inflated - Poisson",
-    `Famille de distribution` == "ZI_Negative_Binomial"    ~ "Zero inflated - Negative binomiale",
-    `Famille de distribution` == "Hurdle_Poisson"          ~ "Hurdle Poisson",
-   `Famille de distribution` == "Hurdle_Negative_Binomial" ~ "Hurdle Negative binomiale",
-    TRUE ~ `Famille de distribution`  # garde la valeur d'origine si aucune correspondance
-  )) %>% 
-  left_join(res_test, by = c("periode", "espece")) %>%
-  select(
-    espece,
-    periode,
-    Tendance,
-    Significativité,
-    `Famille de distribution`,
-    `Taux de changement`,
-    rate_change_gamm,
-    `IC 95%`
-    ) %>% 
-  mutate (rate_change_gamm = round(rate_change_gamm, 2))
-# %>%
-#   filter(espece == "TRF" |
-#            espece == "BRO" | espece == "SPI" | espece == "LOT")
-
-df_res <- df_res %>%
-  rename(
-    "Code Espèce" = espece,
-    "Periode" = periode,
-    "Tendance temporelle" = Tendance,
-    # "Significativité" = sig,
-    "Taux de changement GLMM" = `Taux de changement`,
-    "Famille de distribution GLMM" = `Famille de distribution`,
-    "Taux de changement GAMM" = rate_change_gamm,
-    "IC 95% GAMM" = `IC 95%`
-  ) 
-
-# Lignes positives et significatives
-i_vert  <- which(
-  df_res$'Tendance temporelle' == "\U2197" &
-    df_res$Significativité %in% c("*", "**", "***")
-)
-# Lignes négatives et significatives
-i_rouge <- which(
-  df_res$'Tendance temporelle'== "\U2198" &
-    df_res$Significativité %in% c("*", "**", "***")
-)
-
-
-tab_glmm_resultats <- df_res %>%
-  flextable::flextable() %>%
-  flextable::autofit() %>%
-  # flextable::colformat_int(j = c(1, 3), big.mark = " ") %>%
-  flextable::theme_booktabs() %>%
-  flextable::font(fontname = "Calibri", part = "all") %>%
-  flextable::fontsize(size = 16, part = "all") %>%
-  flextable::padding(padding = 10, part = "header") %>%
-  flextable::align(align = "center", part = "all") %>% 
-  flextable::hline(border = officer::fp_border(width = 2.5, color="grey80"), part = "header") %>% 
-  flextable::hline_bottom(border = officer::fp_border(width = 2.5, color="grey80")) %>% 
-  flextable::hline_top(border = officer::fp_border(width = 2.5, color="grey80")) %>% 
-  flextable::border_inner_h(border = officer::fp_border(width = 1.8, color="grey80")) %>% 
-  flextable::border_outer(border = officer::fp_border(width = 2.5, color="grey70")) %>% 
-  flextable::vline_right(border = officer::fp_border(color="white")) %>% 
-  flextable::vline_left(border = officer::fp_border(color="white")) %>% 
-  # flextable::italic(j = "Package", italic = TRUE, part = "body")
-  flextable::bg(i = i_vert, bg = "lightgreen") %>%   # vert clair
-  flextable::bg(i = i_rouge, bg = "lightcoral")   # rouge clair
-  # flextable::set_caption("Synthèse des tendances des populations de poissons d'eau douce de BFC")
-  # flextable::italic(italic = T, part = "header")
+# df_res <- df_zip_glmm_resultats %>%
+#   rename(
+#     espece = `Code Espèce`, 
+#           periode = Periode) %>% 
+#   mutate(`Famille de distribution` = case_when(
+#    `Famille de distribution` == "ZI_Poisson"              ~ "Zero inflated - Poisson",
+#     `Famille de distribution` == "ZI_Negative_Binomial"    ~ "Zero inflated - Negative binomiale",
+#     `Famille de distribution` == "Hurdle_Poisson"          ~ "Hurdle Poisson",
+#    `Famille de distribution` == "Hurdle_Negative_Binomial" ~ "Hurdle Negative binomiale",
+#     TRUE ~ `Famille de distribution`  # garde la valeur d'origine si aucune correspondance
+#   )) %>% 
+#   left_join(res_test, by = c("periode", "espece")) %>%
+#   select(
+#     espece,
+#     periode,
+#     Tendance,
+#     Significativité,
+#     `Famille de distribution`,
+#     `Taux de changement`,
+#     rate_change_gamm,
+#     `IC 95%`
+#     ) %>% 
+#   mutate (rate_change_gamm = round(rate_change_gamm, 2))
+# # %>%
+# #   filter(espece == "TRF" |
+# #            espece == "BRO" | espece == "SPI" | espece == "LOT")
+# 
+# df_res <- df_res %>%
+#   rename(
+#     "Code Espèce" = espece,
+#     "Periode" = periode,
+#     "Tendance temporelle" = Tendance,
+#     # "Significativité" = sig,
+#     "Taux de changement GLMM" = `Taux de changement`,
+#     "Famille de distribution GLMM" = `Famille de distribution`,
+#     "Taux de changement GAMM" = rate_change_gamm,
+#     "IC 95% GAMM" = `IC 95%`
+#   ) 
+# 
+# # Lignes positives et significatives
+# i_vert  <- which(
+#   df_res$'Tendance temporelle' == "\U2197" &
+#     df_res$Significativité %in% c("*", "**", "***")
+# )
+# # Lignes négatives et significatives
+# i_rouge <- which(
+#   df_res$'Tendance temporelle'== "\U2198" &
+#     df_res$Significativité %in% c("*", "**", "***")
+# )
+# 
+# 
+# tab_glmm_resultats <- df_res %>%
+#   flextable::flextable() %>%
+#   flextable::autofit() %>%
+#   # flextable::colformat_int(j = c(1, 3), big.mark = " ") %>%
+#   flextable::theme_booktabs() %>%
+#   flextable::font(fontname = "Calibri", part = "all") %>%
+#   flextable::fontsize(size = 16, part = "all") %>%
+#   flextable::padding(padding = 10, part = "header") %>%
+#   flextable::align(align = "center", part = "all") %>% 
+#   flextable::hline(border = officer::fp_border(width = 2.5, color="grey80"), part = "header") %>% 
+#   flextable::hline_bottom(border = officer::fp_border(width = 2.5, color="grey80")) %>% 
+#   flextable::hline_top(border = officer::fp_border(width = 2.5, color="grey80")) %>% 
+#   flextable::border_inner_h(border = officer::fp_border(width = 1.8, color="grey80")) %>% 
+#   flextable::border_outer(border = officer::fp_border(width = 2.5, color="grey70")) %>% 
+#   flextable::vline_right(border = officer::fp_border(color="white")) %>% 
+#   flextable::vline_left(border = officer::fp_border(color="white")) %>% 
+#   # flextable::italic(j = "Package", italic = TRUE, part = "body")
+#   flextable::bg(i = i_vert, bg = "lightgreen") %>%   # vert clair
+#   flextable::bg(i = i_rouge, bg = "lightcoral")   # rouge clair
+#   # flextable::set_caption("Synthèse des tendances des populations de poissons d'eau douce de BFC")
+#   # flextable::italic(italic = T, part = "header")
 
 # tab_glmm_resultats
 # tab_glmm_resultats <- flextable::save_as_image(tab_glmm_resultats, "../output/tab_zip_glmm_resultats_all.png")
@@ -375,7 +431,7 @@ glmm_resultats_format <- glmm_resultats_annee %>%
 
 ```
 
-Construction d'un tableau récapitulatif des résultats du modèle GLMM :
+Construction d'un tableau récapitulatif des résultats des modèles GLMM occurence :
 
 ```{r}
 df_glmm_occu_resultats <- glmm_resultats_format %>%
@@ -388,7 +444,7 @@ df_glmm_occu_resultats <- glmm_resultats_format %>%
     Estimate = round(Estimate, digits = 2),
     family = case_when(
       family == "Cloglog" ~ "GLMM - Binomiale - Cloglog",
-      family == "Cauchit" ~ "GLMM - Binomiale - Poisson",  
+      family == "Cauchit" ~ "GLMM - Binomiale - Cauchit",  
       family == "Probit"  ~ "GLMM - Binomiale - Probit",
       family == "Logit"   ~ "GLMM - Binomiale - Logit",
       TRUE ~ family  # garde la valeur d'origine si aucune correspondance
@@ -563,21 +619,6 @@ summary(mod_1
 Anova(mod_1)
 ```
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # Gamm densité 
 
 ```{r Mise en forme sortie fonction GLMM}
@@ -591,21 +632,22 @@ df_gamm_resultats <- df_gamm_tx_evolution %>%
     family = "GAMM - Negative binomiale - log", 
     indicateur = "Densité",
   ) %>%
-  select(espece, periode, indicateur,  trend, rate_change_gamm, family, `IC 95%`) %>%
+  select(espece, periode, indicateur,  trend, sig, rate_change_gamm, family, `IC 95%`) %>%
   rename(
     "Code Espèce" = espece,
     "Indicateur" = indicateur, 
     "Periode" = periode,
     "Tendance" = trend,
+    "Significativité" = sig,
     "Taux de changement" = rate_change_gamm,
     "Modèle" = family
   )
 ```
 
-# Graphique pour fiche espèces 
-
+# Mise en forme des df pour graphique de synthèse des modèles 
 
 ```{r}
+# On fusionne les 3 df contenat les résultast des modèles GAMM, des GLMM densité et GLMM occurence
 res_glmm_gamm <- bind_rows(df_zip_glmm_resultats,
                            df_glmm_occu_resultats,
                            df_gamm_resultats) %>%
@@ -624,16 +666,18 @@ res_glmm_gamm <- bind_rows(df_zip_glmm_resultats,
   mutate(`Taux de changement` = round(`Taux de changement`, 2))
 ```
 
+# Graphique synthèse resultats de tous les modèles pour toute les espèces
+
 ```{r}
 # Lignes positives et significatives
 i_vert  <- which(
   res_glmm_gamm$Tendance == "\U2197" &
-    res_glmm_gamm$Significativité %in% c("*", "**", "***")
+    res_glmm_gamm$Significativité %in% c("*", "**", "***", "S")
 )
 # Lignes négatives et significatives
 i_rouge <- which(
   res_glmm_gamm$Tendance == "\U2198" &
-    res_glmm_gamm$Significativité %in% c("*", "**", "***")
+    res_glmm_gamm$Significativité %in% c("*", "**", "***", "S")
 )
 tab_res_glmm_gamm <- res_glmm_gamm %>% 
   flextable::flextable() %>%
@@ -659,23 +703,24 @@ tab_res_glmm_gamm <- res_glmm_gamm %>%
   flextable::bg(i = i_vert, bg = "lightgreen") %>%   # vert clair
   flextable::bg(i = i_rouge, bg = "lightcoral")   # rouge clair
 tab_res_glmm_gamm
-# tab_res_glmm_gamm <- flextable::save_as_image(tab_res_glmm_gamm, "../output/tab_res_glmm_gamm.png")
+tab_res_glmm_gamm <- flextable::save_as_image(tab_res_glmm_gamm, "../output/tab_result_models/tab_res_glmm_gamm_full.png")
 ```
 
 # Graphique synthèse resultats modèle par espèce
 ```{r}
 res_glmm_gamm_esp <- res_glmm_gamm %>% 
-  filter(`Code Espèce` == "BRO") 
+  filter(`Code Espèce` == "TRF") 
 
 # Lignes positives et significatives
 i_vert  <- which(
   res_glmm_gamm_esp$Tendance == "\U2197" &
-    res_glmm_gamm_esp$Significativité %in% c("*", "**", "***")
+    res_glmm_gamm_esp$Significativité %in% c("*", "**", "***", "S")
 )
 # Lignes négatives et significatives
 i_rouge <- which(
+  
   res_glmm_gamm_esp$Tendance == "\U2198" &
-    res_glmm_gamm_esp$Significativité %in% c("*", "**", "***")
+    res_glmm_gamm_esp$Significativité %in% c("*", "**", "***", "S")
 )
 tab_res_glmm_gamm_esp <- res_glmm_gamm_esp %>% 
   flextable::flextable() %>%
@@ -685,7 +730,7 @@ tab_res_glmm_gamm_esp <- res_glmm_gamm_esp %>%
   flextable::font(fontname = "Calibri", part = "header") %>%
   flextable::font(fontname = "Calibri", part = "body") %>%
   flextable::fontsize(size = 17, part = "all") %>%
-  flextable::padding(padding = 10, part = "header") %>%
+  flextable::padding(padding = 10, part = "all") %>%
   flextable::align(align = "center", part = "all") %>% 
   # flextable::merge_at(i = 1:4, j= 1) %>% 
   # flextable::merge_at(i = 1:4, j= 2) %>%
@@ -697,18 +742,18 @@ tab_res_glmm_gamm_esp <- res_glmm_gamm_esp %>%
   flextable::border_inner_h(border = officer::fp_border(width = 1.8, color="grey80")) %>% 
   flextable::border_outer(border = officer::fp_border(width = 2.5, color="grey70")) %>% 
   flextable::vline_right(border = officer::fp_border(color="white")) %>% 
-  flextable::vline_left(border = officer::fp_border(color="white")) 
-  # flextable::bg(i = i_vert, bg = "lightgreen") %>%   # vert clair
-  # flextable::bg(i = i_rouge, bg = "lightcoral")   # rouge clair
+  flextable::vline_left(border = officer::fp_border(color="white")) %>% 
+  flextable::bg(bg = "white", part = "all") %>% 
+  flextable::bg(i = i_vert, bg = "lightgreen") %>%   # vert clair
+  flextable::bg(i = i_rouge, bg = "lightcoral")   # rouge clair
 tab_res_glmm_gamm_esp
-tab_res_glmm_gamm_esp <- flextable::save_as_image(tab_res_glmm_gamm_esp, "../output/tab_result_models/tab_res_glmm_gamm_BRO.png")
+tab_res_glmm_gamm_esp <- flextable::save_as_image(tab_res_glmm_gamm_esp, "../output/tab_result_models/tab_res_glmm_gamm_TRF.png")
 ```
 
 # Sauvergarde
 
 ```{r Sauvegarde}
 # save(
-#   res_glmm_gamm,
 #   zip_glmm_resultats,
 #   df_zip_glmm_resultats,
 #   glmm_resultats,

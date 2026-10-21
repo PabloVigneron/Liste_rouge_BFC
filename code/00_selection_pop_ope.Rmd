@@ -48,6 +48,7 @@ library(mapview)
 library(COGiter)
 library(sf)
 library(flextable)
+library(ggh4x)
 ```
 
 ```{r installation des packages}
@@ -604,7 +605,7 @@ Certaines stations ont été concernées par une erreur de protocole de suivis c
 
 ### Graphique final stations 
 
-```{r Représentation finale séries temporelles, fig.height = 48, fig.width = 32}
+```{r Représentation finale séries temporelles, fig.height = 48, fig.width = 28}
 ope_selection %>% # Représentation graphique des stations sélectionnées et des types de pêche associées
   ggplot(
     aes(
@@ -637,6 +638,53 @@ ope_selection %>% # Représentation graphique des stations sélectionnées et de
   ) +
   coord_flip() +
   scale_y_continuous(breaks = seq(min(ope_selection$annee), max(ope_selection$annee), by = 3))
+```
+
+
+
+```{r Test , fig.height = 26, fig.width = 26}
+ope_selection %>% 
+  arrange(pop_libelle) %>% # Représentation graphique des stations sélectionnées et des types de pêche associées
+  ggplot(aes(
+    x = as.character(pop_libelle),
+    y = annee,
+    fill = pro_libelle
+  )) +
+  geom_tile() +
+  facet_grid2(
+    ~ pro_libelle,
+    scales = "free",
+    independent = "y"
+    # labeller = labeller(indicateur = indicateur_labels)
+  ) +
+  facetted_pos_scales(x = list(
+    scale_x_discrete(position = "bottom"),
+    scale_x_discrete(position = "top")
+  )) +
+  scale_fill_manual(values = pal) +
+  scale_y_continuous(breaks = seq(min(ope_selection$annee), max(ope_selection$annee), by = 2)) +
+  labs(
+    # title = "Les points de prélèvements sélectionnés et les types de pêches associées",
+    # subtitle = "Région Bourgogne-Franche-Comté",
+    x = "",
+    y = "Années",
+    fill = "Type de pêche"
+  ) +
+  theme(
+    strip.background = element_rect(color = "grey35", fill = "grey88"),
+    strip.text = element_text(size = 18, face = "bold"),
+    panel.border = element_rect(color = "grey35"),
+    panel.grid.major = element_line(color = "#ffffff", size = 0.1),
+    panel.grid.minor = element_line(color = "#ffffff"),
+    panel.background = element_rect(fill = "#faf0e6"),
+    legend.position = "bottom",
+    legend.text = element_text(size = 18),
+    legend.title = element_text(size = 15),
+    axis.text.y = element_text(size = 20) # taille noms stations
+  ) +
+  coord_flip()
+
+
 ```
 
 ```{r tableau recapitulatif final du nb ope et nb de stations selectionne}

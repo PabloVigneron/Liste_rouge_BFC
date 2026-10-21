@@ -63,7 +63,7 @@ time_series_chart_sp <- function (data, mon_espece, mes_indicateurs)
     "taux_occurrence" = "Taux d'occurrence",
     "biomasse" = "Biomasse")
   # Tracer le graphique
-  graph <- ggplot(data = filtered_data,aes(x = annee, y = valeur)) +
+  graph <- ggplot(data = filtered_data, aes(x = annee, y = valeur)) +
     facet_grid2(
       espece ~ indicateur,
       scales = "free",
@@ -71,15 +71,24 @@ time_series_chart_sp <- function (data, mon_espece, mes_indicateurs)
       axes = "all",
       labeller = labeller(indicateur = indicateur_labels)
     ) +
-    geom_point(shape = 21, size = 2) +
-    geom_line(linetype = 3, linewidth = 0.5) +
+    geom_point(
+      alpha = 0.7, size = 3,
+      aes(color = indicateur),
+      show.legend = F
+    ) +
+    geom_line(
+      linetype = 3,
+      linewidth = 0.5,
+      aes(color = indicateur),
+      show.legend = F
+    ) +
     labs(
       # title = "Indicateurs de tendances à l'échelle régionale des espèces de poissons d'eau douce de BFC",
       x = "Années",
       y = "Valeur indicateur"
     ) +
     geom_smooth(method = "loess",
-                se = F,
+                se = T,
                 color = "darkred") +
     theme(
       strip.background = element_rect(color = "grey35", fill = "grey90"),
@@ -90,7 +99,7 @@ time_series_chart_sp <- function (data, mon_espece, mes_indicateurs)
       panel.grid.minor = element_line(color = "white"),
       axis.text.x = element_text(angle = 45),
       strip.text = element_text(size = 12)
-    )+
+    ) +
     ggtitle(mon_espece)
   
   return(graph)

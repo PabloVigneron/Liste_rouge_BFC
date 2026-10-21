@@ -101,8 +101,8 @@ graphs <- time_series_charts_sp (
 # Afficher l'ensemble des graphiques : 
 walk(graphs, print)
 
-# Enregistrements de l'ensemble des graphiques 
-iwalk(graphs, ~ ggsave(paste0("graphique_indicateurs_reg_", .y, ".png"), .x, width = 12, height = 3, dpi = 300, path = "../output/graph_indicateurs_reg"))
+# Enregistrements de l'ensemble des graphiques
+iwalk(graphs, ~ ggsave(paste0("graphique_indicateurs_reg_se", .y, ".png"), .x, width = 12, height = 3, dpi = 300, path = "../output/graph_indicateurs_reg"))
 
 ```
 
@@ -161,8 +161,10 @@ indicateur_for_graph <- mes_especes_rapport %>%
   #   strip.position = "top",
   #   labeller = labeller(indicateur = indicateur_labels)
   # ) +
-  geom_point(shape = 21, size = 2) +
-  geom_line(linetype = 3, linewidth = 0.5) +
+  geom_point(alpha = 0.7, size = 3, aes(color = indicateur), show.legend = F) +
+
+  # geom_point(shape = 21, size = 2) +
+  geom_line(linetype = 3, linewidth = 0.5, aes(color = indicateur), show.legend = F) +
   labs(
     # title = "Indicateurs de tendances à l'échelle régionale des espèces de poissons d'eau douce de BFC",
     x = "Années", y = "Valeur indicateur") +
@@ -178,7 +180,6 @@ indicateur_for_graph <- mes_especes_rapport %>%
         panel.grid.minor = element_line(color = "white"),
         axis.text.x = element_text(angle = 45),
         strip.text = element_text(size = 12)
-
   ) 
 
 print(indicateur_for_graph)
