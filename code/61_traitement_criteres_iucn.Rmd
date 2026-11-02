@@ -39,7 +39,8 @@ library(scales)
 ```{r chargement des données}
 load(file = "../processed_data/assemblage_tab_par_ope.rda")
 load(file = "../processed_data/calcul_indicateurs_regionaux.rda")
-load(file = "../processed_data/resultats_modele.rda")
+load(file = "../processed_data/resultats_modele_glmm.rda")
+load(file = "../processed_data/resultats_modele_gamm.rda")
 ```
 
 # Chargement excel "selection_taxon_lrr"
@@ -183,10 +184,13 @@ mes_especes <- c("ABL", "ANG", "BAF", "BLN", "BRB", "BRE", "BRO", "CCO", "CHA", 
 #   mutate(pourcentage_evo = ((valeur_predite_fin - valeur_predite_debut) / valeur_predite_debut) * 100)
 ```
 
+
 ```{r}
-# Correctiond des espèces qui finalement sont en DD !
-df_zip_glmm_resultats_cor <- df_zip_glmm_resultats %>% 
-  filter(esp_code_alternatif %in% mes_especes)
+# Renommer les noms des colonnes
+df_zip_glmm_resultats_cor <- df_zip_glmm_resultats %>%
+  janitor::clean_names() %>%
+  # Correction des espèces qui finalement sont en DD !
+  filter(code_espece %in% mes_especes)
 ```
 
 
@@ -194,11 +198,11 @@ df_zip_glmm_resultats_cor <- df_zip_glmm_resultats %>%
 # Déterminer le statut des espèces
 statut_pourcentage_evo <- df_zip_glmm_resultats_cor %>%
   mutate(statut_espece_lrr_2025 = case_when(
-    is.nan(rate_change) ~ "NaN",
-    rate_change <= -80 ~ "CR",
-    (rate_change <= -50 & rate_change > -80) ~ "EN",
-    (rate_change <= -30 & rate_change > -50) ~ "VU",
-    (rate_change <= -20 & rate_change > -30) ~ "NT",
+    is.nan(taux_de_changement) ~ "NaN",
+    taux_de_changement <= -80 ~ "CR",
+    (taux_de_changement <= -50 & taux_de_changement > -80) ~ "EN",
+    (taux_de_changement <= -30 & taux_de_changement > -50) ~ "VU",
+    (taux_de_changement <= -20 & taux_de_changement > -30) ~ "NT",
     TRUE ~ "LC"  # Si aucune condition n'est satisfaite, le statut est "préoccupation mineure"
   ))
 ```
@@ -206,8 +210,8 @@ statut_pourcentage_evo <- df_zip_glmm_resultats_cor %>%
 ```{r}
 # Sélectionner les colonnes d'intérêt
 glmm_indicateur_critere_A2b_tab <- statut_pourcentage_evo %>%
-  select(esp_code_alternatif, 
-         rate_change, 
+  select(code_espece, 
+         taux_de_changement, 
          statut_espece_lrr_2025) %>%
   unique()
 ```
@@ -224,7 +228,8 @@ glmm_indicateur_critere_A2b_tab %>%
 ```{r}
 load(file = "../processed_data/liste_especes_lrr.rda")
 
-table_liste_bfc_sp_cor <- table_liste_bfc_sp_cor %>% 
+table_liste_bfc_sp_cor <- table_liste_bfc_sp_cor %>%
+  # rows_update()
   janitor::clean_names() 
 ```
 
@@ -250,11 +255,11 @@ table_liste_bfc <- table_liste_bfc_sp_cor %>%
 
 ```{r}
 liste_rouge_prelim <- table_liste_bfc %>% 
-  rename(esp_code_alternatif =code_espece) %>% 
-  left_join(glmm_indicateur_critere_A2b_tab, by = "esp_code_alternatif") %>% 
+  left_join(glmm_indicateur_critere_A2b_tab, by = "code_espece") %>% 
   mutate(statut_espece_lrr_2025 = if_else(statut == "allochtone", " ", statut_espece_lrr_2025), 
     statut_espece_lrr_2025 = if_else(is.na(statut_espece_lrr_2025), "NA",statut_espece_lrr_2025), 
     statut_espece_lrr_2025 = factor(statut_espece_lrr_2025, levels = c("CR", "EN", "VU","NT", "LC", "DD", "NA", " "))) %>% 
+  filter(statut == "autochtone") %>% 
   arrange(statut_espece_lrr_2025)
    
 # Définir les couleurs pour chaque zone
@@ -276,21 +281,21 @@ liste_rouge_prelim_brouillon <- liste_rouge_prelim %>%
     ordre,
     nom_scientifique,
     nom_vernaculaire,
-    esp_code_alternatif,
-    statut,
-    rate_change,
+    code_espece,
+    # statut,
+    # taux_de_changement,
     statut_espece_lrr_2025,
-    lrr_france_2019
+    # lrr_france_2019
   ) %>%
   rename(
     'Ordre' = ordre,
     'Nom scientifique' = nom_scientifique,
     'Nom vernaculaire' = nom_vernaculaire,
-    'Code espèce' = esp_code_alternatif,
-    'Statut' = statut,
-    "Taux d'évolution" = rate_change,
+    'Code espèce' = code_espece,
+    # 'Statut' = statut,
+    # "Taux d'évolution" = rate_change,
     'LRR BFC 2026' = statut_espece_lrr_2025,
-    'LRR France 2019' = lrr_france_2019
+    # 'LRR France 2019' = lrr_france_2019
   ) %>% 
 flextable::flextable() %>%
   flextable::autofit() %>%
@@ -317,26 +322,26 @@ flextable::flextable() %>%
   flextable::italic(j = "Nom scientifique", italic = TRUE, part = "body") %>% 
   flextable::font(fontname = "calibri", part = "all") %>% 
   # flextable::bg(part = "all", bg = "white") %>%
-  flextable::bg(j = 'LRR France 2019',i = which(liste_rouge_prelim$lrr_france_2019 == "CR"),
-                bg = color_CR) %>%
-  flextable::bg(j = 'LRR France 2019',i = which(liste_rouge_prelim$lrr_france_2019 == "EN"),
-                bg = color_EN) %>%
-  flextable::bg(j = 'LRR France 2019',i = which(liste_rouge_prelim$lrr_france_2019 == "VU"),
-                bg = color_VU) %>%
-  flextable::bg(j = 'LRR France 2019',i = which(liste_rouge_prelim$lrr_france_2019 == "NT"),
-                bg = color_NT) %>%
-  flextable::bg(j = 'LRR France 2019',i = which(liste_rouge_prelim$lrr_france_2019 == "LC"),
-                bg = color_LC) %>%
-  flextable::bg(j = 'LRR France 2019',i = which(liste_rouge_prelim$lrr_france_2019 == "DD"),
-                bg = color_DD) %>%
-  flextable::bg(j = 'LRR France 2019',i = which(liste_rouge_prelim$lrr_france_2019 == "NA"),
-                bg = color_NA) %>% 
+  # flextable::bg(j = 'LRR France 2019',i = which(liste_rouge_prelim$lrr_france_2019 == "CR"),
+  #               bg = color_CR) %>%
+  # flextable::bg(j = 'LRR France 2019',i = which(liste_rouge_prelim$lrr_france_2019 == "EN"),
+  #               bg = color_EN) %>%
+  # flextable::bg(j = 'LRR France 2019',i = which(liste_rouge_prelim$lrr_france_2019 == "VU"),
+  #               bg = color_VU) %>%
+  # flextable::bg(j = 'LRR France 2019',i = which(liste_rouge_prelim$lrr_france_2019 == "NT"),
+  #               bg = color_NT) %>%
+  # flextable::bg(j = 'LRR France 2019',i = which(liste_rouge_prelim$lrr_france_2019 == "LC"),
+  #               bg = color_LC) %>%
+  # flextable::bg(j = 'LRR France 2019',i = which(liste_rouge_prelim$lrr_france_2019 == "DD"),
+  #               bg = color_DD) %>%
+  # flextable::bg(j = 'LRR France 2019',i = which(liste_rouge_prelim$lrr_france_2019 == "NA"),
+  #               bg = color_NA) %>% 
  flextable::fontsize(size = 16, part = "all") %>% 
     flextable::padding(padding = 5, part = "all") 
 
 
 liste_rouge_prelim_brouillon
-liste_rouge_prelim_brouillon <- flextable::save_as_image(liste_rouge_prelim_brouillon, "../output/lrr_bfc_2026.png")
+# liste_rouge_prelim_brouillon <- flextable::save_as_image(liste_rouge_prelim_brouillon, "../output/lrr_bfc_2026.png")
 
 ```
 
@@ -344,6 +349,83 @@ liste_rouge_prelim_brouillon <- flextable::save_as_image(liste_rouge_prelim_brou
 liste_rouge_prelim_brouillon <- flextable::save_as_image(liste_rouge_prelim_brouillon, "../output/liste_rouge_prelim.png")
 ```
 
+## Création d'un diagramme circulaire des catégories liste rouge
+```{r}
+
+
+# Définir les couleurs pour chaque zone
+color_EX <- "#000000" # R 0 / V 0 / B 0
+color_EW <- "#3D1951" # R 61 / V 25 / B 81
+color_RE <- "#5A1A63" # R 90 / V 26 / B 99
+color_CR <- "#D3001B" # R 211 / V 0 / B 27
+color_EN <- "#FBBF00" # R 251 / V 191 / B 0
+color_VU <- "#FFED00" # R 255 / V 237 / B 0
+color_NT <- "#FBF2CA" # R 251 / V 242 / B 202
+color_LC <- "#78B74A" # R 120 / V 183 / B 74
+color_DD <- "#D3D4D5" # R 211 / V 212 / B 213
+color_NA <- "#D3D4D5" # R 211 / V 212 / B 213
+
+
+tab_diag_lrr <- liste_rouge_prelim %>%
+  mutate(
+    statut_espece_lrr_2025 = if_else(statut_espece_lrr_2025 == "NA", "DD", statut_espece_lrr_2025)
+  ) %>%
+  filter(!statut_espece_lrr_2025 == " ") %>%
+  count(statut_espece_lrr_2025) %>%
+  mutate (
+    statut_espece_lrr_2025 = case_when(
+      statut_espece_lrr_2025 == "CR" ~ "CR : En Danger critique",
+      statut_espece_lrr_2025 == "EN" ~ "EN : En danger",
+      statut_espece_lrr_2025 == "VU" ~ "VU : Vulnérable",
+      statut_espece_lrr_2025 == "NT" ~ "NT : Quasi menacée",
+      statut_espece_lrr_2025 == "LC" ~ "LC : Préoccupation mineure",
+      statut_espece_lrr_2025 == "DD" ~ "DD : Données insuffisantes",
+      TRUE ~ statut_espece_lrr_2025
+    )
+  ) %>% 
+  mutate(statut_espece_lrr_2025 = factor(
+    statut_espece_lrr_2025,
+    levels = c("CR : En Danger critique", "EN : En danger", "VU : Vulnérable", "NT : Quasi menacée", "LC : Préoccupation mineure", "DD : Données insuffisantes", "NA")
+  )) %>%
+  arrange(statut_espece_lrr_2025) %>%
+  mutate(
+    pct = round(n / sum(n) * 100),
+    pos = sum(n) - (cumsum(n) - 0.5 * n),
+    lab_col = if_else(
+      statut_espece_lrr_2025 %in% c("LC : Préoccupation mineure", "CR : En Danger critique", "NA"),
+      "white",
+      "grey15"
+    ))
+
+
+diag <- tab_diag_lrr %>%
+  ggplot(mapping = aes(x = "", y = n, fill = statut_espece_lrr_2025)) +
+  geom_col(width = 1, color = "white") +
+  coord_polar("y", start = 0) +
+  geom_text(aes(
+    y = pos,
+    label = paste0(pct, "%"),
+    colour = lab_col
+  ),
+  fontface = "bold",
+  size = 4) +
+  scale_fill_manual(
+    name = "Catégorie liste rouge",
+    values = c(
+      "CR : En Danger critique" = color_CR,
+      "EN : En danger" = color_EN,
+      "VU : Vulnérable" = color_VU,
+      "NT : Quasi menacée" = color_NT,
+      "LC : Préoccupation mineure" = color_LC,
+      "DD : Données insuffisantes" = color_DD,
+      "NA" = "#faffff"
+    )
+  ) +  scale_colour_identity() +
+  theme_void( paper = "White") 
+
+diag
+ggsave( "../output/diagramme_circulaire_lrr.png", dpi = 300)
+```
 
 
 ## Pour mon rapport, je ne sélectionne que les résultats qui sont significatifs avec les modèles GLMM :

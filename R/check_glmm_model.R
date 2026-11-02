@@ -91,7 +91,7 @@ check_glmm_model <- function (data, mon_espece, indicateur, family, link, ...){
       )
     )
   ## b) homoscédasticité/Absence de sur-dispersion des résidus
-  disp <- overdisp.glmer(model)
+  disp <- DHARMa::testDispersion()
   
   # Condition 3 : si GLMM ou LMM lme4 Loi normale
   if (family == "gaussian")
