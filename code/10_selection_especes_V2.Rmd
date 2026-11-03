@@ -123,6 +123,7 @@ Pour pouvoir ajouter les libéllés de nom d'espèces au jeu de donnée de base 
 
 
 On importe également une liste d'espèces réalisé par l'OFB en 2016 avec les statut d'autochtonie qu'on appelera **liste_esp_bfc**. 
+
 ```{r importer liste espèce BFC}
 liste_esp_bfc <- readxl::read_xlsx("../raw_data/espèces de poisson BFC.xlsx") %>%
   rename(esp_code_alternatif = "Code espèce") %>%
@@ -245,7 +246,7 @@ esp_effectif <- ope_esp_densite %>% # Calcul de l'effectif total pour chaque esp
 ggplot(esp_effectif,
        aes(x = esp_code_alternatif, y = effectif_total, fill = effectif_total)) +
   geom_col() +
-  scale_fill_gradient(low = "darkseagreen3", high = "darkseagreen4") +
+  scale_fill_distiller(name = "Effectif total par espèce") +
   scale_y_log10(
     name = "Effectif total (échelle log10)",
     breaks = c(1, 10, 100, 1000),

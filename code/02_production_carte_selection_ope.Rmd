@@ -152,6 +152,6 @@ carte_finale
 Nous enregistrons la carte finale sous format .png.
 
 ```{r Enregistrement carte finale}
-ggsave(filename = "../assets/carte_selection_stations.png", 
-       plot = carte_finale, width = 10, height = 8, dpi = 300) # Enregistrer l'image
+# ggsave(filename = "../processed_data/carte_selection_stations.png", 
+#        plot = carte_finale, width = 10, height = 8, dpi = 300) # Enregistrer l'image
 ```

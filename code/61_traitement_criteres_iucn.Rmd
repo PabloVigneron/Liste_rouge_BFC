@@ -41,6 +41,7 @@ load(file = "../processed_data/assemblage_tab_par_ope.rda")
 load(file = "../processed_data/calcul_indicateurs_regionaux.rda")
 load(file = "../processed_data/resultats_modele_glmm.rda")
 load(file = "../processed_data/resultats_modele_gamm.rda")
+load(file = "../processed_data/selection_especes.rda")
 ```
 
 # Chargement excel "selection_taxon_lrr"
@@ -210,9 +211,11 @@ statut_pourcentage_evo <- df_zip_glmm_resultats_cor %>%
 ```{r}
 # Sélectionner les colonnes d'intérêt
 glmm_indicateur_critere_A2b_tab <- statut_pourcentage_evo %>%
-  select(code_espece, 
+  mutate(criteres = "A2b") %>% 
+  select(esp_code_alternatif = code_espece, 
          taux_de_changement, 
-         statut_espece_lrr_2025) %>%
+         statut_espece_lrr_2025, 
+         criteres) %>%
   unique()
 ```
 
@@ -226,41 +229,44 @@ glmm_indicateur_critere_A2b_tab %>%
 ## Liste rouge préliminaire 
 
 ```{r}
-load(file = "../processed_data/liste_especes_lrr.rda")
-
-table_liste_bfc_sp_cor <- table_liste_bfc_sp_cor %>%
-  # rows_update()
-  janitor::clean_names() 
-```
-
-```{r}
 #Selection des nom vernaculaire : 1 seul
-liste_nom_esp <- readxl::read_xlsx("../processed_data/taille_de_maturite_synthese.xlsx",sheet = 1) %>% janitor::clean_names() %>% 
-  select(nom_vernaculaire, code_espece)
+# liste_nom_esp <- readxl::read_xlsx("../processed_data/taille_de_maturite_synthese.xlsx",sheet = 1) %>% janitor::clean_names() %>% 
+#   select(nom_vernaculaire, code_espece)
 ```
 
 
 ```{r}
-table_liste_bfc <- table_liste_bfc_sp_cor %>% 
-  left_join(liste_nom_esp, by = "code_espece") %>% 
-  select(ordre, 
-         nom_scientifique, 
-         nom_vernaculaire, 
-         code_espece, 
-         statut, 
-         lrr_france_2019
-         ) 
+# table_liste_bfc <- table_liste_bfc_sp_cor %>% 
+#   left_join(liste_nom_esp, by = "code_espece") %>% 
+#   select(ordre, 
+#          nom_scientifique, 
+#          nom_vernaculaire, 
+#          code_espece, 
+#          statut, 
+#          lrr_france_2019
+#          ) 
 ```
 
 
 ```{r}
-liste_rouge_prelim <- table_liste_bfc %>% 
-  left_join(glmm_indicateur_critere_A2b_tab, by = "code_espece") %>% 
-  mutate(statut_espece_lrr_2025 = if_else(statut == "allochtone", " ", statut_espece_lrr_2025), 
+liste_rouge_prelim <- liste_rouge %>% 
+  left_join(glmm_indicateur_critere_A2b_tab,by = "esp_code_alternatif") %>% 
+  mutate(statut_espece_lrr_2025 = if_else(autochtonie == "allochtone", " ", statut_espece_lrr_2025), 
     statut_espece_lrr_2025 = if_else(is.na(statut_espece_lrr_2025), "NA",statut_espece_lrr_2025), 
     statut_espece_lrr_2025 = factor(statut_espece_lrr_2025, levels = c("CR", "EN", "VU","NT", "LC", "DD", "NA", " "))) %>% 
-  filter(statut == "autochtone") %>% 
-  arrange(statut_espece_lrr_2025)
+  filter(autochtonie == "autochtone") %>% 
+  arrange(statut_espece_lrr_2025) %>% 
+  select(
+    ordre,
+    esp_nom_complet,
+    esp_nom_commun,
+    esp_code_alternatif,
+    # autochronie,
+    # taux_de_changement,
+    statut_espece_lrr_2025,
+    criteres,
+    categorie_lr_france_2019
+  ) 
    
 # Définir les couleurs pour chaque zone
 color_EX <- "#000000" # R 0 / V 0 / B 0
@@ -276,30 +282,23 @@ color_NA <- "#D3D4D5" # R 211 / V 212 / B 213
 
 col_1_7 <- c('Ordre' ,'Nom scientifique','Nom vernaculaire','Code espèce' , 'Statut' , "Taux d'évolution" , 'LRR BFC 2026')
 
-liste_rouge_prelim_brouillon <- liste_rouge_prelim %>%
-  select(
-    ordre,
-    nom_scientifique,
-    nom_vernaculaire,
-    code_espece,
-    # statut,
-    # taux_de_changement,
-    statut_espece_lrr_2025,
-    # lrr_france_2019
-  ) %>%
+
+```
+
+```{r}
+flextable_liste_rouge_prelim <- liste_rouge_prelim %>%
   rename(
     'Ordre' = ordre,
-    'Nom scientifique' = nom_scientifique,
-    'Nom vernaculaire' = nom_vernaculaire,
-    'Code espèce' = code_espece,
-    # 'Statut' = statut,
-    # "Taux d'évolution" = rate_change,
-    'LRR BFC 2026' = statut_espece_lrr_2025,
-    # 'LRR France 2019' = lrr_france_2019
-  ) %>% 
-flextable::flextable() %>%
+    'Nom scientifique' = esp_nom_complet,
+    'Nom vernaculaire' = esp_nom_commun,
+    'Code espèce' = esp_code_alternatif,
+    'Catégorie Liste rouge régionale BFC' = statut_espece_lrr_2025,
+    'Critères' = criteres,
+    'Catégorie Liste rouge france' = categorie_lr_france_2019
+  ) %>%
+  flextable::flextable() %>%
   flextable::autofit() %>%
-  flextable::colformat_int(j = c(1, 3), big.mark = " ") %>%
+  # flextable::colformat_int(j = c(1, 3), big.mark = " ") %>%
   flextable::theme_booktabs() %>%
   flextable::font(fontname = "calibri") %>%
   flextable::fontsize(size = 13) %>%
@@ -318,32 +317,26 @@ flextable::flextable() %>%
                 bg = color_DD) %>%
   flextable::bg(i = which(liste_rouge_prelim$statut_espece_lrr_2025 == "NA"),
                 bg = color_NA) %>%
+  flextable::bg(j = "Catégorie Liste rouge france", part = "all", bg = "white") %>%
+  flextable::bg(part = "header", bg = "grey87") %>%
   flextable::align(align = "center", part = "all") %>%
-  flextable::italic(j = "Nom scientifique", italic = TRUE, part = "body") %>% 
-  flextable::font(fontname = "calibri", part = "all") %>% 
-  # flextable::bg(part = "all", bg = "white") %>%
-  # flextable::bg(j = 'LRR France 2019',i = which(liste_rouge_prelim$lrr_france_2019 == "CR"),
-  #               bg = color_CR) %>%
-  # flextable::bg(j = 'LRR France 2019',i = which(liste_rouge_prelim$lrr_france_2019 == "EN"),
-  #               bg = color_EN) %>%
-  # flextable::bg(j = 'LRR France 2019',i = which(liste_rouge_prelim$lrr_france_2019 == "VU"),
-  #               bg = color_VU) %>%
-  # flextable::bg(j = 'LRR France 2019',i = which(liste_rouge_prelim$lrr_france_2019 == "NT"),
-  #               bg = color_NT) %>%
-  # flextable::bg(j = 'LRR France 2019',i = which(liste_rouge_prelim$lrr_france_2019 == "LC"),
-  #               bg = color_LC) %>%
-  # flextable::bg(j = 'LRR France 2019',i = which(liste_rouge_prelim$lrr_france_2019 == "DD"),
-  #               bg = color_DD) %>%
-  # flextable::bg(j = 'LRR France 2019',i = which(liste_rouge_prelim$lrr_france_2019 == "NA"),
-  #               bg = color_NA) %>% 
- flextable::fontsize(size = 16, part = "all") %>% 
-    flextable::padding(padding = 5, part = "all") 
+  flextable::align(j = 1:3, align = "left", part = "all") %>%
+  flextable::italic(j = "Nom scientifique", italic = TRUE, part = "body") %>%
+  flextable::font(fontname = "calibri", part = "all") %>%
+  flextable::fontsize(size = 12, part = "all") %>%
+  flextable::bold(bold = T, part = "header") %>%
+  flextable::padding(padding = 4, part = "all") 
+  # flextable::vline(j = 6:7, part = "body")
 
 
-liste_rouge_prelim_brouillon
-# liste_rouge_prelim_brouillon <- flextable::save_as_image(liste_rouge_prelim_brouillon, "../output/lrr_bfc_2026.png")
+flextable_liste_rouge_prelim
+# flextable_liste_rouge_prelim <- flextable::save_as_image(flextable_liste_rouge_prelim, "../output/lrr_bfc_2026.png")
 
 ```
+
+
+
+
 
 ```{r}
 liste_rouge_prelim_brouillon <- flextable::save_as_image(liste_rouge_prelim_brouillon, "../output/liste_rouge_prelim.png")
