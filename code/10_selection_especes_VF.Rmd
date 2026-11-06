@@ -528,27 +528,25 @@ mes_especes <- c("ABL","ANG","BAF","BLN","BRB", "BRE","BRO","CCO","CHA","CHE", "
 
 Avant de filter le df **esp_ope_selection** on enregistre le df avec toute les espèces qui pourra nous être utile au besoin.  
 ```{r}
-esp_ope_selection_all <- esp_ope_selection
+# esp_ope_selection_all <- esp_ope_selection
 ```
 
 
 ```{r Filtrage espèce esp_ope_selection}
-esp_ope_selection <- esp_ope_selection %>% 
-  filter(autochtonie == "autochtone") %>%
-  filter(esp_code_alternatif %in% mes_especes)
+# esp_ope_selection <- esp_ope_selection %>% 
+#   filter(autochtonie == "autochtone") %>%
+#   filter(esp_code_alternatif %in% mes_especes)
 ```
 
-```{r}
-table(esp_ope_selection$esp_code_alternatif)
-```
+
 ```{r Filtrage espèce tab_occurence}
-tab_occurrence_esp <- tab_occurrence %>% 
-  filter(esp_code_alternatif%in% mes_especes)
+# tab_occurrence_esp <- tab_occurrence %>% 
+#   filter(esp_code_alternatif%in% mes_especes)
 ```
 
 ```{r}
-ope_esp_densite_cal <- ope_esp_densite_cal %>% 
-  filter(esp_code_alternatif%in% mes_especes)
+# ope_esp_densite_cal <- ope_esp_densite_cal %>% 
+#   filter(esp_code_alternatif%in% mes_especes)
 ```
 
 
@@ -619,17 +617,17 @@ ope_esp_densite_cal <- ope_esp_densite_cal %>%
 Sauvegarde pour le script suivant : script 20_pre_traitements_donnees_ope_especes.
 
 ```{r Sauvegarde}
-save(
-  # passerelle,
-  especes_lrr_2014,
-  mes_especes,
-  # esp_ope_selection,
-esp_ope_selection_all,
-  # ope_esp_densite_cal,
-  # tab_occurrence_esp,
-  liste_rouge,
-  file = "../processed_data/selection_especes.rda"
-)
+# save(
+#   passerelle,
+#   especes_lrr_2014,
+#   mes_especes,
+#   esp_ope_selection,
+#   # esp_ope_selection_all,
+#   ope_esp_densite_cal,
+#   tab_occurrence_esp,
+#   liste_rouge,
+#   file = "../processed_data/selection_especes.rda"
+# )
 ```
 
 

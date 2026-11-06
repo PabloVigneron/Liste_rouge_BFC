@@ -162,6 +162,19 @@ mes_especes <- c("ABL","ANG","BAF","BLN","BRB", "BRE","BRO","CCO","CHA","CHE", "
 robustesse_modele <- adequate_data_for_model(ope_effectif_glmm_abs, esp = mes_especes)
 robustesse_modele
 ```
+
+Définition des espèces dites "Données déficientes" DD 
+
+```{r}
+mes_especes_dd <- robustesse_modele %>% 
+  filter(statut == "INSUFFISANTE") %>% 
+  select(espece)
+mes_especes_dd
+```
+
+
+
+
 ### Creation d'un tableau 
 
 
@@ -173,7 +186,6 @@ graph <- check_glmm_model(
   link = "log",
   n_sim = 1000)
 ```
-
 
 
 
@@ -745,6 +757,7 @@ tab_res_glmm_gamm_esp <- flextable::save_as_image(tab_res_glmm_gamm_esp, "../out
 
 ```{r Sauvegarde}
 # save(
+#   mes_especes_dd
 #   zip_glmm_resultats,
 #   df_zip_glmm_resultats,
 #   glmm_resultats,
